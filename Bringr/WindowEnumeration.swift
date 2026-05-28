@@ -43,11 +43,17 @@ struct RawWindow: Equatable, Sendable {
     let isOnscreen: Bool
     let isMinimized: Bool
     let isHidden: Bool
+    /// Whether the owning app's AX window list contains this number — i.e. Bringr can raise/
+    /// focus it (Bringr-93j.52). Off-screen records the broadened query surfaces that aren't
+    /// AX-backed are phantom helper surfaces (Chrome/Ghostty keep them) you can't focus, so
+    /// they're dropped. Defaults true (on-screen windows are real), so fixtures needn't set it.
+    let isAXBacked: Bool
 
     init(
         windowNumber: Int, ownerPID: pid_t, ownerName: String, title: String,
         layer: Int, alpha: Double, bounds: CGRect,
-        isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false
+        isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false,
+        isAXBacked: Bool = true
     ) {
         self.windowNumber = windowNumber
         self.ownerPID = ownerPID
@@ -59,15 +65,17 @@ struct RawWindow: Equatable, Sendable {
         self.isOnscreen = isOnscreen
         self.isMinimized = isMinimized
         self.isHidden = isHidden
+        self.isAXBacked = isAXBacked
     }
 
-    /// A copy carrying the per-window minimized/hidden classification the live source
-    /// resolves after the raw list is parsed (Bringr-93j.50).
-    func classified(isMinimized: Bool, isHidden: Bool) -> RawWindow {
+    /// A copy carrying the per-window minimized/hidden/AX-backed classification the live
+    /// source resolves after the raw list is parsed (Bringr-93j.50 / Bringr-93j.52).
+    func classified(isMinimized: Bool, isHidden: Bool, isAXBacked: Bool) -> RawWindow {
         RawWindow(
             windowNumber: windowNumber, ownerPID: ownerPID, ownerName: ownerName, title: title,
             layer: layer, alpha: alpha, bounds: bounds,
-            isOnscreen: isOnscreen, isMinimized: isMinimized, isHidden: isHidden
+            isOnscreen: isOnscreen, isMinimized: isMinimized, isHidden: isHidden,
+            isAXBacked: isAXBacked
         )
     }
 }
@@ -183,15 +191,18 @@ final class WindowEnumerator {
     }
 
     /// Whether to keep a (normal) window given the broadening flags (Bringr-93j.50). An
-    /// on-screen window is always kept (the default set). An off-screen one is classified by
-    /// precedence — a hidden app's windows count as hidden even if also minimized, since
-    /// `includeHidden` is meant to bring a whole hidden app back — then kept only if the
-    /// matching flag is on; anything left (off-Space) rides on `allSpaces`. With every flag
-    /// off the source returned only on-screen windows, so this keeps them all unchanged.
+    /// on-screen window is always kept (the default set). An off-screen record with no AX
+    /// window is a phantom helper surface Bringr can't focus, so it is dropped regardless of
+    /// flags (Bringr-93j.52). The rest are classified by precedence — a hidden app's windows
+    /// count as hidden even if also minimized, since `includeHidden` is meant to bring a whole
+    /// hidden app back — then kept only if the matching flag is on; anything left (off-Space)
+    /// rides on `allSpaces`. With every flag off the source returned only on-screen windows
+    /// (all AX-backed by default), so this keeps them all unchanged.
     private func shouldCollect(
         _ window: RawWindow, allSpaces: Bool, includeMinimized: Bool, includeHidden: Bool
     ) -> Bool {
         if window.isOnscreen { return true }
+        if !window.isAXBacked { return false }
         if window.isHidden { return includeHidden }
         if window.isMinimized { return includeMinimized }
         return allSpaces
@@ -315,25 +326,27 @@ final class CGWindowSource: WindowEnumerationSource {
         return includingOffscreen ? classify(raws) : raws
     }
 
-    /// Stamp each broadened record with its minimized/hidden state so the enumerator's
-    /// keep-rule can split off-Space from minimized from hidden. Minimized state comes from
-    /// each app's AX windows (which include minimized ones, and expose the stable window
-    /// number); hidden state is the app's `NSRunningApplication.isHidden`. Done once per
-    /// summon, only when broadened, so the cheap default never pays the AX cost.
+    /// Stamp each broadened record with its minimized/hidden/AX-backed state so the keep-rule
+    /// can split off-Space from minimized from hidden and drop phantoms (Bringr-93j.52): each
+    /// app's AX windows yield the minimized set and the set of controllable window numbers — a
+    /// broadened record whose number is absent from the latter is a phantom. Hidden via `isHidden`.
     private func classify(_ raws: [RawWindow]) -> [RawWindow] {
         var minimizedNumbers: Set<Int> = []
         var hiddenPIDs: Set<pid_t> = []
+        var axNumbers: Set<Int> = []
         for pid in Set(raws.map(\.ownerPID)) {
             let app = AppID(pid: pid)
             if stateProbe.isHidden(app) { hiddenPIDs.insert(pid) }
-            for window in stateProbe.windows(of: app) where stateProbe.isMinimized(window) {
-                minimizedNumbers.insert(window.token)
+            for window in stateProbe.windows(of: app) {
+                axNumbers.insert(window.token)
+                if stateProbe.isMinimized(window) { minimizedNumbers.insert(window.token) }
             }
         }
         return raws.map {
             $0.classified(
                 isMinimized: minimizedNumbers.contains($0.windowNumber),
-                isHidden: hiddenPIDs.contains($0.ownerPID)
+                isHidden: hiddenPIDs.contains($0.ownerPID),
+                isAXBacked: axNumbers.contains($0.windowNumber)
             )
         }
     }

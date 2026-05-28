@@ -178,6 +178,42 @@ final class WindowEnumeratorVisibilityTests: XCTestCase {
         _ = WindowEnumerator(source: hidden).enumerate(includeHidden: true)
         XCTAssertEqual(hidden.lastIncludedOffscreen, true)
     }
+
+    func testPhantomOffScreenWindowWithoutAXBackingIsDropped() {
+        // Bringr-93j.52: the broadened query surfaces a record with no matching AX window
+        // (Chrome/Ghostty keep such background surfaces) — selecting it can't focus anything,
+        // so it must not appear even with every broadening flag on. A real off-Space window
+        // (AX-backed) is still kept, so the feature isn't gutted.
+        let source = FakeWindowEnumerationSource(
+            selfPID: selfPID,
+            windows: [raw(number: 1, pid: 10, name: "Chrome")],
+            offscreenWindows: [
+                raw(number: 1, pid: 10, name: "Chrome"),
+                raw(number: 2, pid: 10, name: "Chrome", isOnscreen: false, isAXBacked: false),
+                raw(number: 3, pid: 20, name: "Mail", isOnscreen: false)
+            ]
+        )
+
+        let apps = WindowEnumerator(source: source)
+            .enumerate(allSpaces: true, includeMinimized: true, includeHidden: true)
+        XCTAssertEqual(apps.map(\.name), ["Chrome", "Mail"])
+        XCTAssertEqual(apps[0].windows.map(\.id.token), [1])
+    }
+
+    func testOnscreenWindowKeptEvenWhenNotAXBacked() {
+        // The AX-backing drop applies only to the off-screen records broadening adds; an
+        // on-screen record is always real and is kept (the keep-rule checks onscreen first).
+        let source = FakeWindowEnumerationSource(
+            selfPID: selfPID,
+            windows: [raw(number: 1, pid: 10, name: "Chrome")],
+            offscreenWindows: [raw(number: 1, pid: 10, name: "Chrome", isAXBacked: false)]
+        )
+
+        XCTAssertEqual(
+            WindowEnumerator(source: source).enumerate(allSpaces: true).map(\.name),
+            ["Chrome"]
+        )
+    }
 }
 
 /// Shared fixture builder for both classes in this file. `isOnscreen` defaults to a plain
@@ -187,7 +223,8 @@ final class WindowEnumeratorVisibilityTests: XCTestCase {
 private func raw(
     number: Int, pid: pid_t, name: String,
     x: CGFloat = 0, y: CGFloat = 0, width: CGFloat = 800, height: CGFloat = 600,
-    isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false
+    isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false,
+    isAXBacked: Bool = true
 ) -> RawWindow {
     RawWindow(
         windowNumber: number,
@@ -199,6 +236,7 @@ private func raw(
         bounds: CGRect(x: x, y: y, width: width, height: height),
         isOnscreen: isOnscreen,
         isMinimized: isMinimized,
-        isHidden: isHidden
+        isHidden: isHidden,
+        isAXBacked: isAXBacked
     )
 }
