@@ -50,6 +50,14 @@ after each iteration and it's included in prompts for context.
 - **Titles are best-effort in v1:** `kCGWindowName` needs Screen Recording permission (a non-goal), so titles are usually empty under Accessibility-only; `WindowEnumerator.title(for:index:)` falls back to `"Window N"` (US-006 permits index labels). Real titles are a clean later enrichment: fill `RawWindow.title` from AX in the live layer — model/consumers don't change.
 - **Timing (AC4):** `WindowEnumerator.lastDuration` (+ os_log) records each `enumerate()` call. Measured live ~0.7 ms for 8 apps (CoreGraphics path), far under the 16 ms summon budget. Spaces caveat: `.optionOnScreenOnly` returns only the current Space's windows — apps with windows only on other Spaces won't appear (acceptable for v1 "live state at summon"; ties to the PRD multi-monitor/Spaces open question).
 
+### Data-driven menu tree (the US-005 pattern)
+- **Generic model in `MenuModel.swift`; the v1 menu is one conformer.** `MenuNode` (Identifiable struct) nests to any depth via `children: MenuChildren`, which is `.static([MenuNode])` OR `.dynamic(@MainActor () -> [MenuNode])`. `resolvedChildren()` (`@MainActor`) runs the provider — that's the seam that makes the wheel live. The closure is `@MainActor` because it captures the `@MainActor WindowEnumerator`; storing a `@MainActor` closure in an enum case is fine, you just resolve on the main actor (tests are `@MainActor`).
+- **No singleton = value-type nodes + a registry that builds fresh.** `MenuRegistry` holds `[MenuTrigger: any MenuDefinition]`; `makeMenu(for:)` calls `definition.makeRoot()` each summon → a brand-new tree. `MenuDefinition` is a `@MainActor protocol` with one method `makeRoot()`; future menus (URL/file) are new conformers, registered under a trigger, zero changes to existing code. Decouple trigger from definition (`register(_:for:)`) so ONE definition answers BOTH v1 triggers.
+- **`MenuAction` is a plain enum** (`.expand`, `.focusWindow(WindowID)`); "open for extension" = add a case (+ its executor, a later story). No protocol/existential — that would over-engineer v1, and there's no action executor yet to break with a new case.
+- **Building apps→windows from the enumerator:** root children = `.dynamic { enumerator.enumerate().map(appNode) }`; each app node's children = `.dynamic { enumerator.enumerate().first { $0.id == appID }?.windows ... }` — re-queries live state on hover (genuinely dynamic, matches "rebuilds the sub-wheel"), not a captured snapshot. Stable node ids: `"root:apps"`, `"app:<pid>"`, `"window:<pid>:<token>"`.
+- **`map` + `@MainActor` static helpers gotcha (recurs here):** pass an *explicit closure* `.map { Self.windowNode($0) }`, NOT the bare function reference `.map(Self.windowNode)` — a `@MainActor` function reference fails to convert to `map`'s non-isolated closure param. Same family as the default-arg `nonisolated` gotcha noted for `PermissionsManager`.
+- **Tests:** the test target's `FakeWindowEnumerationSource` is immutable, so added a mutable `StubEnumerationSource` (`var windows`) to prove a provider re-runs and reflects changes between resolves. To compare `[AppID?]` from `map(\.representedApp)`, annotate the literal: `[AppID(pid: 10)] as [AppID?]`.
+
 ---
 
 ## 2026-05-28 - Bringr-93j.1 (US-001: lint and test tooling)
@@ -89,5 +97,14 @@ after each iteration and it's included in prompts for context.
 - Gates: build SUCCEEDED, swiftlint 0 violations, 25 tests pass (10 new). App launches stably with the new code linked.
 - AC4 live timing: measured the CoreGraphics path standalone at ~0.7 ms for 8 apps (throwaway script, not left in the app) — well under the 16 ms summon budget. No runtime driver yet (no summon until US-006/007), same as US-004; enumeration is wired in when a trigger exists.
 - **Learnings:** see the new "Window enumeration behind a source seam" Codebase Patterns section above — note especially the ⚠️ WindowID token-scheme mismatch with US-004's `LiveWindowSystem` that US-010/011/012 must reconcile.
+---
+
+## 2026-05-28 - Bringr-93j.5 (US-005: Nestable, non-singleton menu model)
+- Added `MenuModel.swift` (app target): `MenuAction` (enum `.expand`/`.focusWindow(WindowID)`, extend by adding cases), `MenuNodeID` (typed string wrapper, stable per subject), `MenuChildren` (`.static([MenuNode])` | `.dynamic(@MainActor () -> [MenuNode])`), `MenuNode` (Identifiable struct, nests via `children`, `resolvedChildren()` runs the provider), `MenuTrigger` (`.mouseChord`/`.threeFingerPress`), `MenuDefinition` (`@MainActor protocol`, `makeRoot()`), `MenuRegistry` (`[MenuTrigger: any MenuDefinition]`, `makeMenu(for:)` builds fresh per summon — no singleton), and `WindowSwitcherMenu` (conformer building apps→windows from `WindowEnumerator`).
+- Added `MenuModelTests.swift` (test target): 9 tests across all 5 ACs — arbitrary depth, static vs dynamic children (provider re-runs each resolve), action carried, registry-by-trigger + one-def-multiple-triggers + fresh-tree-per-summon, and apps→windows tree from enumeration fixtures incl. live re-query on app-node resolve. Added mutable `StubEnumerationSource` (the existing `FakeWindowEnumerationSource` is immutable) to prove dynamism.
+- Files changed: `Bringr/MenuModel.swift` (new), `BringrTests/MenuModelTests.swift` (new), `Bringr.xcodeproj/project.pbxproj` (IDs 0x31–0x34).
+- Gates: build SUCCEEDED, swiftlint 0 violations, 34 tests pass (9 new). App launches stably with the new code linked.
+- Not wired into `AppDelegate` yet — nothing summons a menu until a trigger/overlay (US-006/007/008); avoided an unused stored property, same as US-003/004. The registry + `WindowSwitcherMenu` get wired when a trigger exists.
+- **Learnings:** see the new "Data-driven menu tree (the US-005 pattern)" Codebase Patterns section above.
 ---
 

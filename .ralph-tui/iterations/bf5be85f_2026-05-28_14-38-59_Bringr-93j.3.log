@@ -1,0 +1,99 @@
+# Iteration 4 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.3
+- **Task Title**: US-003: Window enumeration service
+- **Description**: As the menu, I want a service that reports which apps currently have on-screen windows and the windows belonging to each so that the wheel reflects live state at summon time.
+
+## Acceptance Criteria
+-...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T11:38:59.598Z
+- **Ended At**: 2026-05-28T11:47:52.133Z
+- **Duration**: 8m 52s
+- **Input Tokens**: 182
+- **Output Tokens**: 43259
+- **Total Tokens**: 43441
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and existing codebase patterns, then implement the window enumeration service.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+Now let me study the existing code, especially `WindowControl.swift` since US-003's enumeration service will share identity types with it.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m
+Let me read the AppDelegate, PermissionsManager, and an existing test file to understand the patterns.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PermissionsManager.swift[0m
+Now let me read the existing test files to mirror their structure.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowControlTests.swift[0m
+Now let me look at the project file to understand how to wire in new source files, and check the bead status.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Let me check the SwiftLint config and confirm the bead status before writing code.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.swiftlint.yml[0m
+I have enough context. Let me claim the bead and start implementing. First, mark it in progress.
+[94m[Bash][0m Claim bead and show details $ bd show Bringr-93j.3 --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>&1 | head -40
+Bead claimed. Now I'll write the enumeration service.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowEnumeration.swift[0m "import CoreGraphics
+import Foundation
+import os
+
+/// A window discovered at summon time, with the metadata the wheel needs to
+/// render and target it. `id` carries the stable, system-assigned window ... (6717 chars)"
+Now the test file with fixtures.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowEnumerationTests.swift[0m "import XCTest
+@testable import Bringr
+
+@MainActor
+final class WindowEnumerationTests: XCTestCase {
+    private let selfPID: pid_t = 1000
+
+    // MARK: - AC1/AC3: returns apps with normal on-screen win... (5752 chars)"
+The `AppID`/`WindowID` errors are because the new file isn't in the project target yet — SourceKit analyzes it standalone. Wiring it into `project.pbxproj` will resolve that. Let me add both files (IDs 0x2D–0x30).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000002C /* WindowControlTests.s..." → "		1A000000000000000000002C /* WindowControlTests.s..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000002B /* WindowControlTests.s..." → "		1A000000000000000000002B /* WindowControlTests.s..."
+Now the group children — app source into the Bringr group, test into BringrTests group.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000021 /* PermissionsManager..." → "				1A0000000000000000000021 /* PermissionsManager..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000027 /* PermissionsManager..." → "				1A0000000000000000000027 /* PermissionsManager..."
+Now the two Sources build phases.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000022 /* PermissionsManager..." → "				1A0000000000000000000022 /* PermissionsManager..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000028 /* PermissionsManager..." → "				1A0000000000000000000028 /* PermissionsManager..."
+All 8 pbxproj edits done. Let me verify the project parses, then run the three quality gates.
+[94m[Bash][0m Verify project file parses $ xcodebuild -list -project Bringr.xcodeproj 2>&1 | head -25
+Project parses. Now the build gate.
+[94m[Bash][0m Run the build quality gate $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded. Now lint and tests in parallel.
+[94m[Bash][0m Run SwiftLint strict gate $ swiftlint lint --strict 2>&1 | tail -15
+[94m[Bash][0m Run the test quality gate $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All three gates pass (build succeeded, 0 lint violations, 25 tests pass including 10 new). 
+
+AC4 asks to actually measure live timing. Nothing drives `enumerate()` at runtime yet (no summon trigger until US-006/007), so I'll measure the live CoreGraphics path with a throwaway script to record a representative number — without leaving dead code in the app.
+[94m[Bash][0m Measure live enumeration timing $ cat > /tmp/measure_enum.swift <<'EOF' import CoreGraphics import Foundation  let selfPID = ProcessIn...
+Live enumeration is ~0.7 ms for 8 apps — far under the 16 ms summon budget. Now the build-and-run stability check, then cleanup.
+[94m[Bash][0m Launch app to confirm stability, then clean up $ echo "cleaned up"
+App launches stably with the new code linked. Now I'll document learnings in `progress.md` — both a reusable pattern and the iteration log entry.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **Verification limitation**: US-004 ships primit..." → "- **Verification limitation**: US-004 ships primit..."
+Now the iteration log entry at the bottom.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- Not wired into `AppDelegate` yet — nothing drive..." → "- Not wired into `AppDelegate` yet — nothing drive..."
+All gates pass and learnings documented. Now I'll close the bead.
+[94m[Bash][0m Close the bead $ all 3 gates pass" 2>&1 | tail -10
+US-003 complete. All acceptance criteria met and the bead is closed.
+
+**What shipped** (`Bringr/WindowEnumeration.swift` + `BringrTests/WindowEnumerationTests.swift`, pbxproj IDs 0x2D–0x30):
+
+- `WindowEnumerator` reports apps with normal, on-screen windows grouped front-to-back, behind a `WindowEnumerationSource` seam — mirroring the existing `WindowControlling` pattern. `CGWindowSource` is the live CoreGraphics conformer; `FakeWindowEnumerationSource` backs the tests.
+- Models: `AppWindows` (per-app group with name + windows) and `WindowInfo` (stable `WindowID` whose token is `kCGWindowNumber`, plus title and computed owning `app`).
+- "Normal window" filter drops Bringr itself, non-layer-0 surfaces (menu bar/dock/status items), invisible (alpha 0) and tiny helper windows; apps left with zero windows fall out, so menu-bar-only apps/agents are excluded for free.
+- Titles are best-effort: `kCGWindowName` needs Screen Recording (a non-goal), so they're usually empty and fall back to `"Window N"` (US-006 permits index labels). Real titles are a clean later live-layer enrichment.
+- AC4 timing: `lastDuration` + os_log record every call; measured ~0.7 ms for 8 apps live — far under the 16 ms summon budget.
+
+**Gates:** build SUCCEEDED · swiftlint 0 violations · 25 tests pass (10 new). App launches stably.
+
+**Flagged for later:** US-003's `WindowID` token (CG window number) differs from US-004 `LiveWindowSystem`'s enumeration-index token — US-010/011/012 must reconcile them before passing enumerator `WindowID`s to `WindowController`. Documented in `progress.md`. No commit created (engine handles that).
+
+<promise>COMPLETE</promise>
