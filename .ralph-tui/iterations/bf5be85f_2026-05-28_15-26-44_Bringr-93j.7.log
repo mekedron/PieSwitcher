@@ -1,0 +1,148 @@
+# Iteration 8 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.7
+- **Task Title**: US-007: Activation — simultaneous left+right mouse click
+- **Description**: As a mouse user, I want pressing left and right buttons together to summon the menu so that I can trigger it without the keyboard.
+
+## Acceptance Criteria
+- [ ] A global event tap detects left and rig...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T12:26:44.570Z
+- **Ended At**: 2026-05-28T12:42:27.579Z
+- **Duration**: 15m 43s
+- **Input Tokens**: 290
+- **Output Tokens**: 69229
+- **Total Tokens**: 69519
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and existing code structure to understand the patterns I should follow.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+Now let me read the key existing files I'll need to work with for this task.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+Let me read the controller, menu model, and app entry point in parallel.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m
+Let me read the seam-pattern reference files and the project file to understand the injectable-closure pattern and ID sequence.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PermissionsManager.swift[0m
+Let me read the WindowControl seam (closest analog for an injectable system seam), a test file for patterns, and the project file.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m
+Now let me claim the bead and look at the project file structure and a test file in parallel.
+[94m[Bash][0m Claim the US-007 bead and show its details $ bd show Bringr-93j.7 2>&1 | head -30
+The bead is already in_progress. Let me examine the project file structure and an existing test to mirror the seam-test pattern.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Let me look at a test file to mirror the test structure, and check the RadialMenuView for context.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowControlTests.swift[0m
+Let me read the RadialMenuView to understand the dismiss affordance, and check whether an entitlements file exists for the event tap.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+I have a complete picture of the architecture. Now let me design and implement US-007.
+
+The design mirrors the established seam pattern: a **pure, value-type detector** (`MouseChordDetector`) holds all the threshold/combo logic and is fully unit-tested (AC1, AC5), and a thin **live `CGEventTap` layer** (`MouseChordMonitor`) feeds real events into it and applies its verdicts (AC2, AC4), guarded out of XCTest.
+
+The key correctness challenge: to *not leak* the chord to the focused app (AC4), the first button-down must be deferred (held) until we know whether a partner follows within the threshold — if it does, we discard it (chord, no leak); if not, we replay it so normal clicks pass through (AC2).
+
+Let me write the activation source file.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m "import AppKit
+import CoreGraphics
+import Foundation
+import os
+
+// MARK: - Detector input/output
+
+/// A mouse button the chord cares about. v1 only uses the primary (left) and
+/// secondary (right) but... (13281 chars)"
+Now the test file mirroring the existing test patterns.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/MouseChordTests.swift[0m "import XCTest
+@testable import Bringr
+
+/// Exercises the chord detection state machine in isolation from the live event
+/// stream (AC5): every test drives `MouseChordDetector` with synthetic value
+//... (6245 chars)"
+Now let me wire the monitor into `AppDelegate` so the chord summons the radial menu.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "import AppKit" → "import AppKit
+import Combine"
+The XCTest diagnostic is just SourceKit not yet seeing the new file in the project — it resolves once I add it to the pbxproj. Let me add the monitor properties and lifecycle to AppDelegate.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "    private(set) var radialMenu: RadialMenuControl..." → "    private(set) var radialMenu: RadialMenuControl..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        permissions.startMonitoring()
+        prew..." → "        permissions.startMonitoring()
+        prew..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        radialMenu = RadialMenuController(registry..." → "        radialMenu = RadialMenuController(registry..."
+Now I'll register both new files in the project. Following the hand-written pbxproj pattern, I'll continue the hex sequence: `0x43`/`0x44` for the app file, `0x45`/`0x46` for the test file. First, the PBXBuildFile entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000042 /* RadialLayoutTests.sw..." → "		1A0000000000000000000042 /* RadialLayoutTests.sw..."
+These SourceKit errors are transient while the pbxproj is mid-edit; they resolve once all edits land. Continuing with the PBXFileReference entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000041 /* RadialLayoutTests.sw..." → "		1A0000000000000000000041 /* RadialLayoutTests.sw..."
+Now the two PBXGroup `children` lists — app source group and test group.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000003B /* RadialLayout.swift..." → "				1A000000000000000000003B /* RadialLayout.swift..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000039 /* PermissionAlertTes..." → "				1A0000000000000000000039 /* PermissionAlertTes..."
+Now the two PBXSourcesBuildPhase `files` lists — app and test targets.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000003C /* RadialLayout.swift..." → "				1A000000000000000000003C /* RadialLayout.swift..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000003A /* PermissionAlertTes..." → "				1A000000000000000000003A /* PermissionAlertTes..."
+All pbxproj edits done. Let me verify the project parses, then run the build.
+[94m[Bash][0m Verify the project file parses and lists targets/schemes $ xcodebuild -list -project Bringr.xcodeproj 2>&1 | head -30
+The project parses correctly. Now let me run the build.
+[94m[Bash][0m Build the Debug scheme $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded. Now the lint and test gates.
+[94m[Bash][0m Run SwiftLint in strict mode $ swiftlint lint --strict 2>&1 | tail -20
+Zero violations. Now the test suite.
+[94m[Bash][0m Run the full XCTest suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All three automated gates pass: build SUCCEEDED, 0 lint violations, 68 tests pass (15 new). Now the build-and-run gate — confirming the app launches stably with the global tap wired in (a crashing tap install would be a regression).
+[94m[Bash][0m Launch the fresh build and confirm it stays alive $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING" || echo "...
+App launches stably (PID 30391) — the tap install doesn't crash. Let me check the unified log to confirm the tap either installed or degraded gracefully, and check current Accessibility trust state.
+[94m[Bash][0m Query unified log for the tap install/failure message $ checking log above for install vs failure."
+The log query needs `--info` to capture non-default levels. Let me retry with the right flags.
+[94m[Bash][0m Query unified log including info/debug levels for tap status $ echo "===exit $?==="
+No persisted output — info-level `Logger` messages aren't persisted by default. Let me capture the install message live via `log stream` while relaunching.
+[94m[Bash][0m Stream unified log while relaunching to capture tap install status $ sleep 1 open build/Build/Products/Debug/Bringr.app sleep 3 kill $STREAM_PID 2>/dev/null echo "=== Mo...
+Let me run the binary directly in the foreground — `Logger`/`os_log` output surfaces on stderr for a directly-run process, unlike `open`.
+[94m[Bash][0m Run binary directly and capture os_log/stderr output for tap status $ sleep 1 ( build/Build/Products/Debug/Bringr.app/Contents/MacOS/Bringr > /tmp/bringr_stderr.log 2>&1 ...
+os_log is fully suppressed in this environment. Let me add temporary `NSLog` instrumentation (reliably hits stderr on a direct run) to confirm the install path runs and reports its result — then revert it.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        activationMonitor = monitor
+        monito..." → "        activationMonitor = monitor
+        let st..."
+[94m[Bash][0m Rebuild and run directly to capture the tap-started debug line $ sleep 1 build/Build/Products/Debug/Bringr.app/Contents/MacOS/Bringr > /tmp/bringr_dbg.log 2>&1 & sle...
+Confirmed: `tap started = false` — `CGEvent.tapCreate` returns nil because this ad-hoc-signed dev build lacks Accessibility (TCC revoked on rebuild, per the US-016 notes). Crucially, the install path **ran** and the app **degraded gracefully without crashing**, and the `trustCancellable` hook will retry `start()` when permission is granted. The `xcodebuild` build SUCCEEDED (the SourceKit errors are transient re-indexing noise).
+
+Now let me revert the temporary instrumentation.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        activationMonitor = monitor
+        let st..." → "        activationMonitor = monitor
+        monito..."
+Let me rebuild the reverted code, confirm lint is still clean, and relaunch the final build per the workflow.
+[94m[Bash][0m Rebuild reverted code, lint, and relaunch final build $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING" || echo "...
+All four quality gates pass: **build SUCCEEDED**, **0 lint violations**, **68 tests pass** (15 new), and the **app launches stably** with the tap-install path running and degrading gracefully when untrusted. The SourceKit diagnostics are transient re-indexing noise — the compiler succeeded, which is authoritative.
+
+Let me close the bead and document the learnings.
+[94m[Bash][0m Close the US-007 bead with a summary reason $ all gates pass." 2>&1 | tail -8
+Now let me append the learnings to progress.md — both a new reusable pattern at the top and the dated entry at the bottom.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "---
+
+## 2026-05-28 - Bringr-93j.1 (US-001: lint an..." → "### Global mouse-chord activation: pure detector +..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **Learnings:** see the new "Radial overlay + pur..." → "- **Learnings:** see the new "Radial overlay + pur..."
+Everything is complete. Let me do a final sanity check on the diff to confirm exactly what changed and that no debug code leaked through.
+[94m[Bash][0m Final review of changes and debug-code scan $ grep -rn "BRINGR-DEBUG\|NSLog" Bringr/ BringrTests/ || echo "(clean: no debug strings)"
+US-007 is complete. All work is done and the diff is clean (no debug code leaked through).
+
+## Summary
+
+Implemented **simultaneous left+right mouse-click activation** following the codebase's established pure-core/live-shell seam pattern:
+
+**New `Bringr/MouseChordActivation.swift`:**
+- `MouseChordDetector` — a pure value-type state machine holding all threshold/combo logic, with a configurable threshold (default 0.12s). To satisfy AC4 (no leak), it **defers the first button press** rather than delivering it immediately — only by waiting can it distinguish a lone click from a chord-start without leaking a stray click (e.g. a right-down popping a context menu). The hold resolves to summon (partner within threshold), replay-as-normal-click (lone release or press-and-hold timeout), or release-then-rehold (late partner).
+- `MouseChordMonitor` — the live `CGEventTap` that feeds real events into the detector, buffers/replays/consumes `CGEvent`s per its verdict (replays carry a sentinel so the tap ignores its own re-injection), and fires the summon. Requires Accessibility; `start()` degrades gracefully when untrusted and retries when permission flips.
+
+**`Bringr/AppDelegate.swift`:** wires the monitor in (guarded out of XCTest), `onChord` toggles the radial menu at `NSEvent.mouseLocation` (AC3), with a Combine retry on `permissions.$isTrusted`.
+
+**`BringrTests/MouseChordTests.swift`:** 15 tests driving the detector with synthetic events in full isolation from the live stream (AC5).
+
+**Quality gates:** build SUCCEEDED · swiftlint `--strict` 0 violations · 68 tests pass (15 new) · app launches stably and the tap-install path degrades gracefully (verified `tap started = false` on this untrusted dev build via temporary instrumentation, then reverted — the trusted chord/overlay path isn't headlessly verifiable, which the unit tests cover instead).
+
+Bead `Bringr-93j.7` closed; learnings appended to `progress.md`. No commit created (left for the engine).
+
+<promise>COMPLETE</promise>

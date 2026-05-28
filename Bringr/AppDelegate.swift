@@ -50,10 +50,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// permission, so it may fail on first launch of an untrusted dev build; we
     /// retry the instant `PermissionsManager` reports trust, with no relaunch.
     private func startActivationMonitor() {
-        let monitor = MouseChordMonitor { [weak self] in
-            guard let self, let radialMenu = self.radialMenu else { return }
-            radialMenu.toggle(trigger: .mouseChord, at: NSEvent.mouseLocation)
-        }
+        let monitor = MouseChordMonitor(
+            onChord: { [weak self] in
+                guard let self, let radialMenu = self.radialMenu else { return }
+                radialMenu.triggerPressed(for: .mouseChord, at: NSEvent.mouseLocation)
+            },
+            onChordReleased: { [weak self] in
+                self?.radialMenu?.triggerReleased(at: NSEvent.mouseLocation)
+            }
+        )
         activationMonitor = monitor
         monitor.start()
 

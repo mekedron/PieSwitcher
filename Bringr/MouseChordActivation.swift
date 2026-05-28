@@ -174,11 +174,20 @@ struct MouseChordDetector {
 final class MouseChordMonitor {
     private var detector: MouseChordDetector
     private let onChord: () -> Void
+    private let onChordReleased: () -> Void
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var heldEvents: [CGEvent] = []
     private var holdTimer: Timer?
+
+    /// Whether a chord is currently summoned and at least one of its buttons is
+    /// still physically held. Used to fire `onChordReleased` exactly once, when the
+    /// last chord button comes up — the release that drives hold-to-select (US-009).
+    private var chordActive = false
+    /// Buttons physically down right now, tracked from the raw event stream so the
+    /// chord-release moment is known even though the detector consumes the ups.
+    private var physicallyDown: Set<MouseButton> = []
 
     private let log = Logger(subsystem: "com.mekedron.Bringr", category: "MouseChord")
 
@@ -186,9 +195,14 @@ final class MouseChordMonitor {
     /// own re-injected presses straight through instead of re-detecting them.
     private static let replaySentinel: Int64 = 0x4252_4E47  // "BRNG"
 
-    init(threshold: TimeInterval = 0.12, onChord: @escaping () -> Void) {
+    init(
+        threshold: TimeInterval = 0.12,
+        onChord: @escaping () -> Void,
+        onChordReleased: @escaping () -> Void = {}
+    ) {
         self.detector = MouseChordDetector(threshold: threshold)
         self.onChord = onChord
+        self.onChordReleased = onChordReleased
     }
 
     /// Whether the tap is currently installed.
@@ -246,6 +260,8 @@ final class MouseChordMonitor {
         runLoopSource = nil
         cancelHoldTimer()
         heldEvents.removeAll()
+        chordActive = false
+        physicallyDown.removeAll()
         detector.reset()
     }
 
@@ -267,10 +283,23 @@ final class MouseChordMonitor {
             return Unmanaged.passUnretained(event)
         }
 
+        switch phase {
+        case .down: physicallyDown.insert(button)
+        case .up: physicallyDown.remove(button)
+        }
+
         let reaction = detector.handle(
             MouseButtonEvent(button: button, phase: phase, timestamp: ProcessInfo.processInfo.systemUptime)
         )
-        return apply(reaction, to: event)
+        let result = apply(reaction, to: event)
+
+        // Fire once when the last button of a summoned chord is released — the
+        // signal hold-to-select uses to commit (US-009).
+        if chordActive, physicallyDown.isEmpty {
+            chordActive = false
+            onChordReleased()
+        }
+        return result
     }
 
     private func apply(_ reaction: MouseChordReaction, to event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -301,6 +330,7 @@ final class MouseChordMonitor {
         case .summon:
             cancelHoldTimer()
             heldEvents.removeAll()
+            chordActive = true
             onChord()
             return nil
         }

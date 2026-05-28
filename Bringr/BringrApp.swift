@@ -44,7 +44,7 @@ private struct MenuContent: View {
 
         if let radialMenu {
             Button("Open Window Switcher") {
-                radialMenu.toggle(trigger: .mouseChord, at: NSEvent.mouseLocation)
+                radialMenu.summonFromMenuBar(at: NSEvent.mouseLocation)
             }
             Divider()
         }

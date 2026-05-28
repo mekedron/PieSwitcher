@@ -4,7 +4,7 @@ import SwiftUI
 /// Renders the radial wheel: one wedge per top-level node, each carrying its
 /// placeholder content (app icon + name for app slices; index + title for window
 /// slices). No animations — wedges and labels are placed directly from the tested
-/// `RadialLayout` geometry. Real selection/hover lands in US-009/US-010.
+/// `RadialLayout` geometry. Hover-reveal lands in US-010/US-011.
 struct RadialMenuView: View {
     @ObservedObject var controller: RadialMenuController
 
@@ -30,7 +30,12 @@ struct RadialMenuView: View {
         }
         .frame(width: controller.geometry.diameter, height: controller.geometry.diameter)
         .contentShape(Rectangle())
-        .onTapGesture { controller.dismiss() }
+        // A zero-distance drag reports the click location so the controller can map
+        // it to a slice (click-to-stay select) or the dead zone (cancel).
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onEnded { value in controller.clickInOverlay(atLocalPoint: value.location) }
+        )
     }
 }
 
