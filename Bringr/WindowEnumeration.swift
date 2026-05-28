@@ -135,6 +135,20 @@ final class WindowEnumerator {
     /// summon hot-path budget can be measured. `nil` until the first call. (AC4)
     private(set) var lastDuration: TimeInterval?
 
+    /// The broadened (offscreen-inclusive) raw window list fetched once for the current
+    /// summon, reused by every later broadened `enumerate()` of that summon (Bringr-93j.53).
+    /// The source call behind it — the system-wide window list plus the AX classify of
+    /// minimized/hidden/AX-backed state — is the entire cost of the broadened path, and it is
+    /// identical for every read in one summon (apps ring and each app's windows sub-wheel);
+    /// only the per-read keep-rule and screen filter differ. Without this, the sub-wheel's
+    /// dynamic provider re-ran that whole classify on *every* hover, which is what made
+    /// "Include minimized/hidden" lag by seconds. Dropped at the next summon's recording read
+    /// (`recordingRecency: true`, the one authoritative per-summon read), so it never goes
+    /// stale across summons. `nil` on the narrow (default) path, which is never cached so its
+    /// per-hover live re-read — and the Bringr-93j.31 sub-wheel retry that relies on it — is
+    /// preserved exactly.
+    private var broadenedRawCache: [RawWindow]?
+
     init(
         source: WindowEnumerationSource? = nil,
         appOrder: @escaping () -> AppSortOrder = { AppSortOrder.current() },
@@ -179,11 +193,16 @@ final class WindowEnumerator {
         recordingRecency: Bool = false
     ) -> [AppWindows] {
         let start = DispatchTime.now().uptimeNanoseconds
+        // The recording read is the one authoritative per-summon read (the apps ring), and it
+        // runs first, before any hover — so it marks a new summon: drop the prior summon's
+        // cached broadened list so a later broadened read this summon can't serve stale windows
+        // (Bringr-93j.53).
+        if recordingRecency { broadenedRawCache = nil }
         // Any broadening flag needs the all-windows query (the only one that surfaces
         // off-Space / minimized / hidden windows); with none set, the cheap current-Space
         // query suffices and every record is already on-screen.
         let includingOffscreen = allSpaces || includeMinimized || includeHidden
-        let normal = source.rawWindows(includingOffscreen: includingOffscreen).filter(isNormalWindow)
+        let normal = normalWindows(includingOffscreen: includingOffscreen)
         let collected = normal.filter {
             shouldCollect($0, allSpaces: allSpaces, includeMinimized: includeMinimized, includeHidden: includeHidden)
         }
@@ -195,6 +214,22 @@ final class WindowEnumerator {
         lastDuration = elapsed
         log.debug("Enumerated \(result.count) app(s) in \(Int((elapsed * 1000).rounded())) ms")
         return result
+    }
+
+    /// The normal-window raw list for this read. On the broadened path the system-wide query
+    /// plus AX classify is fetched once per summon and reused (Bringr-93j.53): the list is the
+    /// same for the apps ring and every windows sub-wheel of one summon — only the keep-rule and
+    /// screen filter that `enumerate` applies afterwards differ — so re-fetching it on every
+    /// hover was pure repeated cost. The narrow (default) path is deliberately not cached, so its
+    /// per-hover live re-read stays exactly as before.
+    private func normalWindows(includingOffscreen: Bool) -> [RawWindow] {
+        guard includingOffscreen else {
+            return source.rawWindows(includingOffscreen: false).filter(isNormalWindow)
+        }
+        if let cached = broadenedRawCache { return cached }
+        let normal = source.rawWindows(includingOffscreen: true).filter(isNormalWindow)
+        broadenedRawCache = normal
+        return normal
     }
 
     /// Whether to keep a (normal) window given the broadening flags (Bringr-93j.50). A window

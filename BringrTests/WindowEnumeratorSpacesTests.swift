@@ -255,6 +255,80 @@ final class WindowEnumeratorDockAppTests: XCTestCase {
     }
 }
 
+/// The per-summon broadened-raw cache (Bringr-93j.53): the windows sub-wheel's dynamic provider
+/// re-runs `enumerate` on every hover, which on the broadened path re-ran the costly system-wide
+/// query + AX classify each time and made "Include minimized/hidden" lag by seconds. The cache
+/// fetches that list once per summon and reuses it for every broadened read; a new summon (the
+/// recording read) drops it; the narrow default path is never cached. A sibling class sharing the
+/// file-scoped `raw` helper.
+@MainActor
+final class WindowEnumeratorCacheTests: XCTestCase {
+    private let selfPID: pid_t = 1000
+
+    func testBroadenedReadsInOneSummonShareASingleSourceQuery() {
+        // Chrome on-screen, Mail off-Space, Ghostty minimized — so different broadening flags
+        // keep different windows, proving the cache holds the raw list while each read still
+        // applies its own keep-rule.
+        let source = FakeWindowEnumerationSource(
+            selfPID: selfPID,
+            windows: [raw(number: 1, pid: 10, name: "Chrome")],
+            offscreenWindows: [
+                raw(number: 1, pid: 10, name: "Chrome"),
+                raw(number: 2, pid: 20, name: "Mail", isOnscreen: false),
+                raw(number: 3, pid: 30, name: "Ghostty", isOnscreen: false, isMinimized: true)
+            ]
+        )
+        let enumerator = WindowEnumerator(source: source)
+
+        // Apps-ring read (the recording read) starts the summon and fetches the broadened list.
+        let appsRing = enumerator.enumerate(allSpaces: true, recordingRecency: true)
+        // A hover sub-wheel re-read this summon — different broadening flag, served from the
+        // same cached raw list, so the keep-rule differs but the source is not queried again.
+        let subWheel = enumerator.enumerate(includeMinimized: true)
+
+        XCTAssertEqual(appsRing.map(\.name), ["Chrome", "Mail"])
+        XCTAssertEqual(subWheel.map(\.name), ["Chrome", "Ghostty"])
+        XCTAssertEqual(source.broadenedCallCount, 1)
+    }
+
+    func testNewSummonDropsTheCacheAndRefetches() {
+        let source = FakeWindowEnumerationSource(
+            selfPID: selfPID,
+            windows: [raw(number: 1, pid: 10, name: "Chrome")],
+            offscreenWindows: [
+                raw(number: 1, pid: 10, name: "Chrome"),
+                raw(number: 2, pid: 20, name: "Mail", isOnscreen: false)
+            ]
+        )
+        let enumerator = WindowEnumerator(source: source)
+
+        _ = enumerator.enumerate(allSpaces: true, recordingRecency: true)
+        _ = enumerator.enumerate(allSpaces: true) // hover re-read: cache hit
+        XCTAssertEqual(source.broadenedCallCount, 1)
+
+        // The next summon's recording read drops the prior snapshot and queries afresh, so a
+        // window list that changed between summons is never served stale.
+        _ = enumerator.enumerate(allSpaces: true, recordingRecency: true)
+        XCTAssertEqual(source.broadenedCallCount, 2)
+    }
+
+    func testNarrowPathIsNeverCached() {
+        // The default (unbroadened) path must keep re-reading live on every call, so the
+        // Bringr-93j.31 sub-wheel retry that depends on a fresh post-reveal scan is preserved.
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: 10, name: "Chrome")
+        ])
+        let enumerator = WindowEnumerator(source: source)
+
+        _ = enumerator.enumerate(recordingRecency: true)
+        _ = enumerator.enumerate()
+        _ = enumerator.enumerate()
+
+        XCTAssertEqual(source.narrowCallCount, 3)
+        XCTAssertEqual(source.broadenedCallCount, 0)
+    }
+}
+
 /// Shared fixture builder for the classes in this file. `isOnscreen` defaults to a plain
 /// on-screen window and `isDockApp` to an ordinary Dock app; off-Space / minimized / hidden /
 /// background-app fixtures set the relevant flags so the keep-rule can be exercised without the

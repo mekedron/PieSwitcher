@@ -42,23 +42,40 @@ final class CGWindowSource: WindowEnumerationSource {
     /// app's AX windows yield the minimized set and the set of controllable window numbers — a
     /// broadened record whose number is absent from the latter is a phantom. Hidden via `isHidden`.
     /// The Dock-app stamp is set earlier by `rawWindow(from:...)` and carried through unchanged.
+    ///
+    /// Only apps that actually surfaced an OFF-screen record are AX-probed (Bringr-93j.53): an
+    /// on-screen record is kept by `WindowEnumerator.shouldCollect`'s onscreen short-circuit
+    /// before it ever consults minimized/hidden/AX-backed, so probing an app whose windows are
+    /// all on-screen is pure wasted IPC — and that IPC (one `copyWindows` per app, one
+    /// `isMinimized` per window) is what made the broadened path lag. The per-window minimized
+    /// read is likewise limited to off-screen window numbers, since on-screen windows are never
+    /// minimized. On-screen records are returned untouched (their defaults — not minimized, not
+    /// hidden, AX-backed — already match what the old full probe computed for them).
     private func classify(_ raws: [RawWindow]) -> [RawWindow] {
+        let offscreen = raws.filter { !$0.isOnscreen }
+        guard !offscreen.isEmpty else { return raws }
+        let offscreenPIDs = Set(offscreen.map(\.ownerPID))
+        let offscreenNumbers = Set(offscreen.map(\.windowNumber))
+
         var minimizedNumbers: Set<Int> = []
         var hiddenPIDs: Set<pid_t> = []
         var axNumbers: Set<Int> = []
-        for pid in Set(raws.map(\.ownerPID)) {
+        for pid in offscreenPIDs {
             let app = AppID(pid: pid)
             if stateProbe.isHidden(app) { hiddenPIDs.insert(pid) }
             for window in stateProbe.windows(of: app) {
                 axNumbers.insert(window.token)
-                if stateProbe.isMinimized(window) { minimizedNumbers.insert(window.token) }
+                if offscreenNumbers.contains(window.token), stateProbe.isMinimized(window) {
+                    minimizedNumbers.insert(window.token)
+                }
             }
         }
-        return raws.map {
-            $0.classified(
-                isMinimized: minimizedNumbers.contains($0.windowNumber),
-                isHidden: hiddenPIDs.contains($0.ownerPID),
-                isAXBacked: axNumbers.contains($0.windowNumber)
+        return raws.map { raw in
+            guard !raw.isOnscreen else { return raw }
+            return raw.classified(
+                isMinimized: minimizedNumbers.contains(raw.windowNumber),
+                isHidden: hiddenPIDs.contains(raw.ownerPID),
+                isAXBacked: axNumbers.contains(raw.windowNumber)
             )
         }
     }

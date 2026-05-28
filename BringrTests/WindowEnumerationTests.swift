@@ -331,6 +331,11 @@ final class FakeWindowEnumerationSource: WindowEnumerationSource {
     /// The `includingOffscreen` of the most recent call, so a test can assert the enumerator
     /// broadened the query when a Space/minimized/hidden flag was set.
     private(set) var lastIncludedOffscreen: Bool?
+    /// How many times `rawWindows` was queried, split by mode, so a test can assert the
+    /// per-summon broadened cache (Bringr-93j.53) reuses one query across the apps ring and
+    /// the windows sub-wheel re-reads instead of re-hitting the source on every hover.
+    private(set) var broadenedCallCount = 0
+    private(set) var narrowCallCount = 0
 
     init(selfPID: pid_t, windows: [RawWindow], offscreenWindows: [RawWindow]? = nil) {
         self.selfPID = selfPID
@@ -340,7 +345,12 @@ final class FakeWindowEnumerationSource: WindowEnumerationSource {
 
     func rawWindows(includingOffscreen: Bool) -> [RawWindow] {
         lastIncludedOffscreen = includingOffscreen
-        if includingOffscreen, let offscreenWindows { return offscreenWindows }
+        if includingOffscreen {
+            broadenedCallCount += 1
+            if let offscreenWindows { return offscreenWindows }
+        } else {
+            narrowCallCount += 1
+        }
         return windows
     }
 }
