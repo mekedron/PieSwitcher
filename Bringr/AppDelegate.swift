@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 /// Owns app-lifetime services and runs launch-time bootstrap.
 ///
@@ -13,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// launch bootstrap is skipped.
     private(set) var radialMenu: RadialMenuController?
     private var permissionAlertWindow: PermissionAlertWindow?
+    /// Global left+right mouse-chord activation (US-007). `nil` under XCTest.
+    private var activationMonitor: MouseChordMonitor?
+    private var trustCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // The host app is launched by `xcodebuild test` to inject the test
@@ -22,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         permissions.startMonitoring()
         prewarmRadialMenu()
+        startActivationMonitor()
 
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {
@@ -39,6 +44,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registry.register(switcher, for: .mouseChord)
         registry.register(switcher, for: .threeFingerPress)
         radialMenu = RadialMenuController(registry: registry)
+    }
+
+    /// Install the global mouse-chord tap (US-007). The tap needs Accessibility
+    /// permission, so it may fail on first launch of an untrusted dev build; we
+    /// retry the instant `PermissionsManager` reports trust, with no relaunch.
+    private func startActivationMonitor() {
+        let monitor = MouseChordMonitor { [weak self] in
+            guard let self, let radialMenu = self.radialMenu else { return }
+            radialMenu.toggle(trigger: .mouseChord, at: NSEvent.mouseLocation)
+        }
+        activationMonitor = monitor
+        monitor.start()
+
+        trustCancellable = permissions.$isTrusted
+            .sink { [weak self] trusted in
+                if trusted { self?.activationMonitor?.start() }
+            }
     }
 
     /// Whether the launch-time permission alert should be shown: only when access

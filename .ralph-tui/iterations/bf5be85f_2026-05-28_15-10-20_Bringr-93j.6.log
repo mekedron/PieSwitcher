@@ -1,0 +1,159 @@
+# Iteration 7 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.6
+- **Task Title**: US-006: Overlay window and radial layout
+- **Description**: As a user, I want the wheel to appear instantly at my cursor with evenly placed slices so that interaction is immediate and predictable.
+
+## Acceptance Criteria
+- [ ] A borderless, transparent, floati...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T12:10:20.099Z
+- **Ended At**: 2026-05-28T12:26:33.872Z
+- **Duration**: 16m 13s
+- **Input Tokens**: 318
+- **Output Tokens**: 74936
+- **Total Tokens**: 75254
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the current project state and the codebase patterns to understand the architecture before implementing US-006.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+Now let me look at the existing codebase structure and key files.
+[94m[Glob][0m pattern: [96mBringr/**/*.swift[0m
+Let me read the key files to understand the existing patterns I'll build on.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowEnumeration.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PermissionAlertWindow.swift[0m
+Note: the project mandates `bd` for task tracking over TaskCreate, so I'll follow that. Let me read the remaining key files.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m
+Now let me look at the project.pbxproj structure and the PermissionAlertView for the SwiftUI hosting pattern.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Now let me read PermissionAlertView for the SwiftUI hosting pattern and check the bead status.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PermissionAlertView.swift[0m
+Let me check the bead status and look at an existing test file for conventions.
+[94m[Bash][0m Show bead details for US-006 $ bd show Bringr-93j.6 2>&1 | head -40
+The bead is already claimed and in progress. Let me look at a test file for conventions.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/MenuModelTests.swift[0m
+I have a thorough understanding now. Let me check the SwiftLint config to stay within the rules, then check the existing scheme's Testables wiring.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.swiftlint.yml[0m
+Now I have everything I need. Let me write the pure geometry/layout core first — this is the unit-tested foundation.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialLayout.swift[0m "import CoreGraphics
+import Foundation
+
+/// Ring dimensions of the radial menu: a central dead zone and an outer edge.
+/// US-014 will let the user tune these; v1 ships the defaults.
+struct RadialGeome... (4439 chars)"
+Now the overlay window and the controller that pre-warms and drives it.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m "import AppKit
+import SwiftUI
+
+/// Pre-warmed overlay that hosts the radial wheel. Created once at launch and
+/// shown/hidden — never rebuilt on the summon hot path (the < 16 ms budget).
+///
+/// A bor... (3381 chars)"
+Now the SwiftUI view that renders the slices with placeholder content.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m "import AppKit
+import SwiftUI
+
+/// Renders the radial wheel: one wedge per top-level node, each carrying its
+/// placeholder content (app icon + name for app slices; index + title for window
+/// slices... (3958 chars)"
+The diagnostics are expected — the new files aren't in the Xcode project yet. Let me write the test file, then wire all four into `project.pbxproj`.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialLayoutTests.swift[0m "import CoreGraphics
+import XCTest
+@testable import Bringr
+
+final class RadialLayoutTests: XCTestCase {
+    private let geometry = RadialGeometry(innerRadius: 50, outerRadius: 150)
+    private let accu... (5523 chars)"
+These resolve once the files join the module. Let me harden one ambiguous expression, then wire the four files into the project. First the build-file entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m edit: "        let segments = max(2, Int((end - start) / ..." → "        let segments = max(2, Int((end - start) / ..."
+Now wiring into `project.pbxproj`. First, the PBXBuildFile entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000003A /* PermissionAlertTests..." → "		1A000000000000000000003A /* PermissionAlertTests..."
+Now the PBXFileReference entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000039 /* PermissionAlertTests..." → "		1A0000000000000000000039 /* PermissionAlertTests..."
+Now add the three app files to the Bringr group and the test file to the BringrTests group.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000029 /* WindowControl.swif..." → "				1A0000000000000000000029 /* WindowControl.swif..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000033 /* MenuModelTests.swi..." → "				1A0000000000000000000033 /* MenuModelTests.swi..."
+Now add the three app files to the Bringr `Sources` build phase and the test to the BringrTests build phase.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000002A /* WindowControl.swif..." → "				1A000000000000000000002A /* WindowControl.swif..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000034 /* MenuModelTests.swi..." → "				1A0000000000000000000034 /* MenuModelTests.swi..."
+Project wired. Now let me update `AppDelegate` to pre-warm the controller at launch, and expose it.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "    let permissions = PermissionsManager()
+    pri..." → "    let permissions = PermissionsManager()
+    ///..."
+Now add the menu-bar entry point in `BringrApp.swift` so the overlay can be summoned and verified.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m edit: "        MenuBarExtra {
+            MenuContent(per..." → "        MenuBarExtra {
+            MenuContent(per..."
+Now update `MenuContent` to accept the controller and add the summon entry point.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m edit: "private struct MenuContent: View {
+    @ObservedOb..." → "private struct MenuContent: View {
+    @ObservedOb..."
+Now let me build to verify everything compiles. The SourceKit errors should clear once the compiler sees the new module members.
+[94m[Bash][0m Build the app (Debug) $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded — the SourceKit diagnostics are stale index noise (the compiler resolved everything). Now the lint and test gates.
+[94m[Bash][0m Run SwiftLint strict $ swiftlint lint --strict 2>&1 | tail -20
+Lint clean. Now the test gate.
+[94m[Bash][0m Run the test suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+One test had a wrong expectation, not a logic bug. A point at angle `-0.01` is still inside slice 0 (which spans ±45° around the top), so `hitTest` correctly returns 0 — my assertion wrongly expected slice 3. Let me verify my reading of the boundaries and fix the test.
+
+The slice-3/slice-0 boundary for N=4 sits at -45°, so I need a point just past that boundary to land in slice 3.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialLayoutTests.swift[0m edit: "    func testHitTestWrapsCleanlyAroundTheTopBounda..." → "    func testHitTestWrapsCleanlyAroundTheTopBounda..."
+[94m[Bash][0m Re-run tests, filtered to results $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | grep -...
+All 53 tests pass (14 new), and all three command gates are green. Now the 4th gate: build & run. Let me launch and confirm the pre-warm path (panel + hosting view creation at launch) doesn't crash.
+[94m[Bash][0m Launch the app and confirm it runs $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING"
+App launches stably — the pre-warm path works. Let me check what Bringr windows are currently on screen via the CGWindowList technique from the codebase patterns.
+[94m[Bash][0m List on-screen Bringr windows via CGWindowList $ exit(0) } for info in list {     let owner = (info[kCGWindowOwnerName as String] as? String) ?? ""  ...
+The pre-warmed overlay is correctly hidden — the on-screen window is the permission re-grant modal (460-wide, layer 3). My overlay only shows on summon, which needs a click I can't do headlessly. Let me add a temporary env-var-gated auto-summon to verify the *visible* overlay appears with correct geometry, then revert it.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        permissions.startMonitoring()
+        prew..." → "        permissions.startMonitoring()
+        prew..."
+[94m[Bash][0m Rebuild with debug summon hook $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded (SourceKit noise aside). Now launch with the debug env var and check the overlay appears at the right size/level/position.
+[94m[Bash][0m Launch with debug summon and list Bringr windows $ open build/Build/Products/Debug/Bringr.app && sleep 2.5 && swift /tmp/bringr_windows.swift
+Verified: the overlay appears on summon as a **320×320** (= 2 × outerRadius 160, borderless — no titlebar chrome unlike the 460×612 modal), **layer 3 (floating)** window, with x-origin **640 = cursorX(800) − 160**, confirming it's centered at the cursor. The SwiftUI `RadialMenuView` rendered live-enumerated apps without crashing. Now let me revert the temporary debug hook.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        permissions.startMonitoring()
+        prew..." → "        permissions.startMonitoring()
+        prew..."
+[94m[Bash][0m Remove temp script and rebuild after reverting debug hook $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build clean after revert (SourceKit noise is stale index, not real — the compiler resolves all of it). Let me run the final full gate suite and a clean launch to confirm everything is green.
+[94m[Bash][0m Final SwiftLint check $ swiftlint lint --strict 2>&1 | tail -2
+[94m[Bash][0m Final test run $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | grep -...
+[94m[Bash][0m Final clean launch confirmation $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING (clean sta...
+All four gates pass and the app runs cleanly. Let me close the bead.
+[94m[Bash][0m Close the US-006 bead $ verified visible overlay appears at 320x320 floating, centered at cursor." 2>&1 | tail -15
+All gates green and the bead is closed. Now let me document the learnings in `progress.md` — first the reusable pattern at the top.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **Tests:** the test target's `FakeWindowEnumerat..." → "- **Tests:** the test target's `FakeWindowEnumerat..."
+Now the dated progress entry at the end of the file.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- Not wired into `AppDelegate` yet — nothing summo..." → "- Not wired into `AppDelegate` yet — nothing summo..."
+All work is complete. Let me do a final verification that no debug code was left behind.
+[94m[Grep][0m [95m/Users/nikita/Projects/Bringr/Bringr[0m pattern: [96mBRINGR_DEBUG_SUMMON|DEBUG_SUMMON[0m
+Clean — no debug code remains. US-006 is complete.
+
+## Summary
+
+Implemented **US-006: Overlay window and radial layout** for Bringr's radial window switcher.
+
+**New files:**
+- `Bringr/RadialLayout.swift` — pure CoreGraphics geometry core (the unit-tested heart): `RadialGeometry` (ring dimensions), `RadialLayout` (even slice angles, `sliceCenterOffset`, `hitTest` → slice index or nil for dead-zone/outside), `RadialMenuPlacement` (cursor-centring origin).
+- `Bringr/RadialMenuWindow.swift` — `RadialMenuWindow` (pre-warmed borderless/transparent/non-activating floating `NSPanel`) + `RadialMenuController` (owns the window, resolves the menu per summon, `summon`/`toggle`/`dismiss`).
+- `Bringr/RadialMenuView.swift` — SwiftUI rendering: wedges (sampled from the tested ring math) + placeholder labels (app icon+name / window index+title), no animations.
+- `BringrTests/RadialLayoutTests.swift` — 14 tests covering even layout, hit-testing, and placement.
+
+**Wiring:** `AppDelegate.prewarmRadialMenu()` builds the enumerator → `WindowSwitcherMenu` → registry → controller at launch (guarded under XCTest), and a menu-bar "Open Window Switcher" item summons it — the first runtime hookup of US-003 + US-005.
+
+**All four gates pass:** build SUCCEEDED · swiftlint 0 violations · 53 tests pass (14 new) · verified the visible overlay via a temporary env-gated auto-summon + CGWindowList (320×320 borderless, floating layer 3, centered at the cursor), then reverted the hook.
+
+Bead `Bringr-93j.6` closed; `progress.md` updated with a new "Radial overlay + pure layout geometry" pattern and the dated entry. The key gotcha captured for the next stories: the layout's y-down, clockwise-from-north convention, and that CGWindowList reports y-flipped bounds when verifying placement.
+
+<promise>COMPLETE</promise>

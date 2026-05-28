@@ -3,10 +3,10 @@
   "sessionId": "bf5be85f-d1fa-4dc4-8304-f09229dbce6c",
   "status": "running",
   "startedAt": "2026-05-28T11:08:26.939Z",
-  "updatedAt": "2026-05-28T12:26:35.095Z",
-  "currentIteration": 6,
+  "updatedAt": "2026-05-28T12:42:28.686Z",
+  "currentIteration": 7,
   "maxIterations": 0,
-  "tasksCompleted": 6,
+  "tasksCompleted": 7,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -62,8 +62,8 @@
       {
         "id": "Bringr-93j.6",
         "title": "US-006: Overlay window and radial layout",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.7",
@@ -181,6 +181,16 @@
       "durationMs": 615895,
       "startedAt": "2026-05-28T11:59:54.566Z",
       "endedAt": "2026-05-28T12:10:10.461Z"
+    },
+    {
+      "iteration": 7,
+      "status": "completed",
+      "taskId": "Bringr-93j.6",
+      "taskTitle": "US-006: Overlay window and radial layout",
+      "taskCompleted": true,
+      "durationMs": 973773,
+      "startedAt": "2026-05-28T12:10:20.099Z",
+      "endedAt": "2026-05-28T12:26:33.872Z"
     }
   ],
   "skippedTaskIds": [],
