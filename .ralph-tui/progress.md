@@ -21,7 +21,14 @@ after each iteration and it's included in prompts for context.
   UUIDs follow the sequential `1A0000000000000000000XX` scheme — pick the next free value.
 - **SwiftLint `--strict` gotchas:** test files cap at 400 lines / 250-line type body (split big
   suites into topic files, each with its own private fixtures); identifiers must be >= 2 chars
-  (no `i` loop vars; `x`/`y`/`id` excepted); lines <= 120.
+  (no `i` loop vars; `x`/`y`/`id` excepted); lines <= 120. **`file_length` caps ALL files at 400**
+  too — `WindowControl.swift` sits right at it, so any addition there must be paid for by
+  condensing comments / using single-line `if let x = … { … }` (the codebase style).
+- **Parking a window off-screen resizes it.** The window-level hide-others reveal parks siblings
+  at `offScreenPoint` via AX `setPosition`; macOS's `NSWindow` title-bar constraint then **clamps
+  the window's height** (not width) so it stays reachable. Always capture AND restore a window's
+  *size* alongside its position when parking — `WindowSnapshot.originalSize`, restored in
+  `restoreWindowBaseline`/`restoreCapturedFrame` and the crash-recovery `RevealSnapshot`.
 
 ---
 
@@ -52,6 +59,38 @@ US-016: window sub-wheel — app-aligned arcs with overflow fisheye.
   - The empty-sector no-op relies on every `updateHover` branch being idempotent for the same
     region, so returning the last `hovered` from `region(forOffset:)` is safe.
   - Splitting the navigator tests into a Fisheye file kept both under SwiftLint's caps.
+
+---
+
+## 2026-05-28 - Bringr-93j.28
+
+Bug: "Hide others" mode returned windows smaller — on a 4K monitor Chrome came back shorter
+(height wrong, width fine).
+
+- **Root cause:** the window-level hide-others reveal parks siblings off-screen with AX
+  `setPosition` (Bringr-93j.24), but only captured/restored *position*. macOS's `NSWindow`
+  title-bar constraint clamps a window's **height** when it's moved off the bottom of every
+  screen, so restoring position alone left the window at the clamped (shorter) height.
+- **Fix:** capture and restore window *size* as well. Added `size(of:)`/`setSize(_:_:)` to
+  `WindowControlling` (+ `LiveWindowSystem` AX impl reading/writing `kAXSizeAttribute`, +
+  `FakeWindowSystem`), `WindowSnapshot.originalSize`, and threaded it through
+  `captureWindowBaselineIfNeeded`, `restoreWindowBaseline`, `restoreCapturedFrame` (renamed from
+  `restoreCapturedPosition`), and the crash-recovery `RevealSnapshot.WindowEntry` + `applySnapshot`.
+  Restore order is position-then-size so the window grows from its anchored top-left.
+- Files: `Bringr/WindowControl.swift`, `Bringr/LiveWindowSystem.swift`, `Bringr/RevealState.swift`,
+  `BringrTests/FakeWindowSystem.swift`, `BringrTests/RevealStrategyTests.swift` (2 new tests +
+  `sizedApp` fixture), `BringrTests/RevealStateTests.swift` (1 new test + baseline assertion).
+- Quality gates: build SUCCEEDED, `swiftlint lint --strict` 0 violations (44 files),
+  `xcodebuild test` 227 tests pass. App relaunched and left running.
+- **Learnings:**
+  - The off-screen park itself triggers the resize; size capture/restore is a complete fix
+    regardless of *why* the size changed, so I kept the park location unchanged (minimal change).
+  - `WindowControl.swift` was exactly at the 400-line `file_length` ceiling, so the ~14 lines the
+    fix legitimately needed had to be paid back by condensing existing doc comments and collapsing
+    `if let position { … }` blocks to single lines (matches existing `if system.isMinimized(…) { … }`).
+  - `var foo: T?` (optional, no default) gets an implicit `nil` default in a struct's synthesized
+    memberwise init — so adding `var originalSize: CGSize?` to `RevealSnapshot.WindowEntry` didn't
+    break existing `.init(…)` callsites that omit it (and old JSON decodes with it nil).
 
 ---
 

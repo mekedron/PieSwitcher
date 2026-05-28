@@ -3,10 +3,10 @@
   "sessionId": "c31d8153-165a-4c52-8465-2443a54001bb",
   "status": "running",
   "startedAt": "2026-05-28T17:17:18.275Z",
-  "updatedAt": "2026-05-28T17:31:58.565Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-28T17:49:06.650Z",
+  "currentIteration": 1,
   "maxIterations": 10,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "model": "opus",
@@ -171,8 +171,8 @@
       {
         "id": "Bringr-93j.25",
         "title": "US-016: Window sub-wheel — app-aligned arcs with overflow fisheye",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-toj",
@@ -188,7 +188,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "Bringr-93j.25",
+      "taskTitle": "US-016: Window sub-wheel — app-aligned arcs with overflow fisheye",
+      "taskCompleted": true,
+      "durationMs": 867894,
+      "startedAt": "2026-05-28T17:17:29.878Z",
+      "endedAt": "2026-05-28T17:31:57.772Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/Users/nikita/Projects/Bringr",
   "activeTaskIds": [],

@@ -26,6 +26,11 @@ struct RevealSnapshot: Codable, Equatable, Sendable {
         /// launch (Bringr-93j.24). `nil` when the window was minimized before the
         /// summon (it was never parked) or for an older snapshot without the field.
         var originalPosition: CGPoint?
+        /// Pre-summon size of that parked window, so a crash mid-reveal restores its
+        /// exact frame next launch — macOS shrinks a window's height off-screen, so
+        /// position alone leaves it shorter (Bringr-93j.28). `nil` when minimized
+        /// before the summon, or for an older snapshot without the field.
+        var originalSize: CGSize?
     }
 
     /// The app that was frontmost before the summon, to re-activate on restore.

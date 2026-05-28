@@ -11,6 +11,7 @@ final class FakeWindowSystem: WindowControlling {
         case activate(AppID)
         case setMinimized(WindowID, Bool)
         case setPosition(WindowID, CGPoint)
+        case setSize(WindowID, CGSize)
         case raise(WindowID)
         case focusWindow(WindowID)
     }
@@ -19,11 +20,13 @@ final class FakeWindowSystem: WindowControlling {
         let id: WindowID
         var minimized: Bool
         var position: CGPoint
+        var size: CGSize
 
-        init(id: WindowID, minimized: Bool, position: CGPoint = .zero) {
+        init(id: WindowID, minimized: Bool, position: CGPoint = .zero, size: CGSize = .zero) {
             self.id = id
             self.minimized = minimized
             self.position = position
+            self.size = size
         }
     }
 
@@ -135,6 +138,15 @@ final class FakeWindowSystem: WindowControlling {
     func setPosition(_ window: WindowID, _ point: CGPoint) {
         operationLog.append(.setPosition(window, point))
         windowState(window)?.position = point
+    }
+
+    func size(of window: WindowID) -> CGSize? {
+        windowState(window)?.size
+    }
+
+    func setSize(_ window: WindowID, _ size: CGSize) {
+        operationLog.append(.setSize(window, size))
+        windowState(window)?.size = size
     }
 }
 

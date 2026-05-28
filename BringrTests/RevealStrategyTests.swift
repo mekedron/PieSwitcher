@@ -106,6 +106,48 @@ final class RevealStrategyTests: XCTestCase {
         ], "restore returns the original front-to-back order")
     }
 
+    // MARK: - hide-others restores the exact window frame (Bringr-93j.28)
+
+    func testHideOthersRestoresAParkedWindowToItsOriginalSize() {
+        let appA = AppID(pid: 1)
+        let (target, sibling) = (WindowID(app: appA, token: 11), WindowID(app: appA, token: 10))
+        let fake = sizedApp(1, [
+            10: CGRect(x: 100, y: 100, width: 1600, height: 2000),
+            11: CGRect(x: 200, y: 200, width: 800, height: 600)
+        ])
+        let controller = WindowController(system: fake) // default hide-others
+
+        controller.revealWindow(target)
+        XCTAssertEqual(fake.position(of: sibling), WindowController.offScreenPoint)
+        // macOS shrinks a window's HEIGHT when it is parked off the bottom of every
+        // screen (the title-bar constraint), so the model is clamped to mimic that.
+        fake.setSize(sibling, CGSize(width: 1600, height: 1040))
+
+        controller.restore()
+
+        XCTAssertEqual(fake.position(of: sibling), CGPoint(x: 100, y: 100))
+        XCTAssertEqual(fake.size(of: sibling), CGSize(width: 1600, height: 2000),
+                       "the parked window returns to its exact original size, not the clamped height")
+    }
+
+    func testHideOthersReTargetRestoresThePreviouslyParkedWindowSize() {
+        let appA = AppID(pid: 1)
+        let (w10, w11) = (WindowID(app: appA, token: 10), WindowID(app: appA, token: 11))
+        let fake = sizedApp(1, [
+            10: CGRect(x: 100, y: 100, width: 1600, height: 2000),
+            11: CGRect(x: 200, y: 200, width: 800, height: 600)
+        ])
+        let controller = WindowController(system: fake)
+
+        controller.revealWindow(w11)                          // w10 parked off-screen
+        fake.setSize(w10, CGSize(width: 1600, height: 1040))  // OS clamps the parked height
+        controller.revealWindow(w10)                          // re-target un-parks w10
+
+        XCTAssertEqual(fake.position(of: w10), CGPoint(x: 100, y: 100))
+        XCTAssertEqual(fake.size(of: w10), CGSize(width: 1600, height: 2000),
+                       "the re-targeted window recovers its original size when un-parked")
+    }
+
     // MARK: - AC2/AC3: dim-others at both levels
 
     func testDimOthersRevealAppRaisesTargetAndDimsExcludingItsWindows() {
@@ -202,6 +244,18 @@ final class RevealStrategyTests: XCTestCase {
             FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false)
         }
         return FakeWindowSystem.AppState(id: appID, hidden: false, windows: windows)
+    }
+
+    /// A one-app fake whose windows carry explicit frames, so the hide-others reveal's
+    /// park/restore of window *size* can be asserted (Bringr-93j.28). Keyed by token.
+    private func sizedApp(_ pid: pid_t, _ frames: [Int: CGRect]) -> FakeWindowSystem {
+        let appID = AppID(pid: pid)
+        let windows = frames.sorted { $0.key < $1.key }.map { token, frame in
+            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: token),
+                                         minimized: false, position: frame.origin, size: frame.size)
+        }
+        let app = FakeWindowSystem.AppState(id: appID, hidden: false, windows: windows)
+        return FakeWindowSystem(apps: [app], frontmost: appID)
     }
 
     /// An isolated `UserDefaults` suite so persistence tests never touch the real domain.

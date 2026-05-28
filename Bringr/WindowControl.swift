@@ -5,13 +5,10 @@ struct AppID: Hashable, Sendable {
     let pid: pid_t
 }
 
-/// Identifies a window. `token` is an opaque, system-assigned handle (callers
-/// treat it as opaque); `app` ties the window to its owning application.
-///
-/// The token is the window's `kCGWindowNumber` — the same value the enumeration
-/// service (US-003) uses — so a `WindowID` produced by `WindowEnumerator` and one
-/// produced by `LiveWindowSystem` for the same window are equal and interchangeable.
-/// `WindowController` only relies on `WindowID` being `Hashable`.
+/// Identifies a window. `token` is the window's `kCGWindowNumber` — the same value the
+/// enumeration service (US-003) uses — so a `WindowID` from `WindowEnumerator` and one
+/// from `LiveWindowSystem` for the same window are equal and interchangeable. `app` ties
+/// it to its owning application; `WindowController` only relies on `Hashable`.
 struct WindowID: Hashable, Sendable {
     let app: AppID
     let token: Int
@@ -53,16 +50,20 @@ protocol WindowControlling {
     /// unlike AX minimize's slow genie animation — the window-level hide-others reveal
     /// parks the app's other windows off-screen with this instead (Bringr-93j.24).
     func setPosition(_ window: WindowID, _ point: CGPoint)
+
+    /// The window's size, or `nil`. Captured with `position(of:)` so a parked window's
+    /// exact frame can be restored: macOS clamps a window's height when it's moved off
+    /// the bottom of every screen, so position alone leaves it shorter (Bringr-93j.28).
+    func size(of window: WindowID) -> CGSize?
+    /// Set `window`'s size (anchored at its top-left), undoing that off-screen height
+    /// clamp on restore (Bringr-93j.28).
+    func setSize(_ window: WindowID, _ size: CGSize)
 }
 
-/// Low-level window/app control primitives that the reveal strategies (US-013)
-/// and selection (US-012) build on.
-///
-/// Every mutating primitive first captures the pre-mutation state of the scope
-/// it touches — app visibility/order, or one app's window minimized-state/order
-/// — exactly once per session. `restore()` replays that captured baseline, so it
-/// returns to the pre-summon state no matter how many isolate/re-target calls
-/// happened in between.
+/// Low-level window/app control primitives that the reveal strategies (US-013) and
+/// selection (US-012) build on. Every mutating primitive captures the pre-mutation
+/// state it touches once per session; `restore()` replays that baseline, returning to
+/// the pre-summon state no matter how many isolate/re-target calls happened between.
 @MainActor
 final class WindowController {
     private struct AppSnapshot {
@@ -76,6 +77,10 @@ final class WindowController {
         /// Pre-summon top-left so a parked window moves back exactly; `nil` for
         /// windows minimized before the summon (never parked). (Bringr-93j.24)
         let originalPosition: CGPoint?
+        /// Pre-summon size, restored with `originalPosition` so a parked window's exact
+        /// frame comes back — macOS clamps height off-screen (Bringr-93j.28); `nil` when
+        /// minimized.
+        let originalSize: CGSize?
     }
 
     private struct Session {
@@ -86,14 +91,12 @@ final class WindowController {
     }
 
     private let system: WindowControlling
-    /// Mirrors the in-flight baseline to disk so a crash mid-reveal is undone next
-    /// launch (US-015 AC3). `nil` disables journalling (tests/default); prod injects one.
+    /// Mirrors the in-flight baseline to disk so a crash mid-reveal is undone next launch
+    /// (US-015 AC3); `nil` disables journalling (tests/default), production injects one.
     private let store: RevealStateStore?
-    /// Draws/clears the "dim others" spotlight (US-013). `nil` = no dimming (tests/
-    /// non-dim strategies); production injects a `LiveDimmer`, tests a recording double.
+    /// Draws/clears the "dim others" spotlight (US-013); `nil` = no dimming (tests/non-dim).
     private let dimmer: Dimming?
-    /// The reveal strategy in force for the current summon, set by the navigator before
-    /// any reveal call and held for the session so a Preferences change can't switch it.
+    /// The reveal strategy for the current summon, held so a Preferences change can't switch it mid-reveal.
     private var strategy: RevealStrategy = .default
     private var session: Session?
 
@@ -119,10 +122,9 @@ final class WindowController {
 
     // MARK: - Primitives
 
-    /// Raise `window` and move focus to it: first ask AX to raise the selected
-    /// window, then activate its app, then focus/raise/focus the same window again
-    /// so neither app activation nor restored window order can leave a prior front
-    /// app/window as the winner. (AC1)
+    /// Raise `window` and move focus to it: AX-raise it, activate its app, then
+    /// focus/raise/focus it again so neither app activation nor restored window order
+    /// can leave a prior front app/window as the winner. (AC1)
     func raiseAndFocus(_ window: WindowID) {
         system.raise(window)
         system.activate(window.app)
@@ -131,11 +133,10 @@ final class WindowController {
         system.focusWindow(window)
     }
 
-    /// Commit `window` as the user's choice (US-012): restore every other app and
-    /// window moved out of the way (AC2), then surface, raise, and focus `window` (AC1).
-    /// `restore` skips re-activating the prior frontmost (it would race the target's own
-    /// activation); re-enumerating refreshes the AX cache so a stale handle can't no-op
-    /// the un-minimize/raise/focus, and the un-minimize surfaces a hidden target.
+    /// Commit `window` as the user's choice (US-012): restore everything moved aside
+    /// (AC2), then surface, raise, and focus `window` (AC1). `restore` skips re-activating
+    /// the prior frontmost (would race the target); re-enumerating refreshes the AX cache
+    /// so a stale handle can't no-op the un-minimize/raise/focus.
     func commit(_ window: WindowID) {
         restore(reactivatingFrontmost: false)
         _ = system.windows(of: window.app)
@@ -168,17 +169,16 @@ final class WindowController {
         }
     }
 
-    /// Get every window of `target`'s app except `target` out of the way by parking it
-    /// off-screen — instant, unlike the AX minimize this replaced (Bringr-93j.24).
-    /// Captures the app's window state/order first so `restore()` undoes it exactly (AC3).
-    /// Re-targeting reuses that baseline: the new target un-parks (no-op on first isolate)
-    /// and raises while the previous parks; user-minimized windows are left alone.
+    /// Park every window of `target`'s app except `target` off-screen — instant, unlike
+    /// the AX minimize this replaced (Bringr-93j.24). Captures the app's window state/order
+    /// first so `restore()` undoes it exactly (AC3); re-targeting reuses that baseline (the
+    /// new target un-parks while the previous parks; user-minimized windows are left alone).
     func hideOtherWindows(besides target: WindowID) {
         captureWindowBaselineIfNeeded(for: target.app)
         if system.isMinimized(target) {
             system.setMinimized(target, false)
         }
-        restoreCapturedPosition(of: target)
+        restoreCapturedFrame(of: target)
         for window in system.windows(of: target.app)
         where window != target && !system.isMinimized(window) {
             system.setPosition(window, Self.offScreenPoint)
@@ -186,12 +186,14 @@ final class WindowController {
         system.raise(target)
     }
 
-    /// Move `window` back to the position captured at baseline, if one was recorded
-    /// (a no-op for a window minimized before the summon — it was never parked).
-    private func restoreCapturedPosition(of window: WindowID) {
-        guard let position = session?.windowBaseline[window.app]?
-            .first(where: { $0.id == window })?.originalPosition else { return }
-        system.setPosition(window, position)
+    /// Move `window` back to the frame captured at baseline (position then size, so a
+    /// re-targeted window recovers the height macOS clamped off-screen — Bringr-93j.28).
+    /// A no-op for a window minimized before the summon — it was never parked.
+    private func restoreCapturedFrame(of window: WindowID) {
+        guard let snapshot = session?.windowBaseline[window.app]?
+            .first(where: { $0.id == window }) else { return }
+        if let position = snapshot.originalPosition { system.setPosition(window, position) }
+        if let size = snapshot.originalSize { system.setSize(window, size) }
     }
 
     // MARK: - Reveal strategies (US-013)
@@ -255,13 +257,13 @@ final class WindowController {
         system.windows(of: app).compactMap { system.frame(of: $0) }
     }
 
-    /// Put one app's captured window baseline back: un-park to origin, restore minimized-
+    /// Put one app's captured window baseline back: un-park to origin then restore size
+    /// (recovering the height macOS clamped off-screen, Bringr-93j.28), restore minimized-
     /// state, then re-raise back-to-front so the original front window ends up on top.
     private func restoreWindowBaseline(_ windows: [WindowSnapshot]) {
         for snapshot in windows {
-            if let position = snapshot.originalPosition {
-                system.setPosition(snapshot.id, position)
-            }
+            if let position = snapshot.originalPosition { system.setPosition(snapshot.id, position) }
+            if let size = snapshot.originalSize { system.setSize(snapshot.id, size) }
             system.setMinimized(snapshot.id, snapshot.wasMinimized)
         }
         for snapshot in windows.reversed() where !snapshot.wasMinimized {
@@ -283,9 +285,8 @@ final class WindowController {
         }
     }
 
-    /// Restore every app/window touched this session to its pre-summon
-    /// visibility and ordering, then end the session. Safe to call with no
-    /// active session. (AC5)
+    /// Restore every app/window touched this session to its pre-summon visibility and
+    /// ordering, then end the session. Safe to call with no active session. (AC5)
     func restore(reactivatingFrontmost: Bool = true) {
         guard let session else { return }
 
@@ -315,9 +316,8 @@ final class WindowController {
     // MARK: - Restore-on-launch safety net (AC3)
 
     /// If a previous session was killed mid-reveal, its baseline is still persisted —
-    /// replay it so no app stays hidden and no window stays minimized, then clear it.
-    /// Returns whether a stranded reveal was found and undone. A no-op (returns
-    /// `false`) on the common path where the last session restored cleanly.
+    /// replay it so nothing stays hidden/minimized/parked, then clear it. Returns whether
+    /// a stranded reveal was undone; a no-op when the last session restored cleanly.
     @discardableResult
     func restoreFromSnapshotIfNeeded() -> Bool {
         guard let store, let snapshot = store.load() else { return false }
@@ -326,10 +326,9 @@ final class WindowController {
         return true
     }
 
-    /// Put each app/window in `snapshot` back to its pre-summon state in the same order
-    /// `restore()` uses: app visibility first, then re-enumerate each app to repopulate
-    /// the AX element cache before un-parking / restoring minimized-state, then the
-    /// prior frontmost app.
+    /// Put each app/window in `snapshot` back to its pre-summon state in `restore()`'s
+    /// order: app visibility first, then re-enumerate each app to repopulate the AX cache
+    /// before un-parking / restoring frame and minimized-state, then the prior frontmost.
     private func applySnapshot(_ snapshot: RevealSnapshot) {
         for app in snapshot.apps {
             system.setHidden(AppID(pid: app.pid), app.wasHidden)
@@ -339,9 +338,8 @@ final class WindowController {
         }
         for window in snapshot.windows {
             let id = WindowID(app: AppID(pid: window.pid), token: window.token)
-            if let position = window.originalPosition {
-                system.setPosition(id, position)
-            }
+            if let position = window.originalPosition { system.setPosition(id, position) }
+            if let size = window.originalSize { system.setSize(id, size) }
             system.setMinimized(id, window.wasMinimized)
         }
         if let frontmost = snapshot.frontmostPID {
@@ -370,7 +368,8 @@ final class WindowController {
             return WindowSnapshot(
                 id: id,
                 wasMinimized: minimized,
-                originalPosition: minimized ? nil : system.position(of: id)
+                originalPosition: minimized ? nil : system.position(of: id),
+                originalSize: minimized ? nil : system.size(of: id)
             )
         }
         persistSnapshot()
@@ -388,7 +387,8 @@ final class WindowController {
             snapshots.map {
                 RevealSnapshot.WindowEntry(
                     pid: $0.id.app.pid, token: $0.id.token,
-                    wasMinimized: $0.wasMinimized, originalPosition: $0.originalPosition
+                    wasMinimized: $0.wasMinimized,
+                    originalPosition: $0.originalPosition, originalSize: $0.originalSize
                 )
             }
         }

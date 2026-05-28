@@ -135,6 +135,23 @@ final class LiveWindowSystem: WindowControlling {
         logAXFailure(result, operation: "set position", window: window)
     }
 
+    func size(of window: WindowID) -> CGSize? {
+        guard let element = elementCache[window] else { return nil }
+        // Width/height are space-agnostic, so no flip is needed (unlike `frame(of:)`).
+        return axSize(element, kAXSizeAttribute)
+    }
+
+    func setSize(_ window: WindowID, _ size: CGSize) {
+        guard let element = cachedElement(for: window, operation: "set size") else { return }
+        var mutableSize = size
+        guard let value = AXValueCreate(.cgSize, &mutableSize) else {
+            log.error("AX could not create size value for window \(window.token)")
+            return
+        }
+        let result = AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
+        logAXFailure(result, operation: "set size", window: window)
+    }
+
     private func axPoint(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
         guard let value = copyAXValue(element, attribute) else { return nil }
         var point = CGPoint.zero
