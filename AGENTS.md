@@ -35,6 +35,10 @@ build/Build/Products/Debug/Bringr.app/Contents/MacOS/Bringr
 `pkill -x Bringr` before ending the session.
 
 
+## Workflow
+
+After compleating each beads task, launch the latest build of the app.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
 

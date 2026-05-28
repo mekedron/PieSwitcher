@@ -3,10 +3,10 @@
   "sessionId": "bf5be85f-d1fa-4dc4-8304-f09229dbce6c",
   "status": "running",
   "startedAt": "2026-05-28T11:08:26.939Z",
-  "updatedAt": "2026-05-28T11:59:46.261Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-05-28T12:10:11.241Z",
+  "currentIteration": 5,
   "maxIterations": 0,
-  "tasksCompleted": 4,
+  "tasksCompleted": 5,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -56,8 +56,8 @@
       {
         "id": "Bringr-93j.5",
         "title": "US-005: Nestable, non-singleton menu model",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.6",
@@ -161,6 +161,16 @@
       "durationMs": 532535,
       "startedAt": "2026-05-28T11:38:59.598Z",
       "endedAt": "2026-05-28T11:47:52.133Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "Bringr-93j.5",
+      "taskTitle": "US-005: Nestable, non-singleton menu model",
+      "taskCompleted": true,
+      "durationMs": 703346,
+      "startedAt": "2026-05-28T11:48:01.988Z",
+      "endedAt": "2026-05-28T11:59:45.334Z"
     }
   ],
   "skippedTaskIds": [],
