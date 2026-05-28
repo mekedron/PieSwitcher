@@ -70,6 +70,17 @@ final class RadialNavigator {
     /// while its sub-wheel is open, or `.none` when nothing is remembered. Distinct
     /// from `hovered`: it suggests a choice before the cursor reaches it. (US-012 AC4)
     private(set) var prehighlighted: HoverRegion = .none
+    /// Whether the optional second-level cursor lock (Bringr-93j.29) is currently
+    /// confining the pointer to the open app's windows sub-wheel and its parent app
+    /// arc. Engaged when the cursor first enters the windows ring (level 1); released
+    /// when it returns to the apps ring — the parent app arc being the only level-0
+    /// slice reachable while confined. Always false when the setting is disabled. The
+    /// controller reads it to decide whether to snap a stray move back.
+    private(set) var cursorLockEngaged = false
+    /// Whether the cursor-lock setting is on for this summon. Pushed in before `open`
+    /// from the persisted setting (mirroring the strategy/geometry setters), so a
+    /// Preferences change applies on the next open. When false the lock never engages.
+    private var cursorLockEnabled = false
 
     private let windowControl: WindowController
     /// Starts a curated app that has no window to focus (Bringr-93j.39), behind a seam
@@ -130,6 +141,16 @@ final class RadialNavigator {
         windowControl.setStrategy(strategy)
     }
 
+    /// Enable or disable the optional second-level cursor lock for the next summon
+    /// (Bringr-93j.29). Read fresh from the persisted setting just before `open`
+    /// (mirroring `setRevealStrategy`), so a Preferences change applies on the next
+    /// summon without a relaunch. Disabling also clears any active engagement so the
+    /// pointer is freed immediately rather than only on the next open.
+    func setCursorLockEnabled(_ enabled: Bool) {
+        cursorLockEnabled = enabled
+        if !enabled { cursorLockEngaged = false }
+    }
+
     // MARK: - Lifecycle
 
     /// Begin a summon: show the apps ring, nothing expanded, nothing revealed.
@@ -142,6 +163,7 @@ final class RadialNavigator {
         focusedWindowIndex = nil
         hovered = .none
         prehighlighted = .none
+        cursorLockEngaged = false
     }
 
     /// End the interaction: restore every hidden app/window to its pre-summon state
@@ -158,38 +180,7 @@ final class RadialNavigator {
         focusedWindowIndex = nil
         hovered = .none
         prehighlighted = .none
-    }
-
-    /// Whether the windows sub-wheel is open and populated: a level-1 ring carrying at
-    /// least one window node. False when an app expansion's live scan momentarily
-    /// returned no windows (Bringr-93j.31), which the next hover/retry rebuilds.
-    var hasWindowSubWheel: Bool {
-        rings.count > 1 && !rings[1].nodes.isEmpty
-    }
-
-    // MARK: - Hit-testing
-
-    /// Map a cursor `offset` (from the ring centre, +x right / +y down) to the
-    /// region it falls in, using each ring's own shared layout. Rings are checked
-    /// innermost-first; their bands touch, so at most one slice matches.
-    ///
-    /// A cursor inside a ring's radial band but over an uncovered angular gap (an
-    /// empty outer sector of a partially-filled US-016 window ring) is a no-op: it
-    /// returns the current `hovered` region so the sub-wheel stays open, rather than
-    /// `.none` which would collapse it. Only the dead centre or a point outside every
-    /// band — neither of which is in any ring's band — returns `.none`.
-    func region(forOffset offset: CGPoint) -> HoverRegion {
-        let distance = hypot(offset.x, offset.y)
-        var withinARingBand = false
-        for ring in rings {
-            if let index = ring.layout.hitTest(offset) {
-                return .slice(level: ring.level, index: index)
-            }
-            if distance >= ring.geometry.innerRadius, distance <= ring.geometry.outerRadius {
-                withinARingBand = true
-            }
-        }
-        return withinARingBand ? hovered : .none
+        cursorLockEngaged = false
     }
 
     // MARK: - Hover
@@ -204,9 +195,15 @@ final class RadialNavigator {
         hovered = region
         switch region {
         case .slice(level: 0, let index):
+            // Back on the apps ring: the cursor reached the parent app arc, the gate
+            // out of the lock (the only level-0 slice reachable while confined), so
+            // release it (Bringr-93j.29).
+            cursorLockEngaged = false
             restoreWindowIsolation()
             expandApp(at: index)
         case .slice(level: 1, let index):
+            // Entering the windows sub-wheel engages the lock when the setting is on.
+            if cursorLockEnabled { cursorLockEngaged = true }
             isolateWindow(at: index)
             focusWindowSlice(at: index)
         case .slice:
@@ -379,6 +376,7 @@ final class RadialNavigator {
         expandedWindowIndex = nil
         focusedWindowIndex = nil
         prehighlighted = .none
+        cursorLockEngaged = false
     }
 
     /// The app node currently expanded on the apps ring, if any.

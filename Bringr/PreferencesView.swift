@@ -7,7 +7,6 @@ struct PreferencesView: View {
     @EnvironmentObject private var launchAtLogin: LaunchAtLoginManager
     /// The persisted interaction mode. The same key is read by `RadialMenuController`
     /// (via `InteractionMode.current`), so a change here takes effect on the next summon.
-    @AppStorage(InteractionMode.defaultsKey) private var interactionModeRaw = InteractionMode.default.rawValue
     /// Persisted appearance. The same keys are read by `RadialAppearance.current` at
     /// each summon, so changes apply on the next summon without a relaunch (AC2).
     @AppStorage(RadialAppearance.radiusDefaultsKey)
@@ -174,28 +173,7 @@ struct PreferencesView: View {
     }
 
     private var interactionSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("When summoned:", selection: $interactionModeRaw) {
-                ForEach(InteractionMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.displayName).tag(mode.rawValue)
-                }
-            }
-            .pickerStyle(.radioGroup)
-
-            Text(interactionHelp)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var interactionHelp: String {
-        switch InteractionMode(rawValue: interactionModeRaw) ?? .default {
-        case .holdToSelect:
-            return "Release the trigger over a slice to choose it; release on the centre to cancel."
-        case .clickToStay:
-            return "The wheel stays open after release. Click a slice to choose it, or the centre to cancel."
-        }
+        InteractionSettings()
     }
 
     private var revealSection: some View {
@@ -301,6 +279,53 @@ struct PreferencesView: View {
                 }
             }
             .padding(.top, 4)
+        }
+    }
+}
+
+/// The interaction-mode picker (US-009) and the optional second-level cursor-lock toggle
+/// (Bringr-93j.29), grouped in their own view so the Preferences body stays within its
+/// length budget. Both keys are read fresh at each summon by `RadialMenuController`, so a
+/// change here applies on the next open without a relaunch.
+private struct InteractionSettings: View {
+    @AppStorage(InteractionMode.defaultsKey) private var modeRaw = InteractionMode.default.rawValue
+    @AppStorage(CursorLock.defaultsKey) private var cursorLockEnabled = CursorLock.default
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("When summoned:", selection: $modeRaw) {
+                    ForEach(InteractionMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.displayName).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                Text(modeHelp)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Lock the cursor inside an app's windows", isOn: $cursorLockEnabled)
+
+                Text("When you open an app's windows, keep the pointer on that app and its "
+                     + "windows so it can't slip onto another app. Move back onto the app to "
+                     + "release it.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var modeHelp: String {
+        switch InteractionMode(rawValue: modeRaw) ?? .default {
+        case .holdToSelect:
+            return "Release the trigger over a slice to choose it; release on the centre to cancel."
+        case .clickToStay:
+            return "The wheel stays open after release. Click a slice to choose it, or the centre to cancel."
         }
     }
 }

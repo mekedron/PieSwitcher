@@ -67,6 +67,11 @@
 		1A0000000000000000000090 /* WindowEnumeratorRecencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000008F /* WindowEnumeratorRecencyTests.swift */; };
 		1A0000000000000000000092 /* DockIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000091 /* DockIconManager.swift */; };
 		1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000093 /* DockIconManagerTests.swift */; };
+		1A0000000000000000000096 /* CursorLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000095 /* CursorLock.swift */; };
+		1A000000000000000000009C /* RadialMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000009B /* RadialMenuController.swift */; };
+		1A000000000000000000009E /* RadialNavigator+Region.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000009D /* RadialNavigator+Region.swift */; };
+		1A0000000000000000000098 /* CursorLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000097 /* CursorLockTests.swift */; };
+		1A000000000000000000009A /* RadialNavigatorCursorLockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000099 /* RadialNavigatorCursorLockTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -142,6 +147,11 @@
 		1A000000000000000000008F /* WindowEnumeratorRecencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeratorRecencyTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000091 /* DockIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManager.swift; sourceTree = "<group>"; };
 		1A0000000000000000000093 /* DockIconManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManagerTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000095 /* CursorLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLock.swift; sourceTree = "<group>"; };
+		1A000000000000000000009B /* RadialMenuController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialMenuController.swift; sourceTree = "<group>"; };
+		1A000000000000000000009D /* RadialNavigator+Region.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RadialNavigator+Region.swift"; sourceTree = "<group>"; };
+		1A0000000000000000000097 /* CursorLockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CursorLockTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000099 /* RadialNavigatorCursorLockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorCursorLockTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,6 +224,9 @@
 				1A0000000000000000000085 /* MyAppsMenu.swift */,
 				1A000000000000000000008B /* RecencyTracker.swift */,
 				1A0000000000000000000091 /* DockIconManager.swift */,
+				1A0000000000000000000095 /* CursorLock.swift */,
+				1A000000000000000000009B /* RadialMenuController.swift */,
+				1A000000000000000000009D /* RadialNavigator+Region.swift */,
 			);
 			path = Bringr;
 			sourceTree = "<group>";
@@ -250,6 +263,8 @@
 				1A000000000000000000008D /* RecencyTrackerTests.swift */,
 				1A000000000000000000008F /* WindowEnumeratorRecencyTests.swift */,
 				1A0000000000000000000093 /* DockIconManagerTests.swift */,
+				1A0000000000000000000097 /* CursorLockTests.swift */,
+				1A0000000000000000000099 /* RadialNavigatorCursorLockTests.swift */,
 			);
 			path = BringrTests;
 			sourceTree = "<group>";
@@ -383,6 +398,9 @@
 				1A0000000000000000000086 /* MyAppsMenu.swift in Sources */,
 				1A000000000000000000008C /* RecencyTracker.swift in Sources */,
 				1A0000000000000000000092 /* DockIconManager.swift in Sources */,
+				1A0000000000000000000096 /* CursorLock.swift in Sources */,
+				1A000000000000000000009C /* RadialMenuController.swift in Sources */,
+				1A000000000000000000009E /* RadialNavigator+Region.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -419,6 +437,8 @@
 				1A000000000000000000008E /* RecencyTrackerTests.swift in Sources */,
 				1A0000000000000000000090 /* WindowEnumeratorRecencyTests.swift in Sources */,
 				1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */,
+				1A0000000000000000000098 /* CursorLockTests.swift in Sources */,
+				1A000000000000000000009A /* RadialNavigatorCursorLockTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
