@@ -1,11 +1,15 @@
 configVersion = "2.1"
 maxIterations = 10
 agent = "claude"
-tracker = "beads-bv"
+tracker = "beads-rust"
 autoCommit = true
-subagentTracingDetail = "off"
+subagentTracingDetail = "full"
+defaultTracker = "beads-rust"
 
 [agentOptions]
 [trackerOptions]
 beadsDir = ".beads"
 labels = ""
+
+[notifications]
+sound = "system"

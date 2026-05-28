@@ -117,6 +117,43 @@ final class WindowControlTests: XCTestCase {
         XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
     }
 
+    // MARK: - restoreWindows: targeted un-isolate that keeps app hiding intact (US-011)
+
+    func testRestoreWindowsRevealsOneAppsWindowsButKeepsOtherAppsHidden() {
+        let appA = AppID(pid: 1)
+        let fake = FakeWindowSystem(
+            apps: [makeApp(1, windowTokens: [10, 11, 12]), makeApp(2)],
+            frontmost: appA
+        )
+        let controller = WindowController(system: fake)
+        controller.hideOtherApps(besides: appA)                              // app 2 hidden
+        controller.hideOtherWindows(besides: WindowID(app: appA, token: 11)) // 10, 12 minimized
+
+        controller.restoreWindows(of: appA)
+
+        // The app's windows are all back...
+        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
+        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 11)))
+        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 12)))
+        // ...but app 2 stays hidden and the session is still open for a later restore.
+        XCTAssertTrue(fake.isHidden(AppID(pid: 2)))
+        XCTAssertTrue(controller.hasActiveSession)
+
+        controller.restore()
+        XCTAssertFalse(fake.isHidden(AppID(pid: 2)))
+    }
+
+    func testRestoreWindowsIsNoOpForAnAppThatWasNeverIsolated() {
+        let appA = AppID(pid: 1)
+        let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11])], frontmost: appA)
+        let controller = WindowController(system: fake)
+
+        controller.restoreWindows(of: appA) // no session, no baseline to replay
+
+        XCTAssertFalse(controller.hasActiveSession)
+        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
+    }
+
     // MARK: - AC4: capture happens once; restore returns to the original baseline
 
     func testRestoreReturnsToBaselineDespiteReTargeting() {

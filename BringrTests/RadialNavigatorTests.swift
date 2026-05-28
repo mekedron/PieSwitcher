@@ -90,7 +90,7 @@ final class RadialNavigatorTests: XCTestCase {
         XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20)))
     }
 
-    // MARK: - window-ring hover leaves the app expansion alone (US-011 acts later)
+    // MARK: - window-ring hover keeps the app expanded (the apps ring stays live)
 
     func testHoveringWindowRingKeepsAppExpanded() {
         let fixture = makeFixture()
@@ -103,6 +103,119 @@ final class RadialNavigatorTests: XCTestCase {
         XCTAssertEqual(fixture.navigator.rings.count, 2)
         XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20))) // still isolated
         XCTAssertEqual(fixture.navigator.hovered, .slice(level: 1, index: 0))
+    }
+
+    // MARK: - AC1: hovering a window isolates it, hiding the app's other windows
+
+    func testHoveringWindowIsolatesItAndHidesOtherWindowsOfTheApp() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome → [Inbox, Docs]
+
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox
+
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11))) // Inbox stays
+        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))  // Docs hidden
+        XCTAssertEqual(fixture.navigator.expandedWindowIndex, 0)
+    }
+
+    // MARK: - AC2: moving between window slices re-isolates the new target
+
+    func testMovingBetweenWindowSlicesReIsolatesNewTarget() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox isolated
+
+        fixture.navigator.updateHover(.slice(level: 1, index: 1)) // Docs
+
+        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))  // Inbox now hidden
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12))) // Docs now stays
+        XCTAssertEqual(fixture.navigator.expandedWindowIndex, 1)
+    }
+
+    // MARK: - AC3: leaving the window ring restores the app's other windows
+
+    func testMovingBackToAppsRingRestoresWindowsButKeepsAppIsolated() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox isolated (Docs hidden)
+
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // back to the apps ring
+
+        // AC3: both windows are visible again...
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        XCTAssertNil(fixture.navigator.expandedWindowIndex)
+        // ...but the app stays isolated and its sub-wheel stays open.
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20)))
+        XCTAssertEqual(fixture.navigator.rings.count, 2)
+        XCTAssertEqual(fixture.navigator.expandedAppIndex, 0)
+    }
+
+    func testReHoveringTheSameWindowIsIdempotent() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0))
+        fixture.navigator.updateHover(.slice(level: 1, index: 1)) // Docs isolated
+        fixture.navigator.updateHover(.slice(level: 1, index: 1)) // again
+
+        XCTAssertEqual(fixture.navigator.expandedWindowIndex, 1)
+        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+    }
+
+    // MARK: - re-targeting a different app from a window restores the old windows
+
+    func testReTargetingAppFromWindowRestoresOldWindowsAndRebuilds() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox isolated
+
+        fixture.navigator.updateHover(.slice(level: 0, index: 1)) // jump to Ghostty
+
+        // Chrome's windows are no longer minimized...
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        XCTAssertNil(fixture.navigator.expandedWindowIndex)
+        // ...and Ghostty is now the isolated app with its own sub-wheel.
+        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 10)))
+        XCTAssertEqual(fixture.navigator.rings[1].nodes.map(\.title), ["Terminal"])
+        XCTAssertEqual(fixture.navigator.expandedAppIndex, 1)
+    }
+
+    // MARK: - dead zone and close both restore the isolated window
+
+    func testMovingToDeadZoneRestoresWindowsAndApps() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0))
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox isolated
+
+        fixture.navigator.updateHover(.none)
+
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
+        XCTAssertEqual(fixture.navigator.rings.count, 1)
+        XCTAssertNil(fixture.navigator.expandedWindowIndex)
+        XCTAssertNil(fixture.navigator.expandedAppIndex)
+    }
+
+    func testCloseRestoresTheIsolatedWindow() {
+        let fixture = makeFixture()
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0))
+        fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox isolated
+
+        fixture.navigator.close()
+
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        XCTAssertNil(fixture.navigator.expandedWindowIndex)
     }
 
     // MARK: - close restores and clears
@@ -189,16 +302,25 @@ final class RadialNavigatorTests: XCTestCase {
         ])
         let appNodes = WindowSwitcherMenu(enumerator: WindowEnumerator(source: source))
             .makeRoot().resolvedChildren()
+        // The fake's window tokens match the enumerator's window numbers (11/12 for
+        // Chrome, 21 for Ghostty), so a target carried by a window node resolves to
+        // the same window the controller operates on — the US-003↔US-004 reconciliation.
         let fake = FakeWindowSystem(
             apps: [
-                FakeWindowSystem.AppState(id: AppID(pid: 10), hidden: false, windows: []),
-                FakeWindowSystem.AppState(id: AppID(pid: 20), hidden: false, windows: []),
+                FakeWindowSystem.AppState(id: AppID(pid: 10), hidden: false,
+                                          windows: [win(10, 11), win(10, 12)]),
+                FakeWindowSystem.AppState(id: AppID(pid: 20), hidden: false,
+                                          windows: [win(20, 21)]),
                 FakeWindowSystem.AppState(id: AppID(pid: 30), hidden: false, windows: [])
             ],
             frontmost: AppID(pid: 10)
         )
         let navigator = RadialNavigator(windowControl: WindowController(system: fake))
         return Fixture(navigator: navigator, fake: fake, source: source, appNodes: appNodes)
+    }
+
+    private func win(_ pid: pid_t, _ token: Int) -> FakeWindowSystem.WindowState {
+        FakeWindowSystem.WindowState(id: WindowID(app: AppID(pid: pid), token: token), minimized: false)
     }
 
     private func raw(number: Int, pid: pid_t, name: String, title: String = "") -> RawWindow {

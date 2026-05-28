@@ -48,3 +48,4 @@ fastlane/test_output
 
 # bv (beads viewer) local config and caches
 .bv/
+.ralph-tui

@@ -1,6 +1,19 @@
 import AppKit
 import ApplicationServices
+import CoreGraphics
 import Foundation
+
+/// Accessibility SPI that returns the `CGWindowID` (i.e. `kCGWindowNumber`) backing
+/// an `AXUIElement` window. It is the only reliable way to map an AX window element
+/// to the stable window number the enumeration service (US-003) keys on, so the two
+/// subsystems can agree on one `WindowID` token. Declared by symbol name; resolves
+/// against the already-linked Accessibility framework. The caller treats a failure
+/// as "no number" and falls back, so an absent symbol degrades rather than crashes.
+@_silgen_name("_AXUIElementGetWindow")
+private func axUIElementGetWindow(
+    _ element: AXUIElement,
+    _ windowID: UnsafeMutablePointer<CGWindowID>
+) -> AXError
 
 /// Identifies a running application by its process id.
 struct AppID: Hashable, Sendable {
@@ -10,10 +23,10 @@ struct AppID: Hashable, Sendable {
 /// Identifies a window. `token` is an opaque, system-assigned handle (callers
 /// treat it as opaque); `app` ties the window to its owning application.
 ///
-/// v1's live system assigns the token by enumeration index. The richer,
-/// cross-restart-stable identity lives with the enumeration service (US-003);
-/// `WindowController` only relies on `WindowID` being `Hashable`, so that
-/// refinement is additive.
+/// The token is the window's `kCGWindowNumber` — the same value the enumeration
+/// service (US-003) uses — so a `WindowID` produced by `WindowEnumerator` and one
+/// produced by `LiveWindowSystem` for the same window are equal and interchangeable.
+/// `WindowController` only relies on `WindowID` being `Hashable`.
 struct WindowID: Hashable, Sendable {
     let app: AppID
     let token: Int
@@ -116,6 +129,23 @@ final class WindowController {
         }
     }
 
+    /// Restore just `app`'s windows to their captured baseline — un-minimize and
+    /// re-raise back-to-front — and drop that one baseline, leaving app-level
+    /// hiding and the session itself intact. Used when the cursor leaves the
+    /// windows sub-wheel but the app stays isolated, so the app's other windows
+    /// reappear without un-hiding the rest of the apps. No-op if that app's
+    /// windows were never isolated this session.
+    func restoreWindows(of app: AppID) {
+        guard let windows = session?.windowBaseline[app] else { return }
+        for snapshot in windows {
+            system.setMinimized(snapshot.id, snapshot.wasMinimized)
+        }
+        for snapshot in windows.reversed() where !snapshot.wasMinimized {
+            system.raise(snapshot.id)
+        }
+        session?.windowBaseline[app] = nil
+    }
+
     /// Restore every app/window touched this session to its pre-summon
     /// visibility and ordering, then end the session. Safe to call with no
     /// active session. (AC5)
@@ -189,8 +219,11 @@ final class LiveWindowSystem: WindowControlling {
         guard let axWindows = copyWindows(appElement) else { return [] }
 
         var ids: [WindowID] = []
-        for axWindow in axWindows {
-            let id = WindowID(app: app, token: ids.count)
+        for (index, axWindow) in axWindows.enumerated() {
+            // Key on the stable CG window number so a target coming from the
+            // enumeration service resolves to this AX element; fall back to the
+            // enumeration index only if the SPI cannot report a number.
+            let id = WindowID(app: app, token: windowNumber(of: axWindow) ?? index)
             elementCache[id] = axWindow
             ids.append(id)
         }
@@ -245,6 +278,14 @@ final class LiveWindowSystem: WindowControlling {
 
     private func runningApplication(_ app: AppID) -> NSRunningApplication? {
         NSRunningApplication(processIdentifier: app.pid)
+    }
+
+    /// The `kCGWindowNumber` backing an AX window element, or `nil` if the
+    /// Accessibility SPI cannot report it.
+    private func windowNumber(of element: AXUIElement) -> Int? {
+        var windowID: CGWindowID = 0
+        let result = axUIElementGetWindow(element, &windowID)
+        return result == .success ? Int(windowID) : nil
     }
 
     private func copyWindows(_ appElement: AXUIElement) -> [AXUIElement]? {

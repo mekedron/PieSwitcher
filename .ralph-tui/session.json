@@ -3,10 +3,10 @@
   "sessionId": "bf5be85f-d1fa-4dc4-8304-f09229dbce6c",
   "status": "running",
   "startedAt": "2026-05-28T11:08:26.939Z",
-  "updatedAt": "2026-05-28T13:19:31.555Z",
-  "currentIteration": 9,
+  "updatedAt": "2026-05-28T13:31:54.222Z",
+  "currentIteration": 10,
   "maxIterations": 0,
-  "tasksCompleted": 9,
+  "tasksCompleted": 10,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -86,8 +86,8 @@
       {
         "id": "Bringr-93j.10",
         "title": "US-010: App-hover — isolate app and open window sub-wheel",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.11",
@@ -211,6 +211,16 @@
       "durationMs": 1018662,
       "startedAt": "2026-05-28T12:42:37.271Z",
       "endedAt": "2026-05-28T12:59:35.933Z"
+    },
+    {
+      "iteration": 10,
+      "status": "completed",
+      "taskId": "Bringr-93j.10",
+      "taskTitle": "US-010: App-hover — isolate app and open window sub-wheel",
+      "taskCompleted": true,
+      "durationMs": 1184195,
+      "startedAt": "2026-05-28T12:59:46.335Z",
+      "endedAt": "2026-05-28T13:19:30.530Z"
     }
   ],
   "skippedTaskIds": [],

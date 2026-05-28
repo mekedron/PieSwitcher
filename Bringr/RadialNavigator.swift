@@ -41,6 +41,10 @@ final class RadialNavigator {
     /// Index of the expanded slice on the apps ring, or `nil` when collapsed to
     /// apps-only. Drives re-target detection (hovering the same app is a no-op).
     private(set) var expandedAppIndex: Int?
+    /// Index of the isolated slice on the windows ring, or `nil` when no single
+    /// window is isolated. Drives window re-isolation (hovering the same window is
+    /// a no-op) and the un-isolate when the cursor leaves the windows ring.
+    private(set) var expandedWindowIndex: Int?
 
     private let windowControl: WindowController
     private let baseGeometry: RadialGeometry
@@ -78,6 +82,7 @@ final class RadialNavigator {
     func open(appNodes: [MenuNode]) {
         rings = [RadialRing(level: 0, geometry: ringGeometry(forLevel: 0), nodes: appNodes)]
         expandedAppIndex = nil
+        expandedWindowIndex = nil
         hovered = .none
     }
 
@@ -87,6 +92,7 @@ final class RadialNavigator {
         windowControl.restore()
         rings = []
         expandedAppIndex = nil
+        expandedWindowIndex = nil
         hovered = .none
     }
 
@@ -107,15 +113,20 @@ final class RadialNavigator {
 
     // MARK: - Hover
 
-    /// React to the cursor moving to `region`. On the apps ring this drills into or
-    /// re-targets the hovered app; off every ring it collapses back to apps and
-    /// restores them. A deeper ring (the windows sub-wheel) leaves the app
-    /// expansion untouched — US-011 acts on window hovers.
+    /// React to the cursor moving to `region`:
+    /// - apps ring (level 0): un-isolate any single window (its siblings reappear),
+    ///   then drill into or re-target the hovered app;
+    /// - windows ring (level 1): isolate the hovered window, hiding the app's other
+    ///   windows so only it remains;
+    /// - off every ring (dead zone / outside): collapse back to apps and restore.
     func updateHover(_ region: HoverRegion) {
         hovered = region
         switch region {
         case .slice(level: 0, let index):
+            restoreWindowIsolation()
             expandApp(at: index)
+        case .slice(level: 1, let index):
+            isolateWindow(at: index)
         case .slice:
             break
         case .none:
@@ -145,12 +156,48 @@ final class RadialNavigator {
         expandedAppIndex = index
     }
 
-    /// Drop the windows sub-wheel and restore the other apps. No-op when already
-    /// collapsed, so brushing the dead zone repeatedly costs nothing.
+    /// Isolate the window under the windows-ring slice at `index`: hide every other
+    /// window of the expanded app so only this one remains (AC1). Moving between
+    /// window slices re-isolates the new target through the same call — the capture-
+    /// once baseline makes the previously isolated window reappear and the new one
+    /// stand alone (AC2). Idempotent for the already-isolated window.
+    private func isolateWindow(at index: Int) {
+        guard expandedWindowIndex != index, rings.count > 1 else { return }
+        let windowsRing = rings[1]
+        guard index >= 0, index < windowsRing.nodes.count,
+              case .focusWindow(let windowID) = windowsRing.nodes[index].action else { return }
+        windowControl.hideOtherWindows(besides: windowID)
+        expandedWindowIndex = index
+    }
+
+    /// Un-isolate the single window, bringing the expanded app's other windows back
+    /// (AC3), without un-hiding the other apps — the app stays isolated and its
+    /// sub-wheel stays open. No-op when no window is isolated.
+    private func restoreWindowIsolation() {
+        guard expandedWindowIndex != nil, let appID = expandedAppID else {
+            expandedWindowIndex = nil
+            return
+        }
+        windowControl.restoreWindows(of: appID)
+        expandedWindowIndex = nil
+    }
+
+    /// Drop the windows sub-wheel and restore the other apps (and any isolated
+    /// window). No-op when already collapsed, so brushing the dead zone repeatedly
+    /// costs nothing.
     private func collapse() {
         guard expandedAppIndex != nil else { return }
         windowControl.restore()
         rings = Array(rings.prefix(1))
         expandedAppIndex = nil
+        expandedWindowIndex = nil
+    }
+
+    /// The app currently expanded on the apps ring, if any — the scope window
+    /// isolation acts within.
+    private var expandedAppID: AppID? {
+        guard let index = expandedAppIndex, let appsRing = rings.first,
+              index >= 0, index < appsRing.nodes.count else { return nil }
+        return appsRing.nodes[index].representedApp
     }
 }
