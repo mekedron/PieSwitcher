@@ -1,0 +1,131 @@
+# Iteration 2 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.19
+- **Task Title**: Switching interaction-mode setting kills hover feedback in the pie menu
+- **Description**: After changing the interaction-mode / mouse setting in Preferences ("When summoned:" picker, Bringr/PreferencesView.swift:36 — hold-to-select vs click-to-stay / mouse-release behaviour, US-009 Bringr-...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T15:20:21.556Z
+- **Ended At**: 2026-05-28T15:37:18.788Z
+- **Duration**: 16m 57s
+- **Input Tokens**: 286
+- **Output Tokens**: 84040
+- **Total Tokens**: 84326
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and the relevant source files to understand the current state.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m
+The bug report references slightly stale line numbers, but the core issue is clear: `startMenuMonitors()` (line 235) installs only `addGlobalMonitorForEvents` for hover. Global monitors don't fire for events routed to your own app. Let me read the supporting files to understand the full picture before fixing.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/InteractionMode.swift[0m
+[94m[Glob][0m pattern: [96mBringrTests/**/*.swift[0m
+Now let me read the navigator and its tests to understand the hover pipeline and existing test patterns, so I can write coverage that exercises both modes.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m
+This task uses beads, not TaskCreate — I'll follow the bd workflow. Let me claim the bead and look at how the controller and registry are wired in production so I can build a faithful test.
+[94m[Bash][0m Claim the bead as in_progress $ bd update Bringr-93j.19 --status=in_progress --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>&1...
+[94m[Grep][0m pattern: [96mRadialMenuController\(|MenuRegistry|makeMenu[0m
+Let me look at the production wiring and the registry API.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+Let me check the project's Swift concurrency settings, since the fix involves closure isolation, and confirm the test doubles I plan to reuse are accessible.
+[94m[Bash][0m Check Swift version and strict concurrency settings $ grep -E "SWIFT_VERSION|SWIFT_STRICT_CONCURRENCY|SWIFT_UPCOMING|SWIFT_APPROACHABLE" Bringr.xcodeproj/...
+[94m[Grep][0m pattern: [96m(class|struct|enum)\s+(FakeWindowSystem|StubEnumerationSource)[0m
+SWIFT_VERSION 5.0 means minimal concurrency checking — `static let` of a non-Sendable type is fine. Let me locate `FakeWindowSystem` and confirm the `WindowController(system:)` init exists.
+[94m[Grep][0m [95m/Users/nikita/Projects/Bringr[0m pattern: [96mFakeWindowSystem|init\(system:|init\(store:[0m
+I have everything I need. Now I'll implement the fix in `RadialMenuWindow.swift`: add a testable monitor-installer seam, install both a global and a local hover monitor, and let the overlay accept mouse-moved events.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "        isOpaque = false
+        backgroundColor =..." → "        isOpaque = false
+        backgroundColor =..."
+Now add the `monitorInstaller` property and wire it through the initializer.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "    /// Reads the persisted appearance at summon t..." → "    /// Reads the persisted appearance at summon t..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "        modeProvider: @escaping () -> InteractionM..." → "        modeProvider: @escaping () -> InteractionM..."
+Now rewrite `startMenuMonitors()` to install both global and local hover monitors, and update `stopMenuMonitors()` to remove through the installer.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "    private func startMenuMonitors() {
+        gua..." → "    private func startMenuMonitors() {
+        gua..."
+Now I'll add a test that injects a recording `EventMonitorInstaller` to assert the monitor wiring — directly catching the global-only regression — in both interaction modes.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialMenuControllerHoverTests.swift[0m "import AppKit
+import XCTest
+@testable import Bringr
+
+/// Covers the while-open monitor wiring for the radial menu (Bringr-93j.19): hover
+/// must be driven by BOTH a global and a local NSEvent monitor... (7046 chars)"
+Let me verify the file structure is intact after my edits — these "cannot find type" errors often indicate a brace imbalance from an insertion.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+The file structure is intact (braces balanced) — those SourceKit diagnostics are transient indexing noise (the types exist in other files in the module; "No such module XCTest" is a known SourceKit quirk for test files). The authoritative check is `xcodebuild`. Let me build.
+[94m[Bash][0m Build the app (Debug) $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded. Now SwiftLint and the test suite (the test target compiles the new test file).
+[94m[Bash][0m Run SwiftLint strict $ swiftlint lint --strict 2>&1 | tail -20
+[94m[Bash][0m Run the XCTest suite on macOS $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All three gates pass: build succeeded, SwiftLint 0 violations, 173 tests pass. Let me confirm my 4 new tests actually ran (not silently skipped) by filtering to the new class.
+[94m[Bash][0m Run only the new hover test class to confirm all cases execute $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' -only-testing...
+"Executed 0 tests" — my new file isn't a member of the test target. Newly created files aren't auto-added to the Xcode project. Let me inspect how the project references test files (manual `pbxproj` entries vs. synchronized folders).
+[94m[Bash][0m Check for synchronized groups and how an existing test file is referenced $ grep -n "RadialNavigatorTests" Bringr.xcodeproj/project.pbxproj
+Files are referenced manually. I need to add my test file to the `pbxproj` in four places. Let me read the relevant sections to find unused IDs and exact insertion points.
+[94m[Bash][0m Find the highest-numbered project object IDs in use $ grep -nE "1A0000000000000000000[0-9A-F]+ " Bringr.xcodeproj/project.pbxproj | grep -oE "1A0000000000...
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Highest used ID is `...0064`. I'll use `...0065` (fileRef) and `...0066` (buildFile). Let me read the four insertion regions to anchor edits precisely.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+The build-file section ends at line 47. Let me confirm `...0065/0066` are unused and read the other three insertion regions (file references, the test group, the Sources phase).
+[94m[Bash][0m Confirm chosen IDs unused; identify the most recent file entries $ grep -nE "1A000000000000000000006[1-4] " Bringr.xcodeproj/project.pbxproj
+`...0065/0066` are unused. `FakeWindowSystem.swift` is a test file I can mirror exactly. Let me verify lines 171 and 317 are the test group and test target's Sources phase before mirroring.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Confirmed line 171 is in the `BringrTests` group. Let me verify the Sources phase region around line 317.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+All four regions confirmed. The `pbxproj` uses tab indentation — let me verify the exact whitespace of my anchor lines so the edits match byte-for-byte.
+[94m[Bash][0m Show exact whitespace (tabs as ^I) of the four anchor lines $ 325p' Bringr.xcodeproj/project.pbxproj | cat -A
+
+[91m[Error: Exit code 1
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]][0m
+[94m[Bash][0m Show exact tabs (^I) of the four anchor lines $ 325p' Bringr.xcodeproj/project.pbxproj | cat -te
+Now I'll add the four `pbxproj` entries to register the test file with the `BringrTests` target, mirroring `FakeWindowSystem.swift`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000060 /* RadialAppearanceTest..." → "		1A0000000000000000000060 /* RadialAppearanceTest..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000063 /* FakeWindowSystem.swi..." → "		1A0000000000000000000063 /* FakeWindowSystem.swi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000057 /* RadialNavigatorCom..." → "				1A0000000000000000000057 /* RadialNavigatorCom..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000058 /* RadialNavigatorCom..." → "				1A0000000000000000000058 /* RadialNavigatorCom..."
+Now re-run the test suite to confirm the new file compiles into the target and all 4 cases execute.
+[94m[Bash][0m Run only the new hover test class to confirm cases execute $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' -only-testing...
+All 4 new tests pass. Let me run the full suite to confirm the total and no regressions.
+[94m[Bash][0m Run full XCTest suite, confirm total count and no failures $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | grep -...
+Full suite: **177 tests, 0 failures**. All three command gates are green (build, lint, tests). Now the run gate — launch the fresh build and confirm it comes up cleanly with the new monitor wiring.
+[94m[Bash][0m Launch fresh build and confirm it's running $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING"
+App launches and runs cleanly (PID 85876) with the new global+local monitor wiring — no crash. I can't physically perform the chord/gesture and sweep the cursor over slices in this automated environment, so the mode-independent hover behavior is covered by the new unit tests rather than a manual sweep. Let me close the bead.
+[94m[Bash][0m Close the bead with a summary reason $ bd close Bringr-93j.19 --db /Users/nikita/Projects/Bringr/.beads/beads.db --reason "Hover now driven...
+Now I'll document the work and the reusable patterns in the progress log.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "  permission. The handler fires on the main run lo..." → "  permission. The handler fires on the main run lo..."
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "  - Quality gates: build SUCCEEDED, `swiftlint lin..." → "  - Quality gates: build SUCCEEDED, `swiftlint lin..."
+Let me verify the final scope of changes (without committing — the engine handles that).
+[94m[Bash][0m Show changed files (no commit) $ git status --short
+Fix complete and all gates pass. Here's the summary.
+
+## Bringr-93j.19 — hover feedback dies after switching to click-to-stay
+
+**Root cause:** Hover (slice highlight + app/window isolation) was driven by a single *global* `NSEvent` monitor. A global monitor only sees events routed to *other* apps. In hold-to-select the held chord keeps the app underneath active, so cursor moves land there (as drags) and the global monitor fires. In click-to-stay the trigger is released and the moves are delivered to Bringr's own overlay — a global monitor never sees those, so hover went dead the moment the wheel persisted.
+
+**Fix** (`Bringr/RadialMenuWindow.swift`):
+- Install a **local** monitor for the same hover mask alongside the global one. They're mutually exclusive per event (each event reaches exactly one app), so no double-counting; the local handler returns the event so the SwiftUI gesture/tracking still works.
+- Set `acceptsMouseMovedEvents = true` on the overlay panel.
+- Kept the dismiss monitor **global-only** on purpose — a local mouse-down monitor would double-handle the on-wheel click the SwiftUI gesture already owns and cancel the selection.
+- Added an injectable `EventMonitorInstaller` seam (`.live` in production) so the monitor wiring is unit-testable.
+
+**Test** (`BringrTests/RadialMenuControllerHoverTests.swift`, new): a recording installer asserts both a global **and** a local hover monitor are wired in **both** modes (the regression catcher), the local monitor passes events through, dismiss stays global-only, and dismiss removes every installed monitor.
+
+**Gates:** build SUCCEEDED · `swiftlint lint --strict` 0 violations · **177 tests pass** (4 new) · app launches without crash. I couldn't physically perform the chord/gesture and sweep the cursor over slices in this environment, so the mode-independent behavior is covered by the wiring tests rather than a manual sweep.
+
+Two notes:
+- I had to register the new test file in `project.pbxproj` by hand — the project has no synchronized file groups, so a new file is silently uncompiled (the first full run "succeeded" while ignoring it; `-only-testing` reporting "Executed 0 tests" was the tell). Documented as a reusable pattern.
+- The working tree has unrelated uncommitted changes from a prior iteration (a `WindowControl` → `LiveWindowSystem`/`FakeWindowSystem` split). I left those untouched; per the workflow, the engine handles commits.
+
+<promise>COMPLETE</promise>

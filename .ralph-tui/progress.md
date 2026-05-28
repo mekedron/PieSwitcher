@@ -24,11 +24,13 @@ after each iteration and it's included in prompts for context.
   (no `i` loop vars; `x`/`y`/`id` excepted); lines <= 120. **`file_length` caps ALL files at 400**
   too — `WindowControl.swift` sits right at it, so any addition there must be paid for by
   condensing comments / using single-line `if let x = … { … }` (the codebase style).
-- **Parking a window off-screen resizes it.** The window-level hide-others reveal parks siblings
-  at `offScreenPoint` via AX `setPosition`; macOS's `NSWindow` title-bar constraint then **clamps
-  the window's height** (not width) so it stays reachable. Always capture AND restore a window's
-  *size* alongside its position when parking — `WindowSnapshot.originalSize`, restored in
-  `restoreWindowBaseline`/`restoreCapturedFrame` and the crash-recovery `RevealSnapshot`.
+- **Park windows off-screen on X only — never off the bottom.** The window-level hide-others
+  reveal parks siblings at `offScreenPoint` via AX `setPosition`. macOS's title-bar-reachability
+  constraint **clamps a window's height** (not width) when its title bar is moved off the *bottom*
+  of every screen, and reapplying the height on restore *races* that clamp (~50/50 — Bringr-93j.32).
+  So `offScreenPoint` keeps `y` on-screen (`x` far right ⇒ window fully hidden) so the clamp never
+  fires and there is no height to lose. Size is still captured/restored (`WindowSnapshot.originalSize`,
+  in `restoreWindowBaseline`/`restoreCapturedFrame`/crash-recovery `RevealSnapshot`) as a safety net.
 
 ---
 
@@ -91,6 +93,41 @@ Bug: "Hide others" mode returned windows smaller — on a 4K monitor Chrome came
   - `var foo: T?` (optional, no default) gets an implicit `nil` default in a struct's synthesized
     memberwise init — so adding `var originalSize: CGSize?` to `RevealSnapshot.WindowEntry` didn't
     break existing `.init(…)` callsites that omit it (and old JSON decodes with it nil).
+
+---
+
+## 2026-05-28 - Bringr-93j.32
+
+Follow-up to Bringr-93j.28: "Hide others" height restore was still intermittent (~50/50).
+
+- **Root cause (the race):** Bringr-93j.28 *captured and reapplied* the window size on restore,
+  but the reveal still parked siblings at `(50_000, 50_000)` — off the *bottom* of every screen.
+  macOS's title-bar-reachability constraint clamps the window's HEIGHT (never width) when the title
+  bar goes off the bottom. On restore the code does `setPosition` (always lands — moving on-screen
+  is unconstrained) then `setSize`; the `setSize` *races* the clamp: if it is evaluated before the
+  on-screen position commits, macOS re-applies the off-bottom clamp and the height grow is rejected.
+  That's the ~50/50 — and it explains why *position* always came back but *height* didn't.
+- **Fix:** stop triggering the clamp instead of trying to recover from it. `offScreenPoint` is now
+  `(50_000, 100)` — `x` far off-screen-right (window still fully hidden) but `y` on the primary
+  screen, so the title bar stays vertically reachable and macOS never shrinks the height. With no
+  clamp, the captured size never differs from the live size, so restore's `setSize` is a confirming
+  no-op and there is no race to win. Size capture/restore (Bringr-93j.28) is kept as a safety net.
+- Files: `Bringr/WindowControl.swift` (one-constant change + comment, net-zero lines — file is at
+  the 400-line `file_length` cap), new `BringrTests/WindowParkPointTests.swift` (park-point invariant
+  guard, wired into `project.pbxproj` with the 4 edits, UUIDs `…75`/`…76`).
+- Quality gates: build SUCCEEDED, `swiftlint lint --strict` 0 violations (45 files),
+  `xcodebuild test` 228 tests pass. App relaunched and left running (PID confirmed).
+- **Learnings:**
+  - When a back-to-back AX `setPosition`→`setSize` is flaky, suspect an OS *constraint* that one
+    op fights and the other doesn't — here position is unconstrained but size is clamped by the
+    off-bottom title-bar rule. Prevention (don't enter the constrained state) beats a reapply race.
+  - The clamp is purely *vertical*: x-off-screen never touched width in Bringr-93j.28, so keeping
+    only `y` on-screen is sufficient to dodge it. A window parked at huge `x` is fully hidden
+    regardless of `y`, so on-screen `y` costs nothing.
+  - `WindowControlTests` and `RevealStrategyTests` are both at/near the 250-line `type_body_length`
+    cap, so even a 6-line test must go in its own topic file (the documented split pattern).
+  - The fake can't model the OS clamp, so the honest unit-level guard is the *park-point invariant*
+    (x off-screen, y on-screen) — not a fake-driven "no clamp" assertion that would be vacuous.
 
 ---
 

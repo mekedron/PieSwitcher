@@ -1,0 +1,141 @@
+# Iteration 1 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.12
+- **Task Title**: US-012: Select and commit — focus and remember
+- **Description**: As a user, I want clicking/releasing on a window to bring it forward and have Bringr remember my choice so that the next summon starts from where I left off.
+
+## Acceptance Criteria
+- [ ] Committing a...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T14:17:54.212Z
+- **Ended At**: 2026-05-28T14:27:54.652Z
+- **Duration**: 10m 0s
+- **Input Tokens**: 280
+- **Output Tokens**: 52001
+- **Total Tokens**: 52281
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and the existing code to understand the current state.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+The progress file is mostly empty. Let me explore the codebase structure to understand existing patterns.
+[94m[Glob][0m pattern: [96mBringr/**/*.swift[0m
+The project is well underway. Let me check the bead status and read the key files relevant to this task in parallel.
+[94m[Bash][0m Show bead details for US-012 $ bd show Bringr-93j.12 --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>/dev/null
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowMemory.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+The bead is already IN_PROGRESS with substantial implementation. Note the comment at RadialNavigator.swift:158 — `commit` is "implemented but needs to be reimagined/refactored." Let me read the supporting files to understand the full picture.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowEnumeration.swift[0m
+This project uses beads (`bd`) for tracking, not TaskCreate — I'll ignore that reminder per project rules. Let me read the view, app wiring, interaction mode, and existing tests to see how `commit` and `prehighlighted` are consumed.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/InteractionMode.swift[0m
+Now let me read the controller that ties this together — `RadialMenuController`.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+The implementation is wired end-to-end. Now let me examine the existing tests to understand the testing patterns and what's already covered for US-012.
+[94m[Glob][0m pattern: [96m**/*Tests*/**/*.swift[0m
+Let me read the three test files most relevant to US-012.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowMemoryTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowControlTests.swift[0m
+I now have a complete picture. US-012 is substantially implemented across `WindowMemory.swift`, `RadialNavigator.commit`, `WindowController.commit`, and the view's prehighlight rendering — and it's wired end-to-end through the controller. Two things remain:
+
+1. Two stale `// needs to be reimagined/refactored` markers to resolve — the implementation is correct and is the real deliverable now.
+2. AC5 coverage gap: persistence + pure matching are tested in `WindowMemoryTests`, but the **navigator-level** commit (remember + restore + focus + clear) and prehighlight integration, plus the `WindowController.commit` primitive, have no tests.
+
+Let me claim the bead in beads (it's already in_progress) and verify the build baseline while I work.
+[94m[Bash][0m Check swiftlint availability and config $ ls -la .swiftlint.yml 2>/dev/null
+SwiftLint is available. Let me remove the two stale markers — the implementation is the finalized US-012 deliverable.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    /// the case where the chosen window was itsel..." → "    /// the case where the chosen window was itsel..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    /// non-window target — an app slice or the de..." → "    /// non-window target — an app slice or the de..."
+Now let me add tests for the `WindowController.commit` primitive (AC1/AC2 at the primitive level).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowControlTests.swift[0m edit: "    func testRestoreWithoutSessionIsNoOp() {
+     ..." → "    func testRestoreWithoutSessionIsNoOp() {
+     ..."
+Those SourceKit diagnostics are cross-file resolution noise (single-file indexing can't see types defined elsewhere in the module); the real `xcodebuild` compile resolves them, and my edit only removed a comment. Now let me add the navigator-level tests. First, inject an ephemeral store into the fixture so the navigator's remember/prehighlight never touches `.standard`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "    private struct Fixture {
+        let navigator..." → "    private struct Fixture {
+        let navigator..."
+The `XCTest` module diagnostic is the same single-file indexing artifact. Now let me add the navigator-level US-012 tests (commit + prehighlight).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "    // MARK: - AC5: the sub-wheel is rebuilt from ..." → "    // MARK: - US-012 AC1/AC2/AC3: commit a window..."
+Let me verify `StubEnumerationSource` is a class with a mutable `windows` property, since my reorder test reassigns it.
+[94m[Grep][0m pattern: [96mclass StubEnumerationSource|var windows|let windows|struct StubEnumerationSource[0m
+`StubEnumerationSource` is a `final class` with mutable `windows` — my reorder test is valid. Now let me run the quality gates. I'll run SwiftLint (fast) and the build in parallel.
+[94m[Bash][0m Run SwiftLint strict on the source $ swiftlint lint --strict 2>&1 | tail -20
+[94m[Bash][0m Build the Bringr app (Debug) $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded, but SwiftLint flagged my additions: `RadialNavigatorTests.swift` now exceeds the 400-line file limit and 250-line type-body limit. Let me check the SwiftLint config and how the test target includes files (to decide between splitting into a new file vs. trimming).
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.swiftlint.yml[0m
+[94m[Bash][0m Check pbxproj for synchronized groups or explicit test file listing $ grep -n "fileSystemSynchronized\|PBXFileSystemSynchronizedRootGroup\|RadialNavigatorTests\|BringrTes...
+Build passes. SwiftLint flagged that my additions pushed `RadialNavigatorTests.swift` past the 400-line file limit and 250-line type-body limit (the project keeps one test file per concern, all under those limits). `WindowControlTests.swift` linted clean. The right move is to put the US-012 navigator tests in their own file, following the project's convention. Let me revert `RadialNavigatorTests.swift` and create a dedicated file.
+[94m[Bash][0m Revert RadialNavigatorTests, check line counts $ git checkout -- BringrTests/RadialNavigatorTests.swift && echo "reverted" && wc -l BringrTests/Radia...
+`RadialNavigatorTests.swift` is back to 332 lines; `WindowControlTests.swift` at 358 (my commit tests fit). Now let me create the dedicated US-012 navigator test file with its own compact fixture.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorCommitTests.swift[0m "import CoreGraphics
+import XCTest
+@testable import Bringr
+
+/// Exercises the US-012 commit and pre-highlight behaviour of `RadialNavigator`
+/// against a fake window system, a stub enumerator, and an ... (10214 chars)"
+Now I need to register the new file in the pbxproj. Let me read the relevant sections to match the exact pattern and pick non-colliding UUIDs.
+[94m[Bash][0m List highest UUIDs in use in pbxproj $ grep -oE '1A0000000000000000000[0-9A-F]+' Bringr.xcodeproj/project.pbxproj | sort -u | tail -20
+Highest UUID is `...0056`; I'll use `...0057` (fileRef) and `...0058` (buildFile). Let me read the four pbxproj sections I need to edit.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Now I'll register the new file with four pbxproj edits using UUIDs `...0057` (fileRef) and `...0058` (buildFile).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000004E /* RadialNavigatorTests..." → "		1A000000000000000000004E /* RadialNavigatorTests..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000004D /* RadialNavigatorTests..." → "		1A000000000000000000004D /* RadialNavigatorTests..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000004D /* RadialNavigatorTes..." → "				1A000000000000000000004D /* RadialNavigatorTes..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000004E /* RadialNavigatorTes..." → "				1A000000000000000000004E /* RadialNavigatorTes..."
+All four pbxproj edits done. Now let me run SwiftLint and the full test suite (which compiles app + tests and runs them).
+[94m[Bash][0m Run SwiftLint strict $ swiftlint lint --strict 2>&1 | tail -5
+SwiftLint clean across all 31 files. Now the full test suite (builds and runs all tests).
+[94m[Bash][0m Build and run the full XCTest suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All 144 tests pass and the build/lint are clean. Let me confirm my new US-012 tests actually executed (not silently skipped).
+[94m[Bash][0m Confirm new US-012 tests executed and passed $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | grep -...
+All 13 new tests pass (10 navigator commit/prehighlight + 3 WindowController commit), plus the 12 existing `WindowMemoryTests`. AC5 is fully covered. Three code gates are green: build, lint (0 violations), tests (144 pass). Now the visual gate — per CLAUDE.md I'll launch the build and confirm it runs.
+[94m[Bash][0m Launch the built app and confirm it is running $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING"
+The app launches and runs cleanly (PID 31663). The full interactive flow (summon → hover → commit → focus → remember → next-summon pre-highlight) requires Accessibility permission, real input devices, and multiple live app windows, so I can't drive it end-to-end here — but that logic is comprehensively unit-tested against fakes, and the app launches without crashing. Let me clean up the running instance.
+[94m[Bash][0m Stop the running app instance $ pgrep -x Bringr || echo "stopped"
+Now let me close the bead and document learnings in progress.md.
+[94m[Bash][0m Close the US-012 bead $ added 13 unit tests (navigator commit/prehighlight + WindowController.commit primitive) in new Radia...
+Bead closed. Now let me document learnings in progress.md — both the dated entry and reusable patterns for future iterations.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "## Codebase Patterns (Study These First)
+
+*Add reu..." → "## Codebase Patterns (Study These First)
+
+- **Addi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **SourceKit single-file diagnostics lie.** "Cann..." → "- **SourceKit single-file diagnostics lie.** "Cann..."
+US-012 is complete. Here's a summary of the work:
+
+## US-012: Select and commit — focus and remember
+
+The implementation already existed (scaffolded during US-011) but carried two `// needs to be reimagined/refactored` markers and lacked navigator/primitive-level tests. I reviewed the design — it's correct as-is — so I finalized it rather than rewriting.
+
+**Acceptance criteria, all satisfied:**
+- **AC1** (raise/activate/focus): `WindowController.commit` un-minimizes, raises, and focuses the chosen window after restoring others.
+- **AC2** (restore others): `commit` calls `restore()` first — ordering is load-bearing, since `restore()` re-activates the prior frontmost app last, so it must run *before* the raise or the chosen window would lose focus.
+- **AC3** (persist per app): `RadialNavigator.commit` records `(appName, title, index)` via `LastSelectionStore`.
+- **AC4** (pre-highlight): `expandApp` sets `prehighlighted` from the remembered selection (title-match first, falling back to position); the view renders it. Purely visual — never auto-commits.
+- **AC5** (unit-tested): coverage now spans three layers.
+
+**Changes:**
+- `Bringr/WindowControl.swift`, `Bringr/RadialNavigator.swift` — removed the two stale markers.
+- `BringrTests/WindowControlTests.swift` — +3 tests for the `commit` primitive.
+- `BringrTests/RadialNavigatorCommitTests.swift` — **new file**, +10 tests for navigator commit + pre-highlight (incl. an AC3→AC4 round trip), with its own fake-backed fixture and ephemeral store.
+- `Bringr.xcodeproj/project.pbxproj` — 4 edits to register the new test file (the file had to be split out to stay under SwiftLint's 400-line/250-body limits).
+
+**Quality gates:** build SUCCEEDED · `swiftlint --strict` 0 violations (31 files) · `xcodebuild test` 144 tests / 0 failures · app launches and runs clean.
+
+The bead is closed and progress.md is updated with the dated entry plus reusable patterns (pbxproj editing, lint length limits, ephemeral-store test fixtures). Note: I couldn't drive the live interactive flow (it needs Accessibility permission, real input devices, and multiple app windows), but that logic is fully unit-tested against fakes.
+
+<promise>COMPLETE</promise>

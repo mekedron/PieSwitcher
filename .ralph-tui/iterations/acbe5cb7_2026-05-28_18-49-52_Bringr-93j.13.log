@@ -1,0 +1,208 @@
+# Iteration 4 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.13
+- **Task Title**: US-013: Reveal-strategy setting
+- **Description**: As a user, I want to choose how "other" windows/apps get out of the way so that the behavior matches my preference.
+
+## Acceptance Criteria
+- [ ] Preferences offers three reveal strategies: raise-targ...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T15:49:52.585Z
+- **Ended At**: 2026-05-28T16:13:01.442Z
+- **Duration**: 23m 8s
+- **Input Tokens**: 544
+- **Output Tokens**: 112540
+- **Total Tokens**: 113084
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and understanding the current state of the codebase.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+Let me explore the codebase structure to understand the existing patterns.
+[94m[Glob][0m pattern: [96mBringr/*.swift[0m
+There's already a `RevealState.swift`. Let me read the key files to understand the current reveal strategy implementation.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RevealState.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+Now let me read the settings patterns and the controller that wires it together.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/InteractionMode.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialAppearance.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/LiveWindowSystem.swift[0m
+Let me look at the tests directory, the AppDelegate wiring, and the MenuModel to complete my understanding.
+[94m[Glob][0m pattern: [96mBringrTests/*.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/FakeWindowSystem.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/WindowControlTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+This is a substantial feature. Let me set up task tracking and gather the last details I need: existing `WindowControlling` conformers, the window-frame source, and current pbxproj IDs.
+[94m[Bash][0m Show bead and claim in_progress $ bd update Bringr-93j.13 --status=in_progress --db .beads/beads.db 2>&1 | head -5
+Bead claimed. Now let me gather the remaining technical details in parallel.
+[94m[Grep][0m pattern: [96mWindowControlling|: Dimming|protocol Dimming[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowEnumeration.swift[0m
+`WindowControlling` is only conformed by `LiveWindowSystem` and `FakeWindowSystem` (the enumeration match was a comment). Now let me check the pbxproj IDs and confirm the Objective-C shim setup.
+[94m[Bash][0m List highest pbxproj object IDs $ grep -oE '1A00[0-9A-F]{8,}' Bringr.xcodeproj/project.pbxproj | sort -u | tail -25
+Max ID is `…006C`, so I'll use `…006D` onward. Let me examine how an existing file is registered across the four pbxproj sections to mirror it exactly.
+[94m[Bash][0m Find registration lines for sample files $ grep -n -E 'LaunchAtLogin\.swift|RevealState\.swift|LaunchAtLoginTests\.swift|RevealStateTests\.swif...
+Let me read the exact pbxproj sections I need to edit.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+I have the full structure. Let me check the existing settings-test pattern and confirm the Swift concurrency mode before writing.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/InteractionModeTests.swift[0m
+Let me confirm the Swift concurrency settings to ensure the AppKit view code compiles cleanly.
+[94m[Bash][0m Check Swift version and concurrency build settings $ grep -nE 'SWIFT_VERSION|SWIFT_STRICT_CONCURRENCY|SWIFT_APPROACHABLE|SWIFT_UPCOMING|MACOSX_DEPLOYMENT...
+Swift 5 mode, no strict concurrency — the AppKit code will compile cleanly. Now I'll write the new `RevealStrategy.swift`.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/RevealStrategy.swift[0m "import Foundation
+
+/// How the menu pushes the "other" apps/windows out of the way when a slice is
+/// hovered (US-013). Persisted (AC4) and chosen in Preferences; read fresh at each
+/// summon (like ... (2920 chars)"
+Now the `Dimming.swift` seam and live spotlight overlay.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/Dimming.swift[0m "import AppKit
+
+/// Shows and clears the "dim others" spotlight overlay (US-013): a screen-covering
+/// dark layer with the revealed window(s) cut out, so the target stays bright while
+/// everything a... (4138 chars)"
+Now I'll wire the strategy into `WindowControl.swift`. First, add `frame(of:)` to the protocol.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    /// Bring `window` to the front within its app..." → "    /// Bring `window` to the front within its app..."
+Now add the strategy state and dimmer to `WindowController`, plus the `init` parameter.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    private let system: WindowControlling
+    /// ..." → "    private let system: WindowControlling
+    /// ..."
+Now add the strategy dispatchers and the raise/dim implementations between `hideOtherWindows` and `restoreWindows`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    /// Hide every window of `target`'s app except..." → "    /// Hide every window of `target`'s app except..."
+Now make `restoreWindows(of:)` re-apply the app-level dim when leaving the windows sub-wheel under the dim strategy.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    func restoreWindows(of app: AppID) {
+        g..." → "    func restoreWindows(of app: AppID) {
+        g..."
+Now make `restore(...)` clear the dim overlay.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowControl.swift[0m edit: "    func restore(reactivatingFrontmost: Bool = tru..." → "    func restore(reactivatingFrontmost: Bool = tru..."
+Now implement `frame(of:)` in `LiveWindowSystem.swift` using the cached AX element, converting AX (top-left) coordinates to AppKit-global (bottom-left).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/LiveWindowSystem.swift[0m edit: "    func focusWindow(_ window: WindowID) {
+       ..." → "    func focusWindow(_ window: WindowID) {
+       ..."
+The "cannot find" errors are because the new files aren't in the target yet — SourceKit can't see them. Let me register all three new files in the pbxproj now. First, the PBXBuildFile entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000069 /* LaunchAtLoginTests.s..." → "		1A0000000000000000000069 /* LaunchAtLoginTests.s..."
+These are transient SourceKit errors from the half-edited pbxproj. Let me add the PBXFileReference entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A000000000000000000006A /* LaunchAtLoginTests.s..." → "		1A000000000000000000006A /* LaunchAtLoginTests.s..."
+Now add both source files to the Bringr group.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000059 /* RevealState.swift ..." → "				1A0000000000000000000059 /* RevealState.swift ..."
+Now add the test file to the BringrTests group.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000005B /* RevealStateTests.s..." → "				1A000000000000000000005B /* RevealStateTests.s..."
+Now the two PBXSourcesBuildPhase sections — the Bringr target sources first.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000005A /* RevealState.swift ..." → "				1A000000000000000000005A /* RevealState.swift ..."
+Now the BringrTests target sources.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000005C /* RevealStateTests.s..." → "				1A000000000000000000005C /* RevealStateTests.s..."
+pbxproj registered. Now update the navigator to call the strategy-aware methods and accept a strategy.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    /// Set the apps-ring base geometry for the ne..." → "    /// Set the apps-ring base geometry for the ne..."
+
+[91m[Error: <tool_use_error>File has been modified since read, either by the user or by a linter. Read it again before attempting to write it.</tool_use_error>][0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    func setBaseGeometry(_ geometry: RadialGeometr..." → "    func setBaseGeometry(_ geometry: RadialGeometr..."
+Now update the two reveal call sites in the navigator.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "        let appNode = appsRing.nodes[index]
+      ..." → "        let appNode = appsRing.nodes[index]
+      ..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "        guard index >= 0, index < windowsRing.node..." → "        guard index >= 0, index < windowsRing.node..."
+Now wire the strategy provider into `RadialMenuController` (RadialMenuWindow.swift).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "    /// Reads the persisted appearance at summon t..." → "    /// Reads the persisted appearance at summon t..."
+The diagnostics reference `RadialCommitResult` — a type I haven't seen. The earlier "modified since read" suggests a concurrent process may be editing files. Let me re-read RadialNavigator.swift to check its actual current state.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+A concurrent iteration appears to have added `RadialCommitResult` to RadialNavigator.swift after my first read. Let me assess the situation with git status and the current full state of the file.
+[94m[Bash][0m Check git status and recent file modification times $ ls -lt --time-style=+%H:%M:%S Bringr/*.swift 2>/dev/null | head -12 || ls -lT Bringr/*.swift | head ...
+Only my own files show as modified — no separate concurrent author in git. Let me determine whether `RadialCommitResult` is in the committed HEAD or appeared in the working tree.
+[94m[Bash][0m Check if RadialCommitResult is committed or a working-tree change $ git diff HEAD -- Bringr/RadialNavigator.swift | head -60
+`RadialCommitResult` is in HEAD — the ralph engine merged a newer commit (app-commit feature) into my working tree early in the session, so my initial reads were stale. The working tree is now HEAD + only my edits (the diff is clean). I need to re-read the current state of the files the merge touched to ensure consistency. Let me re-read the navigator's commit path and verify my WindowControl edits applied cleanly.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+My navigator edits are intact and the new app-commit path also routes through `windowControl.commit` → `restore` (which now clears the dim). Let me verify my WindowControl.swift edits applied cleanly.
+[94m[Bash][0m Verify WindowControl/LiveWindowSystem edits present $ grep -nE 'func revealApp|func revealWindow|func setStrategy|private var strategy|dimmer\?' Bringr/Wi...
+All WindowControl edits present. Now finish RadialMenuWindow.swift — add the `strategyProvider` init param and push it in `summon`. Let me re-read the current init and summon.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "        modeProvider: @escaping () -> InteractionM..." → "        modeProvider: @escaping () -> InteractionM..."
+Now push the strategy in `summon`. Let me read the summon method's current state.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+Add the strategy push in `summon`, mirroring the appearance setup.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "        appearance = appearanceProvider()
+        ..." → "        appearance = appearanceProvider()
+        ..."
+Now inject `LiveDimmer` into the production `WindowController` in AppDelegate.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "        // A store-backed controller journals each..." → "        // A store-backed controller journals each..."
+Now the Preferences UI. Since the merge may have changed files I read early, let me re-read the current PreferencesView.swift before editing.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m
+PreferencesView is unchanged from my earlier read. The SourceKit cascade is just the unbuilt module. Let me add the reveal-strategy `@AppStorage` binding.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m edit: "    @AppStorage(RadialAppearance.labelsDefaultsKey..." → "    @AppStorage(RadialAppearance.labelsDefaultsKey..."
+Now add the "Reveal" section to the body between Interaction and Appearance, and bump the window height.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m edit: "            Text("Interaction")
+                .f..." → "            Text("Interaction")
+                .f..."
+Now add the `revealSection` view. I'll place it after the `interactionHelp` property.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m edit: "    private var interactionHelp: String {
+        ..." → "    private var interactionHelp: String {
+        ..."
+Now update `FakeWindowSystem` to satisfy the new `frame(of:)` requirement and add a recording `FakeDimmer`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/FakeWindowSystem.swift[0m edit: "    var apps: [AppState]
+    var frontmost: AppID?..." → "    var apps: [AppState]
+    var frontmost: AppID?..."
+Now add the `frame(of:)` method and the `FakeDimmer` double.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/FakeWindowSystem.swift[0m edit: "    func focusWindow(_ window: WindowID) {
+       ..." → "    func focusWindow(_ window: WindowID) {
+       ..."
+Now write the test file covering the enum persistence and the `WindowController` strategy dispatch.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RevealStrategyTests.swift[0m "import CoreGraphics
+import XCTest
+@testable import Bringr
+
+/// Covers the reveal-strategy setting (US-013): the persistence helpers behind the
+/// Preferences picker (AC1, AC4, AC5 default) and `Windo... (9417 chars)"
+All code changes are in place. The remaining diagnostics are transient (unbuilt module). Let me run the build to get real compiler feedback.
+[94m[Bash][0m Build the Debug app target $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+**BUILD SUCCEEDED.** Now run SwiftLint strict and the test suite.
+[94m[Bash][0m Run SwiftLint in strict mode $ swiftlint lint --strict 2>&1 | tail -20
+SwiftLint clean (0 violations). Now run the full test suite.
+[94m[Bash][0m Run the full XCTest suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All 200 tests pass. Let me confirm my new test class actually executed (dodging the silent "0 tests" trap noted in the progress log).
+[94m[Bash][0m Confirm RevealStrategyTests executes its cases $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' -only-testing...
+16 tests executed — confirmed wired in. Now the build-and-run gate. Let me launch the fresh build and confirm it's running.
+[94m[Bash][0m Launch fresh build and confirm running $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr && echo "RUNNING" || echo "...
+App is running (PID 13168), no crash. All four quality gates pass: build, lint, 200 tests (16 new, confirmed executing). Let me close the bead, then update the progress log. First let me re-read progress.md since a concurrent iteration may have appended to it.
+[94m[Bash][0m Close the bead with summary $ dim implemented as a spotlight overlay (LiveDimmer/Dimming seam) with window cutouts. Preferences pi...
+Bead closed. Now let me re-read the current end of progress.md to append my entry without clobbering any concurrent additions.
+[94m[Bash][0m Show current end of progress.md $ tail -25 .ralph-tui/progress.md
+Let me verify no duplicate pbxproj object IDs (the concurrent-iteration hazard from the progress log), then append my progress entry.
+[94m[Bash][0m Check for duplicate pbxproj definitions and my new IDs $ grep -cE '1A00000000000000000000(6D|6E|6F|70|71|72)' Bringr.xcodeproj/project.pbxproj
+No duplicate IDs, my 6 new IDs are correctly placed (12 references = each ID in its definition + its group/phase reference). Now append the progress entry.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "    tests pass (was 177; +7 new). Confirmed the ne..." → "    tests pass (was 177; +7 new). Confirmed the ne..."
+Now add the two reusable patterns to the top "Codebase Patterns" section.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "  `PermissionsManager` shape: `@Published private(..." → "  `PermissionsManager` shape: `@Published private(..."
+All quality gates pass and the work is complete. The app is left running (PID 13168) per the workflow.
+
+## Summary
+
+Implemented **US-013: Reveal-strategy setting** (Bringr-93j.13) — the user can now choose how "other" apps/windows get out of the way when hovering the wheel.
+
+**What I built:**
+- `RevealStrategy` enum (`raiseToFront` / `hideOthers` / `dimOthers`, default **hide-others**) — persisted and read fresh per summon, mirroring the existing `InteractionMode`/`RadialAppearance` pattern.
+- `WindowController` now dispatches the active strategy onto its primitives at **both** levels via `revealApp(_:)`/`revealWindow(_:)` (the navigator's two reveal call sites switched to these):
+  - **raise** — activate the app / AX-raise the window, hiding nothing;
+  - **hide** — the existing minimize/hide behaviour;
+  - **dim** — raise the target plus a spotlight overlay (`Dimming` seam → `LiveDimmer`, a reused click-through `NSPanel`) that darkens the desktop with the target window(s) punched out. `restore()` clears the dim; `restoreWindows(of:)` re-cuts it to the app's windows when leaving the sub-wheel.
+- A "Reveal" radio-group section in Preferences; `RadialMenuController` reads a `strategyProvider` at summon, so a change applies on the next summon without relaunch.
+
+**Quality gates:** build SUCCEEDED · `swiftlint --strict` 0 violations · 200 tests pass (16 new, confirmed executing) · app launches and runs without crashing.
+
+**Honest limitation:** the dim/raise *visuals* and hover sweep need a human (real mouse-chord/trackpad trigger, Accessibility permission, real windows) and can't be verified headlessly — so the strategy *dispatch* (which operations fire, with which frames) is fully covered by `FakeDimmer`-backed unit tests instead. Also noted: a concurrent iteration's app-commit work merged into the tree mid-session, so I re-read files before editing.
+
+<promise>COMPLETE</promise>

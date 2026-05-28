@@ -1,0 +1,163 @@
+# Iteration 1 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.25
+- **Task Title**: US-016: Window sub-wheel — app-aligned arcs with overflow fisheye
+- **Description**: As a user, when I open an app's window sub-wheel, I want each window slice to be as wide as an app slice and aligned outward from its parent app — instead of the windows re-dividing the whole circle —...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T17:17:29.878Z
+- **Ended At**: 2026-05-28T17:31:57.772Z
+- **Duration**: 14m 27s
+- **Input Tokens**: 342
+- **Output Tokens**: 79382
+- **Total Tokens**: 79724
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the progress file and the relevant code to understand the current layout system.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+[94m[Bash][0m Show bead details $ bd show Bringr-93j.25 --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>/dev/null | head -60
+Let me read the full design and the source files.
+[94m[Bash][0m Show rest of bead details $ bd show Bringr-93j.25 --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>/dev/null | tail -40
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialLayout.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m
+Now let me read the view, window controller, and the existing tests.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialLayoutTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m
+Let me find all construction sites of `RadialRing` and `RadialLayout` to make sure I update every call site.
+[94m[Grep][0m pattern: [96mRadialRing\(|RadialLayout\(|\.sliceSpan|itemCount[0m
+Let me check the MenuNode structure and the RadialAppearanceTests usage.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialAppearanceTests.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuNode.swift[0m
+
+[91m[Error: File does not exist. Note: your current working directory is /Users/nikita/Projects/Bringr.][0m
+[94m[Glob][0m pattern: [96mBringr/Menu*.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+I have a complete picture. Let me check the SwiftLint config before writing, so I match its rules.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.swiftlint.yml[0m
+SwiftLint enforces line length ≤120 and identifier names ≥2 chars (so no single-letter loop vars except x/y/id). Now I'll rewrite `RadialLayout`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialLayout.swift[0m edit: "/// Even angular layout of N slices around a ring,..." → "/// One slice's angular extent: a `start` edge and..."
+Now `RadialNavigator.swift`. First the `RadialRing` struct gets a stored `layout`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "/// One concentric ring of the wheel: the menu nod..." → "/// One concentric ring of the wheel: the menu nod..."
+Now add the `focusedWindowIndex` property after `expandedWindowIndex`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    /// Index of the isolated slice on the windows..." → "    /// Index of the isolated slice on the windows..."
+Now update `open` and `clearState` to build the level-0 layout and reset focus.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    /// Begin a summon: show the apps ring, nothin..." → "    /// Begin a summon: show the apps ring, nothin..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    private func clearState() {
+        rings = []..." → "    private func clearState() {
+        rings = []..."
+Now update `region(forOffset:)` to use the stored layout and make empty outer sectors a no-op.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    /// Map a cursor `offset` (from the ring centr..." → "    /// Map a cursor `offset` (from the ring centr..."
+Now wire the fisheye into `updateHover` and rewrite `expandApp` to build the window-ring layout.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "        case .slice(level: 1, let index):
+        ..." → "        case .slice(level: 1, let index):
+        ..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "    private func expandApp(at index: Int) {
+      ..." → "    private func expandApp(at index: Int) {
+      ..."
+Now reset `focusedWindowIndex` in `collapse()`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialNavigator.swift[0m edit: "        guard expandedAppIndex != nil else { retur..." → "        guard expandedAppIndex != nil else { retur..."
+Now update `RadialMenuView.swift` to consume the shared ring layout.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m edit: "    var body: some View {
+        let layout = Rad..." → "    var body: some View {
+        let layout = rin..."
+Those look like transient SourceKit indexing errors (whole-module types suddenly "not found"). Let me verify with a real build.
+[94m[Bash][0m Build the project (Debug) $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeds; the diagnostics are stale-index noise. Now let me check `LastSelectionStore` so I can write the prehighlight-under-fisheye test correctly.
+[94m[Grep][0m pattern: [96mLastSelectionStore|prehighlightIndex|func remember[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/WindowMemory.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorCommitTests.swift[0m
+I understand the store and fixture patterns. Now let me add the `RadialLayout` unit tests.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialLayoutTests.swift[0m edit: "    // MARK: - AC5: placement at the cursor / disp..." → "    // MARK: - US-016: window sub-wheel arcs
+
+    ..."
+Now the navigator fisheye tests, inserted before the Fixtures section.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "    // MARK: - Fixtures
+
+    private struct Fixtur..." → "    // MARK: - US-016: overflow fisheye + app-alig..."
+Now add the `makeOverflowFixture` helper after the existing `makeFixture`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "        let navigator = RadialNavigator(windowCont..." → "        let navigator = RadialNavigator(windowCont..."
+Now the prehighlight-under-fisheye test in the commit test file.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorCommitTests.swift[0m edit: "    // MARK: - AC3 → AC4 end-to-end through one na..." → "    func testPreHighlightResolvesCorrectNodeIndexU..."
+All diagnostics are stale-index noise. Let me run SwiftLint strict, then the test suite.
+[94m[Bash][0m Run SwiftLint in strict mode $ swiftlint lint --strict 2>&1 | tail -20
+The navigator test file exceeds length limits. I'll move the US-016 navigator tests into their own file, mirroring how `RadialNavigatorCommitTests` was split out. First revert the additions to `RadialNavigatorTests.swift`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "    // MARK: - US-016: overflow fisheye + app-alig..." → "    // MARK: - Fixtures
+
+    private struct Fixtur..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorTests.swift[0m edit: "        let navigator = RadialNavigator(windowCont..." → "        let navigator = RadialNavigator(windowCont..."
+I'll create a separate test file. Let me check whether the Xcode project auto-syncs test files or needs explicit references.
+[94m[Bash][0m Check for synchronized groups and existing test file refs $ grep -c "RadialNavigatorCommitTests" Bringr.xcodeproj/project.pbxproj
+No auto-sync; test files are explicitly referenced (4 entries each). I'll create the new file and wire it into `project.pbxproj`. Let me inspect the existing references to replicate the pattern.
+[94m[Bash][0m Find pbxproj lines referencing the navigator test files $ grep -n "RadialNavigatorCommitTests\|RadialNavigatorTests" Bringr.xcodeproj/project.pbxproj
+The UUIDs follow a simple sequential scheme. Let me find the highest used ID to pick safe new ones.
+[94m[Bash][0m List highest UUID values in use $ grep -oE "1A0000000000000000000[0-9A-F]{3}" Bringr.xcodeproj/project.pbxproj | sort -u | tail -8
+I'll use `...73`/`...74`. First create the self-contained fisheye test file.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/RadialNavigatorFisheyeTests.swift[0m "import CoreGraphics
+import XCTest
+@testable import Bringr
+
+/// Exercises the US-016 window sub-wheel: app-aligned window arcs, the overflow
+/// fisheye, and the empty-outer-sector no-op. Kept in its o... (7791 chars)"
+Now wire the new file into `project.pbxproj` with the 4 standard entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000058 /* RadialNavigatorCommi..." → "		1A0000000000000000000058 /* RadialNavigatorCommi..."
+
+[91m[Error: <tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>][0m
+I need to read the pbxproj first.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+Now I'll add all 4 entries.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000058 /* RadialNavigatorCommi..." → "		1A0000000000000000000058 /* RadialNavigatorCommi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000057 /* RadialNavigatorCommi..." → "		1A0000000000000000000057 /* RadialNavigatorCommi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000057 /* RadialNavigatorCom..." → "				1A0000000000000000000057 /* RadialNavigatorCom..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000058 /* RadialNavigatorCom..." → "				1A0000000000000000000058 /* RadialNavigatorCom..."
+Now re-run SwiftLint strict, then build and test.
+[94m[Bash][0m Re-run SwiftLint strict $ swiftlint lint --strict 2>&1 | tail -5
+SwiftLint is clean (44 files, 0 violations). Now run the full test suite.
+[94m[Bash][0m Build and run the XCTest suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All 224 tests pass. Let me confirm my new test classes actually executed.
+[94m[Bash][0m Confirm new US-016 tests executed and passed $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | grep -...
+All 16 new tests pass (plus the back-compat lock and the prehighlight-under-fisheye test). Now per the project workflow, launch the freshly built app and keep it running.
+[94m[Bash][0m Relaunch the freshly built app and confirm it is running $ open build/Build/Products/Debug/Bringr.app && sleep 1 && pgrep -x Bringr
+App is running (PID 60390). Now I'll record learnings in `progress.md` — adding reusable patterns and a dated entry.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "## Codebase Patterns (Study These First)
+
+*Add reu..." → "## Codebase Patterns (Study These First)
+
+- **One ..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "  no `i` loop vars; `x`/`y`/`id` excepted); lines ..." → "  no `i` loop vars; `x`/`y`/`id` excepted); lines ..."
+
+[91m[Error: <tool_use_error>String to replace not found in file.
+String:   no `i` loop vars; `x`/`y`/`id` excepted); lines <= 120.
+
+---</tool_use_error>][0m
+Let me re-read the current state of progress.md to find the right anchor.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "  (no `i` loop vars; `x`/`y`/`id` excepted); lines..." → "  (no `i` loop vars; `x`/`y`/`id` excepted); lines..."
+Now close the bead.
+[94m[Bash][0m Close the bead with a summary reason $ navigator tracks focusedWindowIndex and empty-sector no-op. Build/lint/224 tests pass." 2>&1 | tail ...
+Done. US-016 is implemented, all quality gates pass, and the app is running.
+
+## Summary
+
+Generalized the radial layout to support uneven, app-aligned window arcs with an overflow fisheye, changing **only** the level-1 windows ring (the apps ring is untouched).
+
+**Core changes:**
+- `Bringr/RadialLayout.swift` — Replaced the even N-division with an explicit per-slice arc table (`SliceArc`). `init(itemCount:)` reproduces the old equal layout exactly (back-compat lock); added `init(arcs:)`, `span(ofSliceAt:)`, and a `windowRing(windowCount:appCount:parentIndex:focusedWindowIndex:)` factory covering all three cases (tile / gap / fisheye) plus the single-app fallback. `hitTest` now uses modulo-2π arc containment, so arcs wrap the 12 o'clock seam and uncovered gaps return `nil`.
+- `Bringr/RadialNavigator.swift` — `RadialRing` carries a stored `layout` shared by render and hit-test (can't desync). Added `focusedWindowIndex` + `focusWindowSlice(at:)` so the fisheye focus follows the hovered window live; `region(forOffset:)` returns the current `hovered` (a no-op) over an empty outer sector instead of collapsing.
+- `Bringr/RadialMenuView.swift` — Reads `ring.layout` instead of building one.
+
+**Tests:** 10 new `RadialLayout` geometry tests, a new `RadialNavigatorFisheyeTests` file (6 tests, wired into `project.pbxproj`), and a prehighlight-under-fisheye test.
+
+**Quality gates:** `** BUILD SUCCEEDED **`, `swiftlint lint --strict` 0 violations, `xcodebuild test` 224/224 pass. App relaunched (PID 60390) and left running.
+
+One caveat: the visual gate (verify the three cases on-screen) needs manual interaction — the wheel requires a live trigger + Accessibility permission — so I launched the app for you to confirm visually rather than claiming visual success.
+
+<promise>COMPLETE</promise>

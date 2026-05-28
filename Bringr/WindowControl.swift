@@ -115,10 +115,10 @@ final class WindowController {
     /// Whether a capture/restore session is currently open.
     var hasActiveSession: Bool { session != nil }
 
-    /// Where a window is parked to get it out of the way at the window level (instant,
-    /// unlike AX minimize's slow animation — Bringr-93j.24). Far below-and-right of any
-    /// realistic display (y-down), so the whole window is off-screen; `restore` undoes it.
-    static let offScreenPoint = CGPoint(x: 50_000, y: 50_000)
+    /// Where a window is parked at the window level — instant, unlike AX minimize (Bringr-93j.24).
+    /// `x` is off-screen-right so the window fully hides; `y` stays on-screen so macOS keeps the
+    /// title bar reachable and never clamps the height off the bottom (Bringr-93j.28/.32).
+    static let offScreenPoint = CGPoint(x: 50_000, y: 100)
 
     // MARK: - Primitives
 
