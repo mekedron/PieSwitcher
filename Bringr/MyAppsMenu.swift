@@ -55,6 +55,11 @@ struct MyAppsMenu: MenuDefinition {
     /// values.
     private let dockOrder: () -> [String]
     private let keepFinderLast: () -> Bool
+    /// The user's exclusion list (Bringr-93j.59), read fresh per summon through a closure
+    /// (mirroring `curatedApps`); tests inject a fixed list. A curated entry on the list is
+    /// dropped before any node is built, so an excluded app never appears even when pinned —
+    /// the enumerator already drops it from `live`, so the appended others honour it too.
+    private let ignoreList: () -> AppIgnoreList
 
     init(
         enumerator: WindowEnumerator,
@@ -64,6 +69,7 @@ struct MyAppsMenu: MenuDefinition {
         appSortOrder: @escaping () -> AppSortOrder = { AppSortOrder.current() },
         dockOrder: @escaping () -> [String] = { DockOrder.current() },
         keepFinderLast: @escaping () -> Bool = { DockOrder.keepsFinderLast() },
+        ignoreList: @escaping () -> AppIgnoreList = { AppIgnoreList.current() },
         runningPID: @escaping (String) -> pid_t? = {
             CuratedApp.runningApplication(forBundleIdentifier: $0)?.processIdentifier
         }
@@ -76,11 +82,16 @@ struct MyAppsMenu: MenuDefinition {
         self.appSortOrder = appSortOrder
         self.dockOrder = dockOrder
         self.keepFinderLast = keepFinderLast
+        self.ignoreList = ignoreList
         self.runningPID = runningPID
     }
 
     func makeRoot(appsScope: CollectionScope, windowsScope: CollectionScope) -> MenuNode {
-        let curated = curatedApps()
+        // Drop any pinned app that's on the exclusion list, so it never appears even when
+        // curated (Bringr-93j.59); the appended others come from `live`, which the enumerator
+        // already filters.
+        let ignore = ignoreList()
+        let curated = curatedApps().filter { !ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.name) }
         let showOthers = showOtherRunningApps()
         // Empty list + show-others (the default) → the current full wheel, unchanged (AC:
         // "an empty list reproduces the current wheel"). The general path below would build

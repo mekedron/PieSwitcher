@@ -31,10 +31,29 @@ final class CGWindowSource: WindowEnumerationSource {
         // the query (Bringr-93j.51). One workspace scan, reusing `runningApps()`' `.regular`
         // rule, regardless of window count.
         let dockPIDs = Set(stateProbe.runningApps().map(\.pid))
+        let ignoredPIDs = ignoredPIDs()
         let raws = infoList.compactMap {
-            rawWindow(from: $0, assumeOnscreen: !includingOffscreen, dockPIDs: dockPIDs)
+            rawWindow(
+                from: $0, assumeOnscreen: !includingOffscreen,
+                dockPIDs: dockPIDs, ignoredPIDs: ignoredPIDs
+            )
         }
         return includingOffscreen ? classify(raws) : raws
+    }
+
+    /// PIDs of currently-running apps the user has excluded (Bringr-93j.59), resolved once per
+    /// query like `dockPIDs` and stamped onto every record so the enumerator drops them on both
+    /// the narrow and broadened paths, even when they have an on-screen window. Empty — with no
+    /// workspace scan — when the ignore list is empty, so the common case pays nothing. A running
+    /// app matches by either its bundle id or its localized name, the two handles the list holds.
+    private func ignoredPIDs() -> Set<pid_t> {
+        let ignore = AppIgnoreList.current()
+        guard !ignore.isEmpty else { return [] }
+        return Set(
+            NSWorkspace.shared.runningApplications
+                .filter { ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.localizedName ?? "") }
+                .map(\.processIdentifier)
+        )
     }
 
     /// Stamp each broadened record with its minimized/hidden/AX-backed state so the keep-rule
@@ -80,7 +99,10 @@ final class CGWindowSource: WindowEnumerationSource {
         }
     }
 
-    private func rawWindow(from info: [String: Any], assumeOnscreen: Bool, dockPIDs: Set<pid_t>) -> RawWindow? {
+    private func rawWindow(
+        from info: [String: Any], assumeOnscreen: Bool,
+        dockPIDs: Set<pid_t>, ignoredPIDs: Set<pid_t>
+    ) -> RawWindow? {
         guard let windowNumber = (info[kCGWindowNumber as String] as? NSNumber)?.intValue,
               let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
               let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue,
@@ -101,7 +123,30 @@ final class CGWindowSource: WindowEnumerationSource {
             alpha: (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1,
             bounds: bounds,
             isOnscreen: isOnscreen,
-            isDockApp: dockPIDs.contains(ownerPID)
+            isDockApp: dockPIDs.contains(ownerPID),
+            isIgnored: ignoredPIDs.contains(ownerPID)
         )
+    }
+}
+
+/// Resolves which display a summon happened on (Bringr-93j.30). This is the live
+/// `NSScreen` lookup behind the screen restriction; the geometry that consumes its
+/// result — `WindowEnumerator`'s screen filter — is pure and unit-tested, so this thin
+/// resolver is covered by build & run rather than a hermetic test.
+@MainActor
+enum ScreenLocator {
+    /// CoreGraphics-global bounds (top-left origin) of the display under `cursor`, an
+    /// AppKit-global, y-up point such as `NSEvent.mouseLocation`. Returns `CGDisplayBounds`
+    /// so the rect shares `RawWindow.bounds`' coordinate space; the cursor is matched in
+    /// AppKit space (where it lives) and the result delivered in CoreGraphics space (where
+    /// the windows live). `nil` when no display matches (e.g. a headless test host), which
+    /// makes enumeration span all displays instead of hiding everything.
+    static func displayBounds(forCursor cursor: CGPoint) -> CGRect? {
+        let screen = NSScreen.screens.first { $0.frame.contains(cursor) } ?? NSScreen.main
+        guard let screen,
+              let number = screen.deviceDescription[
+                NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else { return nil }
+        return CGDisplayBounds(CGDirectDisplayID(number.uint32Value))
     }
 }

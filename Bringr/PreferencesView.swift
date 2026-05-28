@@ -40,6 +40,7 @@ struct PreferencesView: View {
                 section("Reveal") { revealSection }
                 section("Sorting") { SortingSettings() }
                 section("Collection") { collectionSection }
+                section("Excluded Apps") { IgnoreListSettings() }
                 section("My Apps") { myAppsSection }
                 section("Appearance") { appearanceSection }
             }

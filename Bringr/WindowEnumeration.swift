@@ -53,12 +53,16 @@ struct RawWindow: Equatable, Sendable {
     /// no longer floods the ring with them (Bringr-93j.51). Defaults true, so the narrow query
     /// and existing fixtures need not set it.
     let isDockApp: Bool
+    /// Whether the owning app is on the user's exclusion list (Bringr-93j.59) — apps that must
+    /// never appear in the wheel, matched by bundle id or name in `CGWindowSource`. Defaults
+    /// false (nothing excluded), so the empty-list path and existing fixtures need not set it.
+    let isIgnored: Bool
 
     init(
         windowNumber: Int, ownerPID: pid_t, ownerName: String, title: String,
         layer: Int, alpha: Double, bounds: CGRect,
         isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false,
-        isAXBacked: Bool = true, isDockApp: Bool = true
+        isAXBacked: Bool = true, isDockApp: Bool = true, isIgnored: Bool = false
     ) {
         self.windowNumber = windowNumber
         self.ownerPID = ownerPID
@@ -72,17 +76,19 @@ struct RawWindow: Equatable, Sendable {
         self.isHidden = isHidden
         self.isAXBacked = isAXBacked
         self.isDockApp = isDockApp
+        self.isIgnored = isIgnored
     }
 
     /// A copy carrying the per-window minimized/hidden/AX-backed classification the live
     /// source resolves after the raw list is parsed (Bringr-93j.50 / Bringr-93j.52). The
-    /// Dock-app stamp is preserved from `self` (set when the record was first built).
+    /// Dock-app and ignored stamps are preserved from `self` (set when the record was first
+    /// built).
     func classified(isMinimized: Bool, isHidden: Bool, isAXBacked: Bool) -> RawWindow {
         RawWindow(
             windowNumber: windowNumber, ownerPID: ownerPID, ownerName: ownerName, title: title,
             layer: layer, alpha: alpha, bounds: bounds,
             isOnscreen: isOnscreen, isMinimized: isMinimized, isHidden: isHidden,
-            isAXBacked: isAXBacked, isDockApp: isDockApp
+            isAXBacked: isAXBacked, isDockApp: isDockApp, isIgnored: isIgnored
         )
     }
 }
@@ -249,19 +255,22 @@ final class WindowEnumerator {
     }
 
     /// Whether to keep a (normal) window given the broadening flags (Bringr-93j.50). A window
-    /// whose owning app isn't an ordinary Dock app is always dropped — the switcher shows only
-    /// Dock apps, on the narrow path too, so "all screens" alone stops surfacing background /
-    /// agent / menu-bar apps (Bringr-93j.51). Otherwise an on-screen window is always kept (the
-    /// default set). An off-screen record with no AX window is a phantom helper surface Bringr
-    /// can't focus, so it is dropped regardless of flags (Bringr-93j.52). The rest are
-    /// classified by precedence — a hidden app's windows count as hidden even if also minimized,
-    /// since `includeHidden` is meant to bring a whole hidden app back — then kept only if the
-    /// matching flag is on; anything left (off-Space) rides on `allSpaces`. With every flag off
-    /// the source returned only on-screen windows (Dock-app / AX-backed by default), so this
-    /// keeps them all unchanged.
+    /// whose owning app is on the user's exclusion list is always dropped — the strongest rule,
+    /// applied before everything else, so an excluded app never appears no matter what
+    /// (Bringr-93j.59). A window whose owning app isn't an ordinary Dock app is likewise dropped
+    /// — the switcher shows only Dock apps, on the narrow path too, so "all screens" alone stops
+    /// surfacing background / agent / menu-bar apps (Bringr-93j.51). Otherwise an on-screen
+    /// window is always kept (the default set). An off-screen record with no AX window is a
+    /// phantom helper surface Bringr can't focus, so it is dropped regardless of flags
+    /// (Bringr-93j.52). The rest are classified by precedence — a hidden app's windows count as
+    /// hidden even if also minimized, since `includeHidden` is meant to bring a whole hidden app
+    /// back — then kept only if the matching flag is on; anything left (off-Space) rides on
+    /// `allSpaces`. With every flag off the source returned only on-screen windows (Dock-app /
+    /// AX-backed / not-ignored by default), so this keeps them all unchanged.
     private func shouldCollect(
         _ window: RawWindow, allSpaces: Bool, includeMinimized: Bool, includeHidden: Bool
     ) -> Bool {
+        if window.isIgnored { return false }
         if !window.isDockApp { return false }
         if window.isOnscreen { return true }
         if !window.isAXBacked { return false }
@@ -367,27 +376,5 @@ final class WindowEnumerator {
     private func title(for window: RawWindow, index: Int) -> String {
         let trimmed = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Window \(index + 1)" : trimmed
-    }
-}
-
-/// Resolves which display a summon happened on (Bringr-93j.30). This is the live
-/// `NSScreen` lookup behind the screen restriction; the geometry that consumes its
-/// result — `WindowEnumerator`'s screen filter — is pure and unit-tested, so this thin
-/// resolver is covered by build & run rather than a hermetic test.
-@MainActor
-enum ScreenLocator {
-    /// CoreGraphics-global bounds (top-left origin) of the display under `cursor`, an
-    /// AppKit-global, y-up point such as `NSEvent.mouseLocation`. Returns `CGDisplayBounds`
-    /// so the rect shares `RawWindow.bounds`' coordinate space; the cursor is matched in
-    /// AppKit space (where it lives) and the result delivered in CoreGraphics space (where
-    /// the windows live). `nil` when no display matches (e.g. a headless test host), which
-    /// makes enumeration span all displays instead of hiding everything.
-    static func displayBounds(forCursor cursor: CGPoint) -> CGRect? {
-        let screen = NSScreen.screens.first { $0.frame.contains(cursor) } ?? NSScreen.main
-        guard let screen,
-              let number = screen.deviceDescription[
-                NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-        else { return nil }
-        return CGDisplayBounds(CGDirectDisplayID(number.uint32Value))
     }
 }
