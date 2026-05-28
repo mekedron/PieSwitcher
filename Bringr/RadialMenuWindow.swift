@@ -217,13 +217,13 @@ final class RadialMenuController: ObservableObject {
         startMenuMonitors()
     }
 
-    /// Commit the slice under `region`: raise and focus the chosen window and
-    /// restore everything else to its pre-summon state (US-012). If `region` is not
-    /// a window leaf (an app slice or the dead zone), fall back to a cancel-restore.
-    /// Either way the overlay goes away.
+    /// Commit the slice under `region`: app slices activate the app, window slices
+    /// raise and focus the chosen window, and both restore everything else to its
+    /// pre-summon state (US-012). If `region` is not selectable, fall back to a
+    /// cancel-restore. Either way the overlay goes away.
     private func commitSelection(region: HoverRegion) {
         if navigator.commit(region) == nil {
-            dismiss() // not a window — restore like a cancel
+            dismiss() // not selectable — restore like a cancel
         } else {
             hideOverlay() // the navigator already restored, focused, and cleared
         }

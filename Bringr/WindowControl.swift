@@ -115,6 +115,19 @@ final class WindowController {
         raiseAndFocus(window)
     }
 
+    /// Commit `app` as the user's choice from the first-level apps ring. This is
+    /// intentionally weaker than choosing a specific window: restore the reveal,
+    /// then activate the app's current front window if one is available.
+    func commit(_ app: AppID) {
+        restore(reactivatingFrontmost: false)
+        if let frontWindow = system.windows(of: app).first {
+            system.setMinimized(frontWindow, false)
+            raiseAndFocus(frontWindow)
+        } else {
+            system.activate(app)
+        }
+    }
+
     /// Hide every app except `target`, capturing app visibility/order first so
     /// `restore()` can put them back exactly. (AC2)
     func hideOtherApps(besides target: AppID) {

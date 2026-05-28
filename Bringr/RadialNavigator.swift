@@ -20,6 +20,14 @@ struct RadialRing: Identifiable {
     var id: Int { level }
 }
 
+/// What the user actually committed from the wheel. Window selections carry the
+/// exact chosen window; app selections mean "activate this app's current front
+/// window" without changing remembered per-window selection.
+enum RadialCommitResult: Equatable {
+    case app(AppID)
+    case window(WindowID)
+}
+
 /// Hover-driven navigation through the menu tree, drawn as concentric rings.
 ///
 /// Holds no AppKit window — only the rings to render, the hovered region, and the
@@ -161,15 +169,25 @@ final class RadialNavigator {
 
     // MARK: - Commit (US-012)
 
-    /// Commit the selection currently under `region`. When it resolves to a window
-    /// leaf, remember it for its app (AC3), restore every app/window moved out of
-    /// the way, and bring the chosen window to the front + focus it (AC1/AC2), then
-    /// clear the wheel; returns the committed window. Returns `nil` for any
-    /// non-window target — an app slice or the dead zone — without touching window
-    /// state, so the caller can cancel-restore instead.
+    /// Commit the selection currently under `region`. Window leaves remember their
+    /// selection for the app; app slices activate that app's current front window.
+    /// Both paths restore every app/window moved out of the way before the final
+    /// activation/focus, then clear the wheel. Returns `nil` only when nothing
+    /// selectable was committed, so the caller can cancel-restore instead.
     @discardableResult
-    func commit(_ region: HoverRegion) -> WindowID? {
-        guard case .slice(level: 1, let index) = region, rings.count > 1 else { return nil }
+    func commit(_ region: HoverRegion) -> RadialCommitResult? {
+        switch region {
+        case .slice(level: 0, let index):
+            return commitApp(at: index)
+        case .slice(level: 1, let index):
+            return commitWindow(at: index)
+        case .slice, .none:
+            return nil
+        }
+    }
+
+    private func commitWindow(at index: Int) -> RadialCommitResult? {
+        guard rings.count > 1 else { return nil }
         let windowsRing = rings[1]
         guard index >= 0, index < windowsRing.nodes.count,
               case .focusWindow(let windowID) = windowsRing.nodes[index].action else { return nil }
@@ -179,7 +197,17 @@ final class RadialNavigator {
         }
         windowControl.commit(windowID)
         clearState()
-        return windowID
+        return .window(windowID)
+    }
+
+    private func commitApp(at index: Int) -> RadialCommitResult? {
+        guard let appsRing = rings.first,
+              index >= 0, index < appsRing.nodes.count,
+              let appID = appsRing.nodes[index].representedApp else { return nil }
+
+        windowControl.commit(appID)
+        clearState()
+        return .app(appID)
     }
 
     // MARK: - Transitions

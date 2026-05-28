@@ -24,7 +24,7 @@ final class RadialNavigatorCommitTests: XCTestCase {
         let committed = fixture.navigator.commit(.slice(level: 1, index: 1))
 
         // AC1: the chosen window is returned, raised, focused, its app active.
-        XCTAssertEqual(committed, WindowID(app: AppID(pid: 10), token: 12))
+        XCTAssertEqual(committed, .window(WindowID(app: AppID(pid: 10), token: 12)))
         XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 10), token: 12))
         XCTAssertEqual(fixture.fake.frontmost, AppID(pid: 10))
         // AC2: the other apps and the app's other window are restored.
@@ -50,24 +50,35 @@ final class RadialNavigatorCommitTests: XCTestCase {
 
         let committed = fixture.navigator.commit(.slice(level: 1, index: 0))
 
-        XCTAssertEqual(committed, WindowID(app: AppID(pid: 10), token: 11))
+        XCTAssertEqual(committed, .window(WindowID(app: AppID(pid: 10), token: 11)))
         XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 10), token: 11))
         XCTAssertEqual(fixture.store.remembered(forAppName: "Chrome"),
                        RememberedSelection(title: "Inbox", index: 0))
     }
 
-    func testCommitReturnsNilForAppSliceWithoutTouchingState() {
+    func testCommittingAnAppSliceActivatesTheAppWithoutRememberingWindow() {
         let fixture = makeFixture()
         fixture.navigator.open(appNodes: fixture.appNodes)
-        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome expanded
+        fixture.navigator.updateHover(.slice(level: 0, index: 1)) // Ghostty expanded
+        fixture.fake.clearLog()
 
-        XCTAssertNil(fixture.navigator.commit(.slice(level: 0, index: 0)))
+        let committed = fixture.navigator.commit(.slice(level: 0, index: 1))
+        let operations = fixture.fake.operationLog
 
-        // Nothing committed: no focus, nothing remembered, the wheel stays as it was.
-        XCTAssertNil(fixture.fake.focusedWindow)
-        XCTAssertNil(fixture.store.remembered(forAppName: "Chrome"))
-        XCTAssertEqual(fixture.navigator.rings.count, 2)
-        XCTAssertEqual(fixture.navigator.expandedAppIndex, 0)
+        XCTAssertEqual(committed, .app(AppID(pid: 20)))
+        XCTAssertEqual(fixture.fake.frontmost, AppID(pid: 20))
+        XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 20), token: 21))
+        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 10)))
+        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 30)))
+        XCTAssertNil(fixture.store.remembered(forAppName: "Ghostty"))
+        XCTAssertTrue(fixture.navigator.rings.isEmpty)
+        XCTAssertFalse(fixture.fake.activationLog.contains(AppID(pid: 10)))
+        XCTAssertTrue(fixture.fake.activationLog.allSatisfy { $0 == AppID(pid: 20) })
+        XCTAssertLessThan(
+            operations.firstIndex(of: .setHidden(AppID(pid: 10), false)) ?? -1,
+            operations.firstIndex(of: .activate(AppID(pid: 20))) ?? -1,
+            "app-slice commit must restore hidden apps before the selected app wins"
+        )
     }
 
     func testCommitReturnsNilForDeadZoneWithoutTouchingState() {
