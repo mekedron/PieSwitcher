@@ -117,15 +117,21 @@ enum MenuTrigger: Hashable, Sendable {
 /// `makeRoot()` for a clean tree.
 @MainActor
 protocol MenuDefinition {
-    /// Build a fresh tree for one summon. `screenBounds` (CoreGraphics-global, top-left
-    /// origin) restricts content to the display the menu was summoned on (Bringr-93j.30);
-    /// `nil` spans all displays. A menu that doesn't care about the display ignores it.
-    func makeRoot(onScreen screenBounds: CGRect?) -> MenuNode
+    /// Build a fresh tree for one summon. `appsScope` scopes the top-level ring and
+    /// `windowsScope` each app's windows sub-wheel — independently, so the two levels can
+    /// pull from different screens/Spaces (Bringr-93j.48). Each scope's `screenBounds`
+    /// (CoreGraphics-global, top-left origin) is the display to restrict to, already `nil`
+    /// for "all displays"; `allSpaces` widens the query to every Space. A menu that doesn't
+    /// care about scope ignores both.
+    func makeRoot(appsScope: CollectionScope, windowsScope: CollectionScope) -> MenuNode
 }
 
 extension MenuDefinition {
-    /// Build a tree spanning all displays — the default when a summon isn't scoped to one.
-    func makeRoot() -> MenuNode { makeRoot(onScreen: nil) }
+    /// Build a tree spanning all displays on the current Space — the default when a summon
+    /// isn't scoped (the menu-bar entry point, tests).
+    func makeRoot() -> MenuNode {
+        makeRoot(appsScope: .allScreensCurrentSpace, windowsScope: .allScreensCurrentSpace)
+    }
 }
 
 /// Maps triggers to menu definitions and builds a fresh tree per summon. Keying
@@ -144,10 +150,15 @@ final class MenuRegistry {
         definitions[trigger]
     }
 
-    /// Build a fresh menu tree for `trigger`, or `nil` if none is registered.
-    /// `screenBounds` scopes the tree to one display (Bringr-93j.30); `nil` spans all.
-    func makeMenu(for trigger: MenuTrigger, onScreen screenBounds: CGRect? = nil) -> MenuNode? {
-        definitions[trigger]?.makeRoot(onScreen: screenBounds)
+    /// Build a fresh menu tree for `trigger`, or `nil` if none is registered. `appsScope`
+    /// and `windowsScope` scope the two levels independently (Bringr-93j.48); both default
+    /// to all displays on the current Space when a summon isn't scoped.
+    func makeMenu(
+        for trigger: MenuTrigger,
+        appsScope: CollectionScope = .allScreensCurrentSpace,
+        windowsScope: CollectionScope = .allScreensCurrentSpace
+    ) -> MenuNode? {
+        definitions[trigger]?.makeRoot(appsScope: appsScope, windowsScope: windowsScope)
     }
 }
 
@@ -166,12 +177,12 @@ struct WindowSwitcherMenu: MenuDefinition {
         self.enumerator = enumerator
     }
 
-    func makeRoot(onScreen screenBounds: CGRect?) -> MenuNode {
+    func makeRoot(appsScope: CollectionScope, windowsScope: CollectionScope) -> MenuNode {
         let enumerator = self.enumerator
-        // Capture `screenBounds` in both the apps provider and each app's windows
-        // provider so the whole menu — top-level ring and every sub-wheel — stays
-        // locked to the display the menu was summoned on, even as hover re-resolves
-        // sub-wheels from live state (Bringr-93j.30).
+        // The apps ring reads at `appsScope`; each app node carries `windowsScope` so its
+        // sub-wheel re-reads at the windows scope on hover. Capturing both keeps the whole
+        // menu locked to the chosen screens/Spaces even as hover re-resolves sub-wheels
+        // from live state (Bringr-93j.30 / Bringr-93j.48).
         return MenuNode(
             id: MenuNodeID("root:apps"),
             title: "Applications",
@@ -180,21 +191,23 @@ struct WindowSwitcherMenu: MenuDefinition {
                 // The apps ring is the one summon-time read, resolved before any reveal,
                 // so it records the recent-use order (Bringr-93j.46); the per-app
                 // sub-wheels re-read on hover and must not (`recordingRecency` defaults off).
-                enumerator.enumerate(onScreen: screenBounds, recordingRecency: true).map {
-                    Self.appNode($0, onScreen: screenBounds, enumerator: enumerator)
+                enumerator.enumerate(
+                    onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces, recordingRecency: true
+                ).map {
+                    Self.appNode($0, windowsScope: windowsScope, enumerator: enumerator)
                 }
             }
         )
     }
 
     /// Build an expand-to-windows app node for `app`, its windows sub-wheel a dynamic
-    /// provider that re-enumerates on the same `screenBounds` at hover time. `static` and
-    /// internal so the curated "My Apps" composition (Bringr-93j.41) reuses the exact same
-    /// node — same id, same live sub-wheel — for a listed app that is running with windows,
+    /// provider that re-enumerates at `windowsScope` at hover time. `static` and internal
+    /// so the curated "My Apps" composition (Bringr-93j.41) reuses the exact same node —
+    /// same id, same live sub-wheel — for a listed app that is running with windows,
     /// passing the entry's `bundleIdentifier` so the slice icon also resolves from the
     /// on-disk bundle (Bringr-93j.38); the raw wheel passes `nil`, rendering from the pid.
     static func appNode(
-        _ app: AppWindows, onScreen screenBounds: CGRect?, enumerator: WindowEnumerator,
+        _ app: AppWindows, windowsScope: CollectionScope, enumerator: WindowEnumerator,
         bundleIdentifier: String? = nil
     ) -> MenuNode {
         let appID = app.id
@@ -205,7 +218,9 @@ struct WindowSwitcherMenu: MenuDefinition {
             representedApp: appID,
             bundleIdentifier: bundleIdentifier,
             children: .dynamic {
-                let current = enumerator.enumerate(onScreen: screenBounds).first { $0.id == appID }
+                let current = enumerator.enumerate(
+                    onScreen: windowsScope.screenBounds, allSpaces: windowsScope.allSpaces
+                ).first { $0.id == appID }
                 return (current?.windows ?? []).map { Self.windowNode($0) }
             }
         )

@@ -42,8 +42,11 @@ struct RawWindow: Equatable, Sendable {
 /// system dependency and no permission prompt during tests.
 @MainActor
 protocol WindowEnumerationSource {
-    /// Every on-screen window record, front-to-back, as the system reports them.
-    func rawWindows() -> [RawWindow]
+    /// Every window record, front-to-back, as the system reports them. `includingAllSpaces`
+    /// widens the query from the current Space to every Space (Bringr-93j.48): only the
+    /// source can do this, because the public window list decides which Spaces it covers at
+    /// query time — there is no per-record Space tag to post-filter on.
+    func rawWindows(includingAllSpaces: Bool) -> [RawWindow]
     /// This process's pid, so Bringr's own windows can be excluded.
     var selfPID: pid_t { get }
 }
@@ -98,15 +101,25 @@ final class WindowEnumerator {
     /// screen the menu was summoned on; an app drops out entirely if none of its windows
     /// are on that display. `nil` spans every display (the menu-bar summon, tests).
     ///
+    /// `allSpaces` widens the underlying query from the current Space to every Space
+    /// (Bringr-93j.48); it is forwarded to the source, since only the window-list query
+    /// decides which Spaces it covers. Independent of `screenBounds`, so a caller can ask
+    /// for, say, every Space on just the current display. Default `false` keeps the
+    /// current-Space behaviour every existing caller and test relies on.
+    ///
     /// `recordingRecency` distinguishes the one authoritative summon-time read (the apps
     /// ring) from the per-app sub-wheel re-reads that hover triggers (Bringr-93j.46). Only
     /// the summon read folds the live order into `RecencyTracker`, because only it runs
     /// *before* any reveal perturbs the z-order; the hover re-reads pass `false` so a
     /// preview never updates the recent-use order. With no `RecencyTracker` injected this
     /// flag is inert.
-    func enumerate(onScreen screenBounds: CGRect? = nil, recordingRecency: Bool = false) -> [AppWindows] {
+    func enumerate(
+        onScreen screenBounds: CGRect? = nil,
+        allSpaces: Bool = false,
+        recordingRecency: Bool = false
+    ) -> [AppWindows] {
         let start = DispatchTime.now().uptimeNanoseconds
-        let normal = source.rawWindows().filter(isNormalWindow)
+        let normal = source.rawWindows(includingAllSpaces: allSpaces).filter(isNormalWindow)
         let onScreen = filter(normal, toScreen: screenBounds)
         let grouped = group(onScreen)
         if recordingRecency { recency?.observe(grouped) }
@@ -217,8 +230,15 @@ final class WindowEnumerator {
 final class CGWindowSource: WindowEnumerationSource {
     let selfPID = ProcessInfo.processInfo.processIdentifier
 
-    func rawWindows() -> [RawWindow] {
-        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    func rawWindows(includingAllSpaces: Bool) -> [RawWindow] {
+        // `.optionOnScreenOnly` limits the list to windows visible on the current Space;
+        // dropping it (an all-windows query) is the only public way to reach windows on
+        // other Spaces (Bringr-93j.48). The all-windows form also surfaces minimized
+        // windows — controlling those is the separate Bringr-93j.50 — but the default
+        // current-Space form stays exactly as before.
+        let options: CGWindowListOption = includingAllSpaces
+            ? [.excludeDesktopElements]
+            : [.optionOnScreenOnly, .excludeDesktopElements]
         guard let infoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
             as? [[String: Any]] else { return [] }
         return infoList.compactMap(rawWindow(from:))

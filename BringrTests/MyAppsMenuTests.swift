@@ -96,7 +96,8 @@ final class MyAppsMenuTests: XCTestCase {
         )
 
         // ...but owns no window on screen A, so on A it lists as a launch node.
-        let apps = menu.makeRoot(onScreen: screenA).resolvedChildren()
+        let scope = CollectionScope(screenBounds: screenA, allSpaces: false)
+        let apps = menu.makeRoot(appsScope: scope, windowsScope: scope).resolvedChildren()
         XCTAssertEqual(apps.map(\.action), [.launchApp(bundleIdentifier: "com.google.Chrome")])
     }
 

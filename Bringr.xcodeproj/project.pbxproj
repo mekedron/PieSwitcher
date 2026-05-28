@@ -76,6 +76,10 @@
 		1A00000000000000000000A2 /* HideOnCommitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000A1 /* HideOnCommitTests.swift */; };
 		1A00000000000000000000A4 /* WindowControlling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000A3 /* WindowControlling.swift */; };
 		1A00000000000000000000A6 /* WindowControlHideOnCommitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000A5 /* WindowControlHideOnCommitTests.swift */; };
+		1A00000000000000000000A8 /* CollectionScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000A7 /* CollectionScope.swift */; };
+		1A00000000000000000000AA /* CollectionScopeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000A9 /* CollectionScopeTests.swift */; };
+		1A00000000000000000000AC /* CollectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000AB /* CollectionSettingsView.swift */; };
+		1A00000000000000000000AE /* WindowEnumeratorSpacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -160,6 +164,10 @@
 		1A00000000000000000000A1 /* HideOnCommitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HideOnCommitTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000A3 /* WindowControlling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControlling.swift; sourceTree = "<group>"; };
 		1A00000000000000000000A5 /* WindowControlHideOnCommitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControlHideOnCommitTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000A7 /* CollectionScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionScope.swift; sourceTree = "<group>"; };
+		1A00000000000000000000A9 /* CollectionScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionScopeTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000AB /* CollectionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSettingsView.swift; sourceTree = "<group>"; };
+		1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeratorSpacesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -237,6 +245,8 @@
 				1A000000000000000000009B /* RadialMenuController.swift */,
 				1A000000000000000000009D /* RadialNavigator+Region.swift */,
 				1A000000000000000000009F /* HideOnCommit.swift */,
+				1A00000000000000000000A7 /* CollectionScope.swift */,
+				1A00000000000000000000AB /* CollectionSettingsView.swift */,
 			);
 			path = Bringr;
 			sourceTree = "<group>";
@@ -277,6 +287,8 @@
 				1A0000000000000000000097 /* CursorLockTests.swift */,
 				1A0000000000000000000099 /* RadialNavigatorCursorLockTests.swift */,
 				1A00000000000000000000A1 /* HideOnCommitTests.swift */,
+				1A00000000000000000000A9 /* CollectionScopeTests.swift */,
+				1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */,
 			);
 			path = BringrTests;
 			sourceTree = "<group>";
@@ -415,6 +427,8 @@
 				1A000000000000000000009C /* RadialMenuController.swift in Sources */,
 				1A000000000000000000009E /* RadialNavigator+Region.swift in Sources */,
 				1A00000000000000000000A0 /* HideOnCommit.swift in Sources */,
+				1A00000000000000000000A8 /* CollectionScope.swift in Sources */,
+				1A00000000000000000000AC /* CollectionSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -455,6 +469,8 @@
 				1A0000000000000000000098 /* CursorLockTests.swift in Sources */,
 				1A000000000000000000009A /* RadialNavigatorCursorLockTests.swift in Sources */,
 				1A00000000000000000000A2 /* HideOnCommitTests.swift in Sources */,
+				1A00000000000000000000AA /* CollectionScopeTests.swift in Sources */,
+				1A00000000000000000000AE /* WindowEnumeratorSpacesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

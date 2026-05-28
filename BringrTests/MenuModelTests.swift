@@ -152,8 +152,9 @@ final class MenuModelTests: XCTestCase {
             raw(number: 11, pid: 10, name: "Chrome", x: 100, y: 100),   // on A
             raw(number: 41, pid: 40, name: "Mail", x: 1600, y: 100)     // off A
         ])
+        let scope = CollectionScope(screenBounds: screenA, allSpaces: false)
         let root = WindowSwitcherMenu(enumerator: WindowEnumerator(source: source))
-            .makeRoot(onScreen: screenA)
+            .makeRoot(appsScope: scope, windowsScope: scope)
 
         XCTAssertEqual(root.resolvedChildren().map(\.title), ["Chrome"])
     }
@@ -163,8 +164,9 @@ final class MenuModelTests: XCTestCase {
             raw(number: 11, pid: 10, name: "Chrome", title: "Inbox", x: 100, y: 100),   // on A
             raw(number: 12, pid: 10, name: "Chrome", title: "Docs", x: 1500, y: 100)    // off A
         ])
+        let scope = CollectionScope(screenBounds: screenA, allSpaces: false)
         let appNode = WindowSwitcherMenu(enumerator: WindowEnumerator(source: source))
-            .makeRoot(onScreen: screenA).resolvedChildren()[0]
+            .makeRoot(appsScope: scope, windowsScope: scope).resolvedChildren()[0]
 
         // The sub-wheel resolves later (on hover) yet still filters to the summon screen,
         // so Chrome's window on the other display never leaks into the wheel.
@@ -263,5 +265,5 @@ final class StubEnumerationSource: WindowEnumerationSource {
         self.windows = windows
     }
 
-    func rawWindows() -> [RawWindow] { windows }
+    func rawWindows(includingAllSpaces: Bool) -> [RawWindow] { windows }
 }

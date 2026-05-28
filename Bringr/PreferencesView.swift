@@ -50,6 +50,7 @@ struct PreferencesView: View {
                 section("Interaction") { interactionSection }
                 section("Reveal") { revealSection }
                 section("Sorting") { sortingSection }
+                section("Screens & Spaces") { collectionSection }
                 section("My Apps") { myAppsSection }
                 section("Appearance") { appearanceSection }
             }
@@ -174,6 +175,10 @@ struct PreferencesView: View {
 
     private var revealSection: some View {
         RevealSettings()
+    }
+
+    private var collectionSection: some View {
+        CollectionSettings()
     }
 
     private var sortingSection: some View {

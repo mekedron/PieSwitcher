@@ -68,7 +68,7 @@ struct MyAppsMenu: MenuDefinition {
         self.runningPID = runningPID
     }
 
-    func makeRoot(onScreen screenBounds: CGRect?) -> MenuNode {
+    func makeRoot(appsScope: CollectionScope, windowsScope: CollectionScope) -> MenuNode {
         let curated = curatedApps()
         let showOthers = showOtherRunningApps()
         // Empty list + show-others (the default) → the current full wheel, unchanged (AC:
@@ -76,14 +76,17 @@ struct MyAppsMenu: MenuDefinition {
         // the same nodes, but routing this documented case straight through the fallback keeps
         // the no-regression guarantee literal. Empty list + others-off intentionally yields an
         // empty ring — "show only the curated apps", of which there are none.
-        if curated.isEmpty && showOthers { return fallback.makeRoot(onScreen: screenBounds) }
+        if curated.isEmpty && showOthers {
+            return fallback.makeRoot(appsScope: appsScope, windowsScope: windowsScope)
+        }
 
         let enumerator = self.enumerator
         let runningPID = self.runningPID
         let keepCuratedOrder = self.keepCuratedOrder
         let appSortOrder = self.appSortOrder
-        // Capture `screenBounds` so the ring and every sub-wheel stay locked to the summon
-        // display (Bringr-93j.30), matching the raw wheel.
+        // The ring reads at `appsScope`; each app node carries `windowsScope` for its
+        // sub-wheel, so the two levels stay independently scoped (Bringr-93j.48), matching
+        // the raw wheel.
         return MenuNode(
             id: MenuNodeID("root:apps"),
             title: "Applications",
@@ -91,7 +94,9 @@ struct MyAppsMenu: MenuDefinition {
             children: .dynamic {
                 // The one summon-time read, before any reveal, so it records the
                 // recent-use order; hover sub-wheels re-read without recording (Bringr-93j.46).
-                let live = enumerator.enumerate(onScreen: screenBounds, recordingRecency: true)
+                let live = enumerator.enumerate(
+                    onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces, recordingRecency: true
+                )
                 // Keep the manual order (the default), or let the active Apps sort order
                 // reorder the curated block when the user turned that off (Bringr-93j.43).
                 let orderedCurated = keepCuratedOrder()
@@ -99,12 +104,12 @@ struct MyAppsMenu: MenuDefinition {
                     : Self.ordered(curated, live: live, runningPID: runningPID, by: appSortOrder())
                 let curatedNodes = orderedCurated.map {
                     Self.node(
-                        for: $0, live: live, onScreen: screenBounds,
+                        for: $0, live: live, windowsScope: windowsScope,
                         enumerator: enumerator, runningPID: runningPID
                     )
                 }
                 guard showOthers else { return curatedNodes }
-                // Append every other running app on this screen — those whose pid no curated
+                // Append every other running app in the apps scope — those whose pid no curated
                 // entry already represents. A curated app running with windows resolves to a
                 // live pid (and an expand node above), so excluding those pids avoids listing
                 // it twice; a curated launch node owns no live window here, so it never
@@ -112,25 +117,26 @@ struct MyAppsMenu: MenuDefinition {
                 let curatedPIDs = Set(curated.compactMap { runningPID($0.bundleIdentifier) })
                 let others = live
                     .filter { !curatedPIDs.contains($0.id.pid) }
-                    .map { WindowSwitcherMenu.appNode($0, onScreen: screenBounds, enumerator: enumerator) }
+                    .map { WindowSwitcherMenu.appNode($0, windowsScope: windowsScope, enumerator: enumerator) }
                 return curatedNodes + others
             }
         )
     }
 
     /// One curated entry's node: the running-with-windows app node when its running pid
-    /// owns at least one window in the screen-scoped `live` enumeration, otherwise a launch
-    /// node. Resolving against `live` (already filtered to the summon screen) means an app
-    /// running only on another display becomes a launch node here — consistent with the
-    /// rest of the screen-scoped wheel (Bringr-93j.30).
+    /// owns at least one window in the apps-scoped `live` enumeration, otherwise a launch
+    /// node. Resolving against `live` (already filtered to the apps scope) means an app
+    /// running only outside that scope becomes a launch node here — consistent with the
+    /// rest of the scoped wheel (Bringr-93j.30 / Bringr-93j.48). The matched node carries
+    /// `windowsScope` for its sub-wheel.
     private static func node(
-        for app: CuratedApp, live: [AppWindows], onScreen screenBounds: CGRect?,
+        for app: CuratedApp, live: [AppWindows], windowsScope: CollectionScope,
         enumerator: WindowEnumerator, runningPID: (String) -> pid_t?
     ) -> MenuNode {
         if let pid = runningPID(app.bundleIdentifier),
            let appWindows = live.first(where: { $0.id.pid == pid }) {
             return WindowSwitcherMenu.appNode(
-                appWindows, onScreen: screenBounds, enumerator: enumerator,
+                appWindows, windowsScope: windowsScope, enumerator: enumerator,
                 bundleIdentifier: app.bundleIdentifier
             )
         }

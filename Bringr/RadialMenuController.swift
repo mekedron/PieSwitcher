@@ -56,6 +56,9 @@ final class RadialMenuController: ObservableObject {
     /// mirroring `modeProvider`, so a Preferences change applies on the next summon
     /// without a relaunch (Bringr-93j.27).
     private let hideOnCommitProvider: () -> Bool
+    /// Reads the persisted apps/windows collection scope at summon time (Bringr-93j.48),
+    /// mirroring `modeProvider`, so a Preferences change applies on the next summon.
+    private let collectionProvider: () -> CollectionPreferences
     /// The last global cursor position seen inside the cursor-lock region while it is
     /// engaged — the point a rejected (out-of-region) move is snapped back to. Refreshed
     /// on every allowed move, so it is always a valid in-region anchor (Bringr-93j.29).
@@ -87,6 +90,7 @@ final class RadialMenuController: ObservableObject {
         strategyProvider: @escaping () -> RevealStrategy = { RevealStrategy.current() },
         cursorLockProvider: @escaping () -> Bool = { CursorLock.isEnabled() },
         hideOnCommitProvider: @escaping () -> Bool = { HideOnCommit.isEnabled() },
+        collectionProvider: @escaping () -> CollectionPreferences = { CollectionPreferences.current() },
         monitorInstaller: EventMonitorInstaller = .live
     ) {
         self.registry = registry
@@ -95,6 +99,7 @@ final class RadialMenuController: ObservableObject {
         self.strategyProvider = strategyProvider
         self.cursorLockProvider = cursorLockProvider
         self.hideOnCommitProvider = hideOnCommitProvider
+        self.collectionProvider = collectionProvider
         self.monitorInstaller = monitorInstaller
         self.navigator = RadialNavigator(
             windowControl: windowControl ?? WindowController(),
@@ -172,10 +177,16 @@ final class RadialMenuController: ObservableObject {
     /// location). Resolves the tree fresh so the wheel reflects live state, and
     /// starts tracking the cursor so hover can drill into apps.
     private func summon(trigger: MenuTrigger, at cursor: CGPoint) {
-        // Scope the wheel to the display under the cursor so a multi-monitor setup shows
-        // only that screen's apps/windows (Bringr-93j.30); `nil` spans every display.
-        let screenBounds = ScreenLocator.displayBounds(forCursor: cursor)
-        guard let root = registry.makeMenu(for: trigger, onScreen: screenBounds) else { return }
+        // Resolve the persisted apps/windows collection scope (Bringr-93j.48) against the
+        // display under the cursor; each level scopes screens/Spaces independently, and a
+        // `nil` display (headless host) reduces to "all displays" rather than hiding all.
+        let display = ScreenLocator.displayBounds(forCursor: cursor)
+        let collection = collectionProvider()
+        let appsScope = collection.appsScope(forDisplay: display)
+        let windowsScope = collection.windowsScope(forDisplay: display)
+        guard let root = registry.makeMenu(
+            for: trigger, appsScope: appsScope, windowsScope: windowsScope
+        ) else { return }
         // Apply the persisted appearance before resolving the tree: the size feeds
         // both the rendered rings and the navigator's hit-testing through one shared
         // geometry, so they stay in lock-step at any size (US-014 AC3).

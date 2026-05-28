@@ -323,11 +323,22 @@ final class WindowEnumerationTests: XCTestCase {
 final class FakeWindowEnumerationSource: WindowEnumerationSource {
     let selfPID: pid_t
     private let windows: [RawWindow]
+    /// Windows to return when asked for all Spaces (Bringr-93j.48); `nil` serves the base
+    /// `windows` for both modes, so the single-list tests are unaffected.
+    private let allSpacesWindows: [RawWindow]?
+    /// The `includingAllSpaces` of the most recent call, so a test can assert the
+    /// enumerator forwarded the scope's Space flag.
+    private(set) var lastIncludedAllSpaces: Bool?
 
-    init(selfPID: pid_t, windows: [RawWindow]) {
+    init(selfPID: pid_t, windows: [RawWindow], allSpacesWindows: [RawWindow]? = nil) {
         self.selfPID = selfPID
         self.windows = windows
+        self.allSpacesWindows = allSpacesWindows
     }
 
-    func rawWindows() -> [RawWindow] { windows }
+    func rawWindows(includingAllSpaces: Bool) -> [RawWindow] {
+        lastIncludedAllSpaces = includingAllSpaces
+        if includingAllSpaces, let allSpacesWindows { return allSpacesWindows }
+        return windows
+    }
 }
