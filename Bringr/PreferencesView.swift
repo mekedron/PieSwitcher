@@ -20,6 +20,11 @@ struct PreferencesView: View {
     /// (via `RevealStrategy.current`) at each summon, so a change here takes effect on
     /// the next summon without a relaunch (US-013 AC4).
     @AppStorage(RevealStrategy.defaultsKey) private var revealStrategyRaw = RevealStrategy.default.rawValue
+    /// The persisted app/window sort orders (Bringr-93j.34). `WindowEnumerator` reads
+    /// the same keys fresh at each summon, so a change here reorders the wheel on the
+    /// next open without a relaunch.
+    @AppStorage(AppSortOrder.defaultsKey) private var appSortOrderRaw = AppSortOrder.default.rawValue
+    @AppStorage(WindowSortOrder.defaultsKey) private var windowSortOrderRaw = WindowSortOrder.default.rawValue
 
     var body: some View {
         ScrollView {
@@ -28,6 +33,7 @@ struct PreferencesView: View {
                 section("Startup") { startupSection }
                 section("Interaction") { interactionSection }
                 section("Reveal") { revealSection }
+                section("Sorting") { sortingSection }
                 section("Appearance") { appearanceSection }
             }
             .padding(28)
@@ -136,6 +142,38 @@ struct PreferencesView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var sortingSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Apps:", selection: $appSortOrderRaw) {
+                    ForEach(AppSortOrder.allCases, id: \.rawValue) { order in
+                        Text(order.displayName).tag(order.rawValue)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                Text((AppSortOrder(rawValue: appSortOrderRaw) ?? .default).detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Windows:", selection: $windowSortOrderRaw) {
+                    ForEach(WindowSortOrder.allCases, id: \.rawValue) { order in
+                        Text(order.displayName).tag(order.rawValue)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+
+                Text((WindowSortOrder(rawValue: windowSortOrderRaw) ?? .default).detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

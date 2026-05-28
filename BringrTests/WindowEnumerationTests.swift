@@ -118,6 +118,119 @@ final class WindowEnumerationTests: XCTestCase {
         XCTAssertTrue(WindowEnumerator(source: source).enumerate().isEmpty)
     }
 
+    // MARK: - Bringr-93j.34: app sort order
+
+    func testAppOrderRecentlyUsedKeepsFrontToBackOrder() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: 20, name: "Ghostty"),
+            raw(number: 2, pid: 10, name: "Chrome"),
+            raw(number: 3, pid: 30, name: "Mail")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .recentlyUsed }, windowOrder: { .recentlyUsed }
+        ).enumerate()
+
+        XCTAssertEqual(apps.map(\.name), ["Ghostty", "Chrome", "Mail"])
+    }
+
+    func testAppOrderByNameSortsAlphabeticallyRegardlessOfZOrder() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: 20, name: "Ghostty"),
+            raw(number: 2, pid: 10, name: "Chrome"),
+            raw(number: 3, pid: 30, name: "Mail")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .name }, windowOrder: { .recentlyUsed }
+        ).enumerate()
+
+        XCTAssertEqual(apps.map(\.name), ["Chrome", "Ghostty", "Mail"])
+    }
+
+    func testAppOrderByNameIsCaseInsensitive() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: 20, name: "zoom"),
+            raw(number: 2, pid: 10, name: "Arc")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .name }, windowOrder: { .recentlyUsed }
+        ).enumerate()
+
+        XCTAssertEqual(apps.map(\.name), ["Arc", "zoom"])
+    }
+
+    // MARK: - Bringr-93j.34: window sort order
+
+    func testWindowOrderRecentlyUsedKeepsFrontToBackOrder() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 30, pid: 10, name: "Chrome"),
+            raw(number: 10, pid: 10, name: "Chrome"),
+            raw(number: 20, pid: 10, name: "Chrome")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .recentlyUsed }, windowOrder: { .recentlyUsed }
+        ).enumerate()
+
+        XCTAssertEqual(apps[0].windows.map(\.id.token), [30, 10, 20])
+    }
+
+    func testWindowOrderFixedSortsByWindowNumberAscending() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 30, pid: 10, name: "Chrome"),
+            raw(number: 10, pid: 10, name: "Chrome"),
+            raw(number: 20, pid: 10, name: "Chrome")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .recentlyUsed }, windowOrder: { .fixed }
+        ).enumerate()
+
+        XCTAssertEqual(apps[0].windows.map(\.id.token), [10, 20, 30])
+    }
+
+    func testAppAndWindowOrdersApplyIndependently() {
+        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 5, pid: 20, name: "Ghostty"),
+            raw(number: 9, pid: 20, name: "Ghostty"),
+            raw(number: 7, pid: 10, name: "Chrome")
+        ])
+        let apps = WindowEnumerator(
+            source: source, appOrder: { .name }, windowOrder: { .fixed }
+        ).enumerate()
+
+        XCTAssertEqual(apps.map(\.name), ["Chrome", "Ghostty"])
+        XCTAssertEqual(apps[1].windows.map(\.id.token), [5, 9])
+    }
+
+    // MARK: - Bringr-93j.34: persisted setting round-trips
+
+    func testAppSortOrderDefaultsToRecentlyUsedWhenUnset() {
+        let defaults = ephemeralDefaults()
+        XCTAssertEqual(AppSortOrder.current(from: defaults), .recentlyUsed)
+    }
+
+    func testAppSortOrderReadsPersistedValue() {
+        let defaults = ephemeralDefaults()
+        defaults.set(AppSortOrder.name.rawValue, forKey: AppSortOrder.defaultsKey)
+        XCTAssertEqual(AppSortOrder.current(from: defaults), .name)
+    }
+
+    func testWindowSortOrderDefaultsToRecentlyUsedWhenUnset() {
+        let defaults = ephemeralDefaults()
+        XCTAssertEqual(WindowSortOrder.current(from: defaults), .recentlyUsed)
+    }
+
+    func testWindowSortOrderReadsPersistedValue() {
+        let defaults = ephemeralDefaults()
+        defaults.set(WindowSortOrder.fixed.rawValue, forKey: WindowSortOrder.defaultsKey)
+        XCTAssertEqual(WindowSortOrder.current(from: defaults), .fixed)
+    }
+
+    private func ephemeralDefaults() -> UserDefaults {
+        let suite = "WindowEnumerationTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
     // MARK: - Fixtures
 
     private func raw(

@@ -53,6 +53,7 @@
 		1A000000000000000000006D /* RevealStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000006E /* RevealStrategy.swift */; };
 		1A000000000000000000006F /* Dimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000070 /* Dimming.swift */; };
 		1A0000000000000000000071 /* RevealStrategyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000072 /* RevealStrategyTests.swift */; };
+		1A000000000000000000007A /* SortOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000079 /* SortOrder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +115,7 @@
 		1A000000000000000000005B /* RevealStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevealStateTests.swift; sourceTree = "<group>"; };
 		1A000000000000000000005D /* RadialAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialAppearance.swift; sourceTree = "<group>"; };
 		1A000000000000000000005F /* RadialAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialAppearanceTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000079 /* SortOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortOrder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,6 +181,7 @@
 				1A000000000000000000005D /* RadialAppearance.swift */,
 				1A000000000000000000006E /* RevealStrategy.swift */,
 				1A0000000000000000000070 /* Dimming.swift */,
+				1A0000000000000000000079 /* SortOrder.swift */,
 			);
 			path = Bringr;
 			sourceTree = "<group>";
@@ -334,6 +337,7 @@
 				1A000000000000000000005E /* RadialAppearance.swift in Sources */,
 				1A000000000000000000006D /* RevealStrategy.swift in Sources */,
 				1A000000000000000000006F /* Dimming.swift in Sources */,
+				1A000000000000000000007A /* SortOrder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

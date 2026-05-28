@@ -59,14 +59,25 @@ final class WindowEnumerator {
     static let minimumWindowSize: CGFloat = 40
 
     private let source: WindowEnumerationSource
+    /// The app/window sort orders to apply (Bringr-93j.34), read through closures so
+    /// each `enumerate()` picks up the persisted Preferences value fresh at summon time
+    /// (mirroring `RevealStrategy.current`), while tests inject fixed orders.
+    private let appOrder: () -> AppSortOrder
+    private let windowOrder: () -> WindowSortOrder
     private let log = Logger(subsystem: "com.mekedron.Bringr", category: "enumeration")
 
     /// Wall-clock duration of the most recent `enumerate()` call, recorded so the
     /// summon hot-path budget can be measured. `nil` until the first call. (AC4)
     private(set) var lastDuration: TimeInterval?
 
-    init(source: WindowEnumerationSource? = nil) {
+    init(
+        source: WindowEnumerationSource? = nil,
+        appOrder: @escaping () -> AppSortOrder = { AppSortOrder.current() },
+        windowOrder: @escaping () -> WindowSortOrder = { WindowSortOrder.current() }
+    ) {
         self.source = source ?? CGWindowSource()
+        self.appOrder = appOrder
+        self.windowOrder = windowOrder
     }
 
     /// Apps that currently own at least one normal, on-screen window, each with
@@ -75,7 +86,7 @@ final class WindowEnumerator {
     func enumerate() -> [AppWindows] {
         let start = DispatchTime.now().uptimeNanoseconds
         let normal = source.rawWindows().filter(isNormalWindow)
-        let result = group(normal)
+        let result = sorted(group(normal))
         let elapsed = TimeInterval(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
         lastDuration = elapsed
         log.debug("Enumerated \(result.count) app(s) in \(Int((elapsed * 1000).rounded())) ms")
@@ -109,6 +120,41 @@ final class WindowEnumerator {
                 )
             }
             return AppWindows(id: appID, name: raws.first?.ownerName ?? "", windows: infos)
+        }
+    }
+
+    /// Apply the persisted app/window sort orders (Bringr-93j.34) to the freshly
+    /// grouped, front-to-back enumeration. `.recentlyUsed` keeps that live z-order (the
+    /// ⌘-Tab-matching default); the alternatives impose a stable arrangement from values
+    /// macOS already reports — the app name, the creation-ordered window number — so
+    /// positions stop reshuffling without any recency tracking of our own.
+    private func sorted(_ apps: [AppWindows]) -> [AppWindows] {
+        let windowsSorted = apps.map { app in
+            AppWindows(id: app.id, name: app.name, windows: sortWindows(app.windows))
+        }
+        switch appOrder() {
+        case .recentlyUsed:
+            return windowsSorted
+        case .name:
+            return windowsSorted.sorted { lhs, rhs in
+                switch lhs.name.localizedCaseInsensitiveCompare(rhs.name) {
+                case .orderedAscending: return true
+                case .orderedDescending: return false
+                case .orderedSame: return lhs.id.pid < rhs.id.pid
+                }
+            }
+        }
+    }
+
+    /// Order one app's windows by the persisted window sort order. `.fixed` sorts by
+    /// window number, which macOS assigns in creation order, so the oldest window keeps
+    /// the first spot summon to summon.
+    private func sortWindows(_ windows: [WindowInfo]) -> [WindowInfo] {
+        switch windowOrder() {
+        case .recentlyUsed:
+            return windows
+        case .fixed:
+            return windows.sorted { $0.id.token < $1.id.token }
         }
     }
 
