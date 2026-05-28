@@ -13,7 +13,11 @@ struct RadialMenuView: View {
 
         ZStack {
             ForEach(controller.rings) { ring in
-                RadialRingView(ring: ring, hovered: controller.hovered)
+                RadialRingView(
+                    ring: ring,
+                    hovered: controller.hovered,
+                    prehighlighted: controller.prehighlighted
+                )
             }
         }
         .frame(width: diameter, height: diameter)
@@ -27,23 +31,31 @@ struct RadialMenuView: View {
     }
 }
 
-/// One concentric ring: a wedge + label per node, with the hovered slice filled
-/// more strongly so isolation is visible at a glance.
+/// One concentric ring: a wedge + label per node. The hovered slice is filled most
+/// strongly; a pre-highlighted slice (the app's remembered last selection) gets a
+/// medium fill and a stronger outline so the suggested choice reads before the
+/// cursor reaches it. (US-012 AC4)
 struct RadialRingView: View {
     let ring: RadialRing
     let hovered: HoverRegion
+    let prehighlighted: HoverRegion
 
     var body: some View {
         let layout = RadialLayout(itemCount: ring.nodes.count, geometry: ring.geometry)
 
         ZStack {
             ForEach(Array(ring.nodes.enumerated()), id: \.element.id) { index, node in
-                let isHovered = hovered == .slice(level: ring.level, index: index)
+                let region = HoverRegion.slice(level: ring.level, index: index)
+                let isHovered = hovered == region
+                let isPrehighlighted = !isHovered && prehighlighted == region
                 RadialWedge(layout: layout, index: index)
-                    .fill(Color.accentColor.opacity(isHovered ? 0.42 : 0.18))
+                    .fill(Color.accentColor.opacity(fillOpacity(hovered: isHovered, prehighlighted: isPrehighlighted)))
                     .overlay(
                         RadialWedge(layout: layout, index: index)
-                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            .stroke(
+                                Color.primary.opacity(isPrehighlighted ? 0.5 : 0.15),
+                                lineWidth: isPrehighlighted ? 2 : 1
+                            )
                     )
 
                 RadialSliceLabel(node: node, index: index)
@@ -53,6 +65,12 @@ struct RadialRingView: View {
                     )
             }
         }
+    }
+
+    private func fillOpacity(hovered: Bool, prehighlighted: Bool) -> Double {
+        if hovered { return 0.42 }
+        if prehighlighted { return 0.30 }
+        return 0.18
     }
 }
 

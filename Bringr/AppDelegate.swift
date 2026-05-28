@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionAlertWindow: PermissionAlertWindow?
     /// Global left+right mouse-chord activation (US-007). `nil` under XCTest.
     private var activationMonitor: MouseChordMonitor?
+    /// Global three-finger trackpad-press activation (US-008). `nil` under XCTest,
+    /// or when MultitouchSupport / a trackpad is unavailable on the host.
+    private var trackpadMonitor: ThreeFingerMonitor?
     private var trustCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -27,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         permissions.startMonitoring()
         prewarmRadialMenu()
         startActivationMonitor()
+        startTrackpadMonitor()
 
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {
@@ -66,6 +70,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] trusted in
                 if trusted { self?.activationMonitor?.start() }
             }
+    }
+
+    /// Install the global three-finger trackpad monitor (US-008). Unlike the mouse
+    /// tap, MultitouchSupport needs no Accessibility permission, so it starts
+    /// outright; if the framework or a trackpad is missing it degrades gracefully
+    /// (logs, no crash) and three-finger activation is simply unavailable.
+    private func startTrackpadMonitor() {
+        let monitor = ThreeFingerMonitor(
+            onPress: { [weak self] in
+                guard let self, let radialMenu = self.radialMenu else { return }
+                radialMenu.triggerPressed(for: .threeFingerPress, at: NSEvent.mouseLocation)
+            },
+            onRelease: { [weak self] in
+                self?.radialMenu?.triggerReleased(at: NSEvent.mouseLocation)
+            }
+        )
+        trackpadMonitor = monitor
+        monitor.start()
     }
 
     /// Whether the launch-time permission alert should be shown: only when access

@@ -47,6 +47,9 @@ final class RadialMenuController: ObservableObject {
     /// The slice the cursor is currently over, for highlighting. Mirrors
     /// `navigator.hovered`.
     @Published private(set) var hovered: HoverRegion = .none
+    /// The slice to pre-highlight (the app's remembered last selection). Mirrors
+    /// `navigator.prehighlighted`. (US-012 AC4)
+    @Published private(set) var prehighlighted: HoverRegion = .none
     /// Whether the overlay is currently on screen.
     @Published private(set) var isVisible = false
 
@@ -104,13 +107,15 @@ final class RadialMenuController: ObservableObject {
     /// A hold-capable trigger was released. Hold-to-select commits on what the
     /// cursor is over; click-to-stay ignores the release and keeps the menu open.
     func triggerReleased(at cursor: CGPoint) {
-        route(machine.handle(.triggerReleased(over: target(forGlobalCursor: cursor))))
+        let region = navigator.region(forOffset: offset(forGlobalCursor: cursor))
+        route(machine.handle(.triggerReleased(over: sliceTarget(region))), region: region)
     }
 
     /// A click inside the overlay. In click-to-stay this selects the slice under the
     /// cursor, or cancels on a dead-zone/outside click; in hold-to-select it is ignored.
     func clickInOverlay(atLocalPoint local: CGPoint) {
-        route(machine.handle(.click(over: target(forLocalPoint: local))))
+        let region = navigator.region(forOffset: offset(forLocalPoint: local))
+        route(machine.handle(.click(over: sliceTarget(region))), region: region)
     }
 
     private func press(trigger: MenuTrigger, mode: InteractionMode, at cursor: CGPoint) {
@@ -122,9 +127,9 @@ final class RadialMenuController: ObservableObject {
         }
     }
 
-    private func route(_ outcome: InteractionOutcome) {
+    private func route(_ outcome: InteractionOutcome, region: HoverRegion) {
         switch outcome {
-        case .select(let index): commitSelection(at: index)
+        case .select: commitSelection(region: region)
         case .cancel: cancelInteraction()
         case .none, .open: break
         }
@@ -146,11 +151,16 @@ final class RadialMenuController: ObservableObject {
         startHoverTracking()
     }
 
-    /// Commit the slice at `index`. v1 closes the wheel and restores the windows it
-    /// moved out of the way; US-012 will raise/focus the chosen window first.
-    private func commitSelection(at index: Int) {
-        _ = index
-        dismiss()
+    /// Commit the slice under `region`: raise and focus the chosen window and
+    /// restore everything else to its pre-summon state (US-012). If `region` is not
+    /// a window leaf (an app slice or the dead zone), fall back to a cancel-restore.
+    /// Either way the overlay goes away.
+    private func commitSelection(region: HoverRegion) {
+        if navigator.commit(region) == nil {
+            dismiss() // not a window — restore like a cancel
+        } else {
+            hideOverlay() // the navigator already restored, focused, and cleared
+        }
     }
 
     /// Cancel the interaction, restoring the pre-summon window state.
@@ -158,10 +168,17 @@ final class RadialMenuController: ObservableObject {
         dismiss()
     }
 
-    /// Hide the overlay and restore every app/window the hover moved out of the way.
+    /// Restore every app/window the hover moved out of the way, then hide the overlay.
     private func dismiss() {
-        stopHoverTracking()
         navigator.close()
+        hideOverlay()
+    }
+
+    /// Tear down the on-screen overlay and stop tracking the cursor, without
+    /// touching window state — used after a commit, where the navigator has already
+    /// restored and focused.
+    private func hideOverlay() {
+        stopHoverTracking()
         syncFromNavigator()
         window.orderOut(nil)
         isVisible = false
@@ -170,6 +187,7 @@ final class RadialMenuController: ObservableObject {
     private func syncFromNavigator() {
         rings = navigator.rings
         hovered = navigator.hovered
+        prehighlighted = navigator.prehighlighted
     }
 
     // MARK: - Hover tracking
@@ -199,17 +217,10 @@ final class RadialMenuController: ObservableObject {
 
     // MARK: - Cursor → target resolution
 
-    private func target(forGlobalCursor cursor: CGPoint) -> SliceTarget {
-        sliceTarget(navigator.region(forOffset: offset(forGlobalCursor: cursor)))
-    }
-
-    private func target(forLocalPoint local: CGPoint) -> SliceTarget {
-        sliceTarget(navigator.region(forOffset: offset(forLocalPoint: local)))
-    }
-
     /// Collapse a hover region to the commit vocabulary: any ring slice is a target,
-    /// the dead zone / outside is none. The committing path (US-012) reads the live
-    /// hovered node; the index here only distinguishes "a slice" from "none".
+    /// the dead zone / outside is none. The state machine only needs "a slice" vs
+    /// "none" to pick select vs cancel; `commitSelection(region:)` reads the live
+    /// region itself to resolve which window.
     private func sliceTarget(_ region: HoverRegion) -> SliceTarget {
         switch region {
         case .slice(_, let index): return .slice(index)

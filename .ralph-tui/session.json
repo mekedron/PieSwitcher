@@ -3,10 +3,10 @@
   "sessionId": "bf5be85f-d1fa-4dc4-8304-f09229dbce6c",
   "status": "running",
   "startedAt": "2026-05-28T11:08:26.939Z",
-  "updatedAt": "2026-05-28T13:31:54.222Z",
-  "currentIteration": 10,
+  "updatedAt": "2026-05-28T13:55:53.034Z",
+  "currentIteration": 12,
   "maxIterations": 0,
-  "tasksCompleted": 10,
+  "tasksCompleted": 11,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -92,8 +92,8 @@
       {
         "id": "Bringr-93j.11",
         "title": "US-011: Window-hover — isolate a single window",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.12",
@@ -221,10 +221,32 @@
       "durationMs": 1184195,
       "startedAt": "2026-05-28T12:59:46.335Z",
       "endedAt": "2026-05-28T13:19:30.530Z"
+    },
+    {
+      "iteration": 11,
+      "status": "completed",
+      "taskId": "Bringr-93j.11",
+      "taskTitle": "US-011: Window-hover — isolate a single window",
+      "taskCompleted": true,
+      "durationMs": 732380,
+      "startedAt": "2026-05-28T13:19:41.052Z",
+      "endedAt": "2026-05-28T13:31:53.432Z"
+    },
+    {
+      "iteration": 12,
+      "status": "failed",
+      "taskId": "Bringr-93j.12",
+      "taskTitle": "US-012: Select and commit — focus and remember",
+      "taskCompleted": false,
+      "durationMs": 652463,
+      "startedAt": "2026-05-28T13:32:03.556Z",
+      "endedAt": "2026-05-28T13:42:56.019Z"
     }
   ],
   "skippedTaskIds": [],
   "cwd": "/Users/nikita/Projects/Bringr",
-  "activeTaskIds": [],
+  "activeTaskIds": [
+    "Bringr-93j.12"
+  ],
   "subagentPanelVisible": false
 }

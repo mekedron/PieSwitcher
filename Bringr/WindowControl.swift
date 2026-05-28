@@ -104,6 +104,22 @@ final class WindowController {
         system.focusWindow(window)
     }
 
+    /// Commit `window` as the user's choice (US-012): first restore every app and
+    /// window moved out of the way to its pre-summon state (AC2), then make
+    /// `window` visible, raise it, and focus it so the chosen window ends up
+    /// frontmost and active (AC1).
+    ///
+    /// Restoring before raising matters: `restore()` re-activates the prior
+    /// frontmost app last, so it must run *before* the raise/focus or it would
+    /// override the focus the user just asked for. The explicit un-minimize covers
+    /// the case where the chosen window was itself minimized before the summon —
+    /// the user picked it, so it should surface regardless of its prior state.
+    func commit(_ window: WindowID) {
+        restore()
+        system.setMinimized(window, false)
+        raiseAndFocus(window)
+    }
+
     /// Hide every app except `target`, capturing app visibility/order first so
     /// `restore()` can put them back exactly. (AC2)
     func hideOtherApps(besides target: AppID) {

@@ -45,19 +45,26 @@ final class RadialNavigator {
     /// window is isolated. Drives window re-isolation (hovering the same window is
     /// a no-op) and the un-isolate when the cursor leaves the windows ring.
     private(set) var expandedWindowIndex: Int?
+    /// The window slice to pre-highlight — the app's remembered last selection —
+    /// while its sub-wheel is open, or `.none` when nothing is remembered. Distinct
+    /// from `hovered`: it suggests a choice before the cursor reaches it. (US-012 AC4)
+    private(set) var prehighlighted: HoverRegion = .none
 
     private let windowControl: WindowController
+    private let store: LastSelectionStore
     private let baseGeometry: RadialGeometry
     private let maxDepth: Int
 
     init(
         windowControl: WindowController,
         baseGeometry: RadialGeometry = .default,
-        maxDepth: Int = 2
+        maxDepth: Int = 2,
+        store: LastSelectionStore? = nil
     ) {
         self.windowControl = windowControl
         self.baseGeometry = baseGeometry
         self.maxDepth = max(1, maxDepth)
+        self.store = store ?? LastSelectionStore()
     }
 
     // MARK: - Concentric geometry
@@ -84,16 +91,22 @@ final class RadialNavigator {
         expandedAppIndex = nil
         expandedWindowIndex = nil
         hovered = .none
+        prehighlighted = .none
     }
 
     /// End the interaction: restore every hidden app/window to its pre-summon state
     /// and clear the wheel. Safe with nothing revealed (restore is a no-op then).
     func close() {
         windowControl.restore()
+        clearState()
+    }
+
+    private func clearState() {
         rings = []
         expandedAppIndex = nil
         expandedWindowIndex = nil
         hovered = .none
+        prehighlighted = .none
     }
 
     // MARK: - Hit-testing
@@ -134,12 +147,36 @@ final class RadialNavigator {
         }
     }
 
+    // MARK: - Commit (US-012)
+
+    /// Commit the selection currently under `region`. When it resolves to a window
+    /// leaf, remember it for its app (AC3), restore every app/window moved out of
+    /// the way, and bring the chosen window to the front + focus it (AC1/AC2), then
+    /// clear the wheel; returns the committed window. Returns `nil` for any
+    /// non-window target — an app slice or the dead zone — without touching window
+    /// state, so the caller can cancel-restore instead.
+    @discardableResult
+    func commit(_ region: HoverRegion) -> WindowID? {
+        guard case .slice(level: 1, let index) = region, rings.count > 1 else { return nil }
+        let windowsRing = rings[1]
+        guard index >= 0, index < windowsRing.nodes.count,
+              case .focusWindow(let windowID) = windowsRing.nodes[index].action else { return nil }
+
+        if let appName = expandedAppNode?.title {
+            store.remember(appName: appName, title: windowsRing.nodes[index].title, index: index)
+        }
+        windowControl.commit(windowID)
+        clearState()
+        return windowID
+    }
+
     // MARK: - Transitions
 
     /// Isolate the app under the apps-ring slice at `index` and open (or rebuild)
     /// its windows sub-wheel. Re-targeting from another app reuses
     /// `WindowController`'s captured baseline, so a later restore still returns to
-    /// the pre-summon state.
+    /// the pre-summon state. Pre-highlights the app's remembered window, if any
+    /// still matches the freshly resolved sub-wheel. (AC4)
     private func expandApp(at index: Int) {
         guard expandedAppIndex != index, let appsRing = rings.first,
               index >= 0, index < appsRing.nodes.count else { return }
@@ -147,13 +184,20 @@ final class RadialNavigator {
         if let appID = appNode.representedApp {
             windowControl.hideOtherApps(besides: appID)
         }
-        let subRing = RadialRing(
-            level: 1,
-            geometry: ringGeometry(forLevel: 1),
-            nodes: appNode.resolvedChildren()
-        )
+        let windowNodes = appNode.resolvedChildren()
+        let subRing = RadialRing(level: 1, geometry: ringGeometry(forLevel: 1), nodes: windowNodes)
         rings = [appsRing, subRing]
         expandedAppIndex = index
+        prehighlighted = prehighlightRegion(forAppNamed: appNode.title, windowNodes: windowNodes)
+    }
+
+    /// The window slice to pre-highlight for the app named `appName`, matching its
+    /// remembered selection against the live sub-wheel, or `.none`.
+    private func prehighlightRegion(forAppNamed appName: String, windowNodes: [MenuNode]) -> HoverRegion {
+        guard let index = store.prehighlightIndex(
+            forAppName: appName, windowTitles: windowNodes.map(\.title)
+        ) else { return .none }
+        return .slice(level: 1, index: index)
     }
 
     /// Isolate the window under the windows-ring slice at `index`: hide every other
@@ -191,13 +235,19 @@ final class RadialNavigator {
         rings = Array(rings.prefix(1))
         expandedAppIndex = nil
         expandedWindowIndex = nil
+        prehighlighted = .none
+    }
+
+    /// The app node currently expanded on the apps ring, if any.
+    private var expandedAppNode: MenuNode? {
+        guard let index = expandedAppIndex, let appsRing = rings.first,
+              index >= 0, index < appsRing.nodes.count else { return nil }
+        return appsRing.nodes[index]
     }
 
     /// The app currently expanded on the apps ring, if any — the scope window
     /// isolation acts within.
     private var expandedAppID: AppID? {
-        guard let index = expandedAppIndex, let appsRing = rings.first,
-              index >= 0, index < appsRing.nodes.count else { return nil }
-        return appsRing.nodes[index].representedApp
+        expandedAppNode?.representedApp
     }
 }
