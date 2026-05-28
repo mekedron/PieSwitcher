@@ -22,15 +22,17 @@ final class RadialAppearanceTests: XCTestCase {
         defaults.set(200.0, forKey: RadialAppearance.radiusDefaultsKey)
         defaults.set(0.4, forKey: RadialAppearance.opacityDefaultsKey)
         defaults.set(false, forKey: RadialAppearance.labelsDefaultsKey)
+        defaults.set(40.0, forKey: RadialAppearance.innerPaddingDefaultsKey)
 
         let appearance = RadialAppearance.current(from: defaults)
         XCTAssertEqual(appearance.outerRadius, 200, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, 0.4, accuracy: opacityAccuracy)
         XCTAssertFalse(appearance.showsLabels)
+        XCTAssertEqual(appearance.innerRadiusPadding, 40, accuracy: accuracy)
     }
 
     func testEachFieldFallsBackToItsDefaultIndependently() {
-        // Only labels were ever changed; size and opacity keep their defaults.
+        // Only labels were ever changed; size, opacity, and padding keep their defaults.
         let defaults = makeDefaults()
         defaults.set(false, forKey: RadialAppearance.labelsDefaultsKey)
 
@@ -38,6 +40,9 @@ final class RadialAppearanceTests: XCTestCase {
         XCTAssertEqual(appearance.outerRadius, RadialAppearance.defaultOuterRadius, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, RadialAppearance.defaultFillOpacity, accuracy: opacityAccuracy)
         XCTAssertFalse(appearance.showsLabels)
+        XCTAssertEqual(
+            appearance.innerRadiusPadding, RadialAppearance.defaultInnerRadiusPadding, accuracy: accuracy
+        )
     }
 
     // MARK: - Clamping a stray value (AC3 — never a degenerate ring)
@@ -50,6 +55,11 @@ final class RadialAppearanceTests: XCTestCase {
     func testOpacityIsClampedIntoRange() {
         XCTAssertEqual(readingOpacity(-1), RadialAppearance.opacityRange.lowerBound, accuracy: opacityAccuracy)
         XCTAssertEqual(readingOpacity(5), RadialAppearance.opacityRange.upperBound, accuracy: opacityAccuracy)
+    }
+
+    func testInnerPaddingIsClampedIntoRange() {
+        XCTAssertEqual(readingInnerPadding(-50), RadialAppearance.innerPaddingRange.lowerBound, accuracy: accuracy)
+        XCTAssertEqual(readingInnerPadding(99_999), RadialAppearance.innerPaddingRange.upperBound, accuracy: accuracy)
     }
 
     // MARK: - Derived geometry
@@ -72,6 +82,52 @@ final class RadialAppearanceTests: XCTestCase {
             XCTAssertGreaterThan(geometry.innerRadius, 0)
             XCTAssertLessThan(geometry.innerRadius, geometry.outerRadius)
         }
+    }
+
+    // MARK: - Inner-radius padding pushes the ring out at constant thickness
+
+    func testInnerPaddingShiftsBothEdgesOutwardKeepingThickness() {
+        let base = appearance(radius: 160).geometry
+        let pushed = appearance(radius: 160, padding: 40).geometry
+
+        // Both edges move out by exactly the padding…
+        XCTAssertEqual(pushed.innerRadius, base.innerRadius + 40, accuracy: accuracy)
+        XCTAssertEqual(pushed.outerRadius, base.outerRadius + 40, accuracy: accuracy)
+        // …so the ring keeps its thickness (concentric levels stay touching).
+        XCTAssertEqual(
+            pushed.outerRadius - pushed.innerRadius,
+            base.outerRadius - base.innerRadius,
+            accuracy: accuracy
+        )
+    }
+
+    func testInnerPaddingWidensTheSliceOuterArc() {
+        // Outer arc length = outerRadius × sliceSpan; sliceSpan depends only on the
+        // item count, so a larger outer radius is what makes a slice easier to hit.
+        let layout = RadialLayout(itemCount: 6)
+        let base = appearance(radius: 160).geometry
+        let pushed = appearance(radius: 160, padding: 60).geometry
+        XCTAssertGreaterThan(
+            pushed.outerRadius * layout.sliceSpan,
+            base.outerRadius * layout.sliceSpan
+        )
+    }
+
+    func testZeroPaddingLeavesGeometryUntouched() {
+        XCTAssertEqual(appearance(radius: 160, padding: 0).geometry, appearance(radius: 160).geometry)
+        XCTAssertEqual(RadialAppearance.default.geometry, RadialGeometry.default)
+    }
+
+    func testHitTestRoundTripsWithPaddingApplied() {
+        let geometry = appearance(radius: 160, padding: 80).geometry
+        let layout = RadialLayout(itemCount: 6, geometry: geometry)
+        for index in 0..<6 {
+            XCTAssertEqual(layout.hitTest(layout.sliceCenterOffset(at: index)), index)
+        }
+        // The (now larger) dead zone still maps to nothing; just outside the ring too.
+        XCTAssertNil(layout.hitTest(.zero))
+        XCTAssertNil(layout.hitTest(CGPoint(x: 0, y: -(geometry.innerRadius - 1))))
+        XCTAssertNil(layout.hitTest(CGPoint(x: 0, y: -(geometry.outerRadius + 1))))
     }
 
     // MARK: - Fill-opacity emphasis ladder
@@ -115,14 +171,20 @@ final class RadialAppearanceTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func appearance(radius: CGFloat, opacity: Double = 0.2) -> RadialAppearance {
-        RadialAppearance(outerRadius: radius, fillOpacity: opacity, showsLabels: true)
+    private func appearance(radius: CGFloat, opacity: Double = 0.2, padding: CGFloat = 0) -> RadialAppearance {
+        RadialAppearance(outerRadius: radius, fillOpacity: opacity, showsLabels: true, innerRadiusPadding: padding)
     }
 
     private func readingRadius(_ value: Double) -> CGFloat {
         let defaults = makeDefaults()
         defaults.set(value, forKey: RadialAppearance.radiusDefaultsKey)
         return RadialAppearance.current(from: defaults).outerRadius
+    }
+
+    private func readingInnerPadding(_ value: Double) -> CGFloat {
+        let defaults = makeDefaults()
+        defaults.set(value, forKey: RadialAppearance.innerPaddingDefaultsKey)
+        return RadialAppearance.current(from: defaults).innerRadiusPadding
     }
 
     private func readingOpacity(_ value: Double) -> Double {
