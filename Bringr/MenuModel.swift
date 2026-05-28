@@ -12,6 +12,12 @@ enum MenuAction: Equatable, Sendable {
     /// Bring `window` to the front and focus it — the terminal action of the
     /// window-switcher tree.
     case focusWindow(WindowID)
+    /// Start the curated "My Apps" app with this bundle identifier (Bringr-93j.39).
+    /// The action of a listed entry that has no window to focus — it isn't running, or
+    /// is running with no on-screen windows — so committing it starts/raises the app
+    /// rather than expanding to (an empty) sub-wheel or focusing a window. A listed app
+    /// that *is* running with windows keeps `.expand` and the existing focus path.
+    case launchApp(bundleIdentifier: String)
 }
 
 // MARK: - Nodes

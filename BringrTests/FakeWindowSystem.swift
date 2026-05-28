@@ -181,3 +181,15 @@ final class FakeDimmer: Dimming {
         calls.append(.clear)
     }
 }
+
+/// Recording `AppLaunching` double: captures each requested bundle id, in call order,
+/// so the launch branch of `RadialNavigator.commitApp` can be asserted without starting
+/// real apps (Bringr-93j.39).
+@MainActor
+final class FakeAppLauncher: AppLaunching {
+    private(set) var launched: [String] = []
+
+    func launch(bundleIdentifier: String) {
+        launched.append(bundleIdentifier)
+    }
+}

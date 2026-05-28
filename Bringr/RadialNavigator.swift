@@ -31,6 +31,9 @@ struct RadialRing: Identifiable {
 enum RadialCommitResult: Equatable {
     case app(AppID)
     case window(WindowID)
+    /// A curated "My Apps" entry with no window to focus was started by bundle id
+    /// (Bringr-93j.39) — distinct from `.app`, which activates a running app's front window.
+    case launch(bundleIdentifier: String)
 }
 
 /// Hover-driven navigation through the menu tree, drawn as concentric rings.
@@ -69,6 +72,9 @@ final class RadialNavigator {
     private(set) var prehighlighted: HoverRegion = .none
 
     private let windowControl: WindowController
+    /// Starts a curated app that has no window to focus (Bringr-93j.39), behind a seam
+    /// so the launch branch of `commitApp` is testable without launching real apps.
+    private let appLauncher: AppLaunching
     private let store: LastSelectionStore
     /// Base ring size for the apps ring. Re-set per summon from the persisted
     /// appearance (US-014), so a Preferences size change applies on the next open.
@@ -79,12 +85,14 @@ final class RadialNavigator {
         windowControl: WindowController,
         baseGeometry: RadialGeometry = .default,
         maxDepth: Int = 2,
-        store: LastSelectionStore? = nil
+        store: LastSelectionStore? = nil,
+        appLauncher: AppLaunching? = nil
     ) {
         self.windowControl = windowControl
         self.baseGeometry = baseGeometry
         self.maxDepth = max(1, maxDepth)
         self.store = store ?? LastSelectionStore()
+        self.appLauncher = appLauncher ?? LiveAppLauncher()
     }
 
     // MARK: - Concentric geometry
@@ -243,9 +251,22 @@ final class RadialNavigator {
 
     private func commitApp(at index: Int) -> RadialCommitResult? {
         guard let appsRing = rings.first,
-              index >= 0, index < appsRing.nodes.count,
-              let appID = appsRing.nodes[index].representedApp else { return nil }
+              index >= 0, index < appsRing.nodes.count else { return nil }
+        let appNode = appsRing.nodes[index]
 
+        // A curated entry with no window to focus (not running, or running window-less)
+        // launches by bundle id instead of activating a front window (Bringr-93j.39).
+        // Restore first so any reveal left from hovering other apps is undone — this
+        // node carried no pid, so its own hover never revealed anything — then start it;
+        // the launched app comes forward on its own.
+        if case .launchApp(let bundleIdentifier) = appNode.action {
+            windowControl.restore()
+            appLauncher.launch(bundleIdentifier: bundleIdentifier)
+            clearState()
+            return .launch(bundleIdentifier: bundleIdentifier)
+        }
+
+        guard let appID = appNode.representedApp else { return nil }
         windowControl.commit(appID)
         clearState()
         return .app(appID)
