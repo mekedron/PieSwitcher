@@ -63,10 +63,17 @@ final class RadialMenuController: ObservableObject {
     /// Reads the persisted interaction mode at summon time so a Preferences change
     /// takes effect on the next summon without a relaunch (AC3 of US-009).
     private let modeProvider: () -> InteractionMode
-    /// Global mouse monitor that feeds cursor moves/drags to the navigator while the
-    /// menu is open, so hover works in both interaction modes (during a held chord
-    /// the moves arrive as drags). Installed on summon, removed on dismiss.
-    private var hoverMonitor: Any?
+    /// Global event monitors that live only while the menu is open: cursor moves/drags
+    /// feed hover to the navigator (during a held chord the moves arrive as drags),
+    /// and key/mouse-downs drive the Esc and click-outside cancels (US-015). Installed
+    /// on summon, removed on dismiss.
+    private var eventMonitors: [Any] = []
+    /// Observes active-Space changes while open so a Space switch mid-reveal cancels
+    /// cleanly rather than stranding hidden windows (US-015 trigger-loss).
+    private var spaceObserver: (any NSObjectProtocol)?
+
+    /// macOS virtual key code for Esc.
+    private static let escapeKeyCode: UInt16 = 53
 
     init(
         registry: MenuRegistry,
@@ -118,6 +125,17 @@ final class RadialMenuController: ObservableObject {
         route(machine.handle(.click(over: sliceTarget(region))), region: region)
     }
 
+    /// Esc was pressed while the menu was open: cancel and restore, in either mode (US-015).
+    func escapePressed() {
+        route(machine.handle(.escape), region: .none)
+    }
+
+    /// The summon context was lost (active-Space change, etc.) while open: cancel and
+    /// restore so no app/window is left hidden (US-015 trigger-loss).
+    func triggerLost() {
+        route(machine.handle(.triggerLost), region: .none)
+    }
+
     private func press(trigger: MenuTrigger, mode: InteractionMode, at cursor: CGPoint) {
         if !machine.isOpen { machine.mode = mode }
         switch machine.handle(.triggerPressed) {
@@ -148,7 +166,7 @@ final class RadialMenuController: ObservableObject {
         window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         isVisible = true
-        startHoverTracking()
+        startMenuMonitors()
     }
 
     /// Commit the slice under `region`: raise and focus the chosen window and
@@ -178,7 +196,7 @@ final class RadialMenuController: ObservableObject {
     /// touching window state — used after a commit, where the navigator has already
     /// restored and focused.
     private func hideOverlay() {
-        stopHoverTracking()
+        stopMenuMonitors()
         syncFromNavigator()
         window.orderOut(nil)
         isVisible = false
@@ -190,24 +208,56 @@ final class RadialMenuController: ObservableObject {
         prehighlighted = navigator.prehighlighted
     }
 
-    // MARK: - Hover tracking
+    // MARK: - While-open monitors (hover + cancel paths)
 
-    /// Observe global cursor movement (moves and, while a chord is held, drags) so
-    /// hover drives app isolation in both interaction modes. The overlay is
-    /// non-activating, so these events go to the app underneath and a global
-    /// monitor is what sees them.
-    private func startHoverTracking() {
-        guard hoverMonitor == nil else { return }
-        hoverMonitor = NSEvent.addGlobalMonitorForEvents(
+    /// Install the global monitors that run only while the menu is open. The overlay
+    /// is a non-activating panel, so events meant for the app underneath — cursor
+    /// moves (hover), Esc, and clicks *outside* the wheel — arrive as global events;
+    /// clicks *on* the wheel are local and handled by the SwiftUI gesture instead.
+    private func startMenuMonitors() {
+        guard eventMonitors.isEmpty else { return }
+        if let hover = NSEvent.addGlobalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
         ) { [weak self] _ in
             self?.updateHover(forGlobalCursor: NSEvent.mouseLocation)
+        } {
+            eventMonitors.append(hover)
+        }
+        if let dismiss = NSEvent.addGlobalMonitorForEvents(
+            matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] event in
+            self?.handleDismissEvent(event)
+        } {
+            eventMonitors.append(dismiss)
+        }
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.triggerLost() }
         }
     }
 
-    private func stopHoverTracking() {
-        if let hoverMonitor { NSEvent.removeMonitor(hoverMonitor) }
-        hoverMonitor = nil
+    private func stopMenuMonitors() {
+        for monitor in eventMonitors { NSEvent.removeMonitor(monitor) }
+        eventMonitors.removeAll()
+        if let spaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
+        }
+        spaceObserver = nil
+    }
+
+    /// Route a global key/mouse-down that bypassed the overlay to a cancel: Esc in
+    /// either mode, or a click outside the wheel which the state machine cancels in
+    /// click-to-stay and ignores in hold-to-select (where the chord is still held).
+    private func handleDismissEvent(_ event: NSEvent) {
+        switch event.type {
+        case .keyDown where event.keyCode == Self.escapeKeyCode:
+            escapePressed()
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            route(machine.handle(.click(over: .none)), region: .none)
+        default:
+            break
+        }
     }
 
     private func updateHover(forGlobalCursor cursor: CGPoint) {

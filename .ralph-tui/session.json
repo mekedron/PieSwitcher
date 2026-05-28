@@ -3,10 +3,10 @@
   "sessionId": "599ac84a-aff5-492c-bdc6-1f8f1c332303",
   "status": "running",
   "startedAt": "2026-05-28T14:17:40.578Z",
-  "updatedAt": "2026-05-28T14:27:55.691Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-05-28T14:43:06.648Z",
+  "currentIteration": 1,
   "maxIterations": 10,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -98,8 +98,8 @@
       {
         "id": "Bringr-93j.12",
         "title": "US-012: Select and commit — focus and remember",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.13",
@@ -133,7 +133,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "Bringr-93j.12",
+      "taskTitle": "US-012: Select and commit — focus and remember",
+      "taskCompleted": true,
+      "durationMs": 600440,
+      "startedAt": "2026-05-28T14:17:54.212Z",
+      "endedAt": "2026-05-28T14:27:54.652Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/Users/nikita/Projects/Bringr",
   "activeTaskIds": [],

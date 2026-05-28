@@ -47,7 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let registry = MenuRegistry()
         registry.register(switcher, for: .mouseChord)
         registry.register(switcher, for: .threeFingerPress)
-        radialMenu = RadialMenuController(registry: registry)
+
+        // A store-backed controller journals each reveal to disk; replay any reveal a
+        // prior crash left stranded before the first summon (US-015 AC3).
+        let windowControl = WindowController(store: RevealStateStore())
+        windowControl.restoreFromSnapshotIfNeeded()
+        radialMenu = RadialMenuController(registry: registry, windowControl: windowControl)
     }
 
     /// Install the global mouse-chord tap (US-007). The tap needs Accessibility

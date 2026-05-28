@@ -85,6 +85,23 @@ final class InteractionModeTests: XCTestCase {
         }
     }
 
+    // MARK: - US-015: trigger-loss force-cancels like Esc, in either mode
+
+    func testTriggerLostCancelsInBothModesWhenOpen() {
+        for mode in InteractionMode.allCases {
+            var machine = InteractionStateMachine(mode: mode)
+            _ = machine.handle(.triggerPressed)
+            XCTAssertEqual(machine.handle(.triggerLost), .cancel, "\(mode) should cancel on trigger-loss")
+            XCTAssertFalse(machine.isOpen)
+        }
+    }
+
+    func testTriggerLostWhileClosedDoesNothing() {
+        var machine = InteractionStateMachine(mode: .holdToSelect)
+        XCTAssertEqual(machine.handle(.triggerLost), .none)
+        XCTAssertFalse(machine.isOpen)
+    }
+
     // MARK: - AC4: both modes share the select/cancel paths
 
     func testBothModesSelectTheSameSliceFromTheirCommitGesture() {

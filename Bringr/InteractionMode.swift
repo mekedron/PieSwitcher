@@ -62,6 +62,10 @@ enum InteractionInput: Equatable, Sendable {
     case click(over: SliceTarget)
     /// The user pressed Esc.
     case escape
+    /// The summon context was lost out from under an open menu — the active Space
+    /// changed, the session locked, or the trigger otherwise vanished without a
+    /// clean release. Cancels exactly like Esc so no reveal is left stranded. (US-015)
+    case triggerLost
 }
 
 /// What the controller should do in response to an input. The controller owns the
@@ -110,7 +114,9 @@ struct InteractionStateMachine {
             // Click-to-stay commits on a click; hold-to-select only ever commits on release.
             guard mode == .clickToStay else { return .none }
             return commit(for: target)
-        case .escape:
+        case .escape, .triggerLost:
+            // Both force a cancel when open: Esc, and any abrupt loss of the summon
+            // context that would otherwise strand a reveal (US-015).
             guard isOpen else { return .none }
             isOpen = false
             return .cancel

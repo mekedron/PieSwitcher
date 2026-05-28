@@ -85,10 +85,16 @@ final class WindowController {
     }
 
     private let system: WindowControlling
+    /// Mirrors the in-flight baseline to disk so a crash mid-reveal can be undone on
+    /// the next launch (US-015 AC3). `nil` disables journalling — the default for the
+    /// fake-backed unit tests and the navigator's default controller; production
+    /// injects a real store.
+    private let store: RevealStateStore?
     private var session: Session?
 
-    init(system: WindowControlling? = nil) {
+    init(system: WindowControlling? = nil, store: RevealStateStore? = nil) {
         self.system = system ?? LiveWindowSystem()
+        self.store = store
     }
 
     /// Whether a capture/restore session is currently open.
@@ -189,7 +195,44 @@ final class WindowController {
             system.activate(frontmost)
         }
 
+        store?.clear()
         self.session = nil
+    }
+
+    // MARK: - Restore-on-launch safety net (AC3)
+
+    /// If a previous session was killed mid-reveal, its baseline is still persisted —
+    /// replay it so no app stays hidden and no window stays minimized, then clear it.
+    /// Returns whether a stranded reveal was found and undone. A no-op (returns
+    /// `false`) on the common path where the last session restored cleanly.
+    @discardableResult
+    func restoreFromSnapshotIfNeeded() -> Bool {
+        guard let store, let snapshot = store.load() else { return false }
+        applySnapshot(snapshot)
+        store.clear()
+        return true
+    }
+
+    /// Put each app/window in `snapshot` back to its pre-summon state, mirroring the
+    /// ordering `restore()` uses: app visibility first (so a hidden app's windows
+    /// become operable), then re-enumerate each app's windows to repopulate the live
+    /// element cache before restoring their minimized-state, then re-activate the
+    /// prior frontmost app.
+    private func applySnapshot(_ snapshot: RevealSnapshot) {
+        for app in snapshot.apps {
+            system.setHidden(AppID(pid: app.pid), app.wasHidden)
+        }
+        for pid in Set(snapshot.windows.map(\.pid)) {
+            _ = system.windows(of: AppID(pid: pid))
+        }
+        for window in snapshot.windows {
+            system.setMinimized(
+                WindowID(app: AppID(pid: window.pid), token: window.token), window.wasMinimized
+            )
+        }
+        if let frontmost = snapshot.frontmostPID {
+            system.activate(AppID(pid: frontmost))
+        }
     }
 
     // MARK: - Baseline capture (AC4)
@@ -202,6 +245,7 @@ final class WindowController {
         session?.appBaseline = system.runningApps().map {
             AppSnapshot(id: $0, wasHidden: system.isHidden($0))
         }
+        persistSnapshot()
     }
 
     private func captureWindowBaselineIfNeeded(for app: AppID) {
@@ -210,6 +254,28 @@ final class WindowController {
         session?.windowBaseline[app] = system.windows(of: app).map {
             WindowSnapshot(id: $0, wasMinimized: system.isMinimized($0))
         }
+        persistSnapshot()
+    }
+
+    /// Mirror the current in-memory baseline to the store. Called whenever the
+    /// baseline grows — once per app-hover, once per app's first window-isolation —
+    /// so it stays off the summon hot path. Clears the store when nothing is captured.
+    private func persistSnapshot() {
+        guard let store, let session else { return }
+        let apps = session.appBaseline.map {
+            RevealSnapshot.AppEntry(pid: $0.id.pid, wasHidden: $0.wasHidden)
+        }
+        let windows = session.windowBaseline.values.flatMap { snapshots in
+            snapshots.map {
+                RevealSnapshot.WindowEntry(
+                    pid: $0.id.app.pid, token: $0.id.token, wasMinimized: $0.wasMinimized
+                )
+            }
+        }
+        let snapshot = RevealSnapshot(
+            frontmostPID: session.frontmostBefore?.pid, apps: apps, windows: windows
+        )
+        if snapshot.isEmpty { store.clear() } else { store.save(snapshot) }
     }
 }
 
