@@ -1,0 +1,148 @@
+# Iteration 9 Log
+
+## Metadata
+
+- **Task ID**: Bringr-93j.9
+- **Task Title**: US-009: Interaction modes — hold-to-select and click-to-stay
+- **Description**: As a user, I want to choose whether the menu stays open after I release the trigger so that it fits how I like to work.
+
+## Acceptance Criteria
+- [ ] Hold-to-select: the menu stays open while the trig...
+- **Status**: completed
+- **Task Completed**: Yes
+- **Promise Detected**: Yes
+- **Started At**: 2026-05-28T12:42:37.271Z
+- **Ended At**: 2026-05-28T12:59:35.933Z
+- **Duration**: 16m 58s
+- **Input Tokens**: 304
+- **Output Tokens**: 81005
+- **Total Tokens**: 81309
+- **Agent**: claude
+- **Model**: claude-opus-4-7
+- **Epic**: Bringr-93j
+- **Sandbox Mode**: auto
+- **Sandbox Network**: Enabled
+--- RAW OUTPUT ---
+I'll start by studying the current state of the project and understanding what's been built so far.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+Now let me study the key files I'll need to modify for US-009. Let me read the radial menu controller, activation, and preferences files.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m
+Let me read the view, app delegate, preferences, and activation files in parallel.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m
+Let me read the app entry point, the permission alert window (for the persistence pattern), and look at the test structure.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m
+Let me read the layout geometry, the permission alert window (for the persistence key pattern), and an existing test file to understand conventions.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialLayout.swift[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/PermissionAlertWindow.swift[0m
+Let me look at an existing state-machine test and the menu model to fully understand conventions before designing.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/MouseChordTests.swift[0m
+Let me read the menu model to understand node actions for the selection path.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr/MenuModel.swift[0m
+Now let me look at the project file and SwiftLint config to understand wiring and constraints, plus claim the bead.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.swiftlint.yml[0m
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m
+I now have a complete picture. Max pbxproj ID is `0x46`; new files will use `0x47`–`0x4A`. Let me claim the bead and start implementing the pure state-machine core.
+[94m[Bash][0m Claim the US-009 bead as in_progress $ bd update Bringr-93j.9 --status=in_progress --db /Users/nikita/Projects/Bringr/.beads/beads.db 2>&1 ...
+Bead claimed. Now let me create the pure state-machine core in `InteractionMode.swift`.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/Bringr/InteractionMode.swift[0m "import Foundation
+
+// MARK: - Mode
+
+/// Whether the radial menu stays open after the summon trigger is released.
+/// Persisted (AC3) and chosen in Preferences; governs the hold-capable triggers
+/// (m... (5587 chars)"
+Now let me wire the state machine into `RadialMenuController`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuWindow.swift[0m edit: "/// Owns the pre-warmed overlay window and resolve..." → "/// Owns the pre-warmed overlay window and resolve..."
+Now update the view to report tap location instead of calling the now-private `dismiss()`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/RadialMenuView.swift[0m edit: "/// Renders the radial wheel: one wedge per top-le..." → "/// Renders the radial wheel: one wedge per top-le..."
+The SourceKit errors are because the new file isn't in the project yet — I'll wire it now. Let me update the pbxproj in all four required spots for both files. First, the `PBXBuildFile` section.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000046 /* MouseChordTests.swif..." → "		1A0000000000000000000046 /* MouseChordTests.swif..."
+Now the `PBXFileReference` section.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "		1A0000000000000000000045 /* MouseChordTests.swif..." → "		1A0000000000000000000045 /* MouseChordTests.swif..."
+Now the two `PBXGroup` children lists (app group and test group).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A000000000000000000003F /* RadialMenuView.swi..." → "				1A000000000000000000003F /* RadialMenuView.swi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000041 /* RadialLayoutTests...." → "				1A0000000000000000000041 /* RadialLayoutTests...."
+Now the two `PBXSourcesBuildPhase` files lists.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000040 /* RadialMenuView.swi..." → "				1A0000000000000000000040 /* RadialMenuView.swi..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr.xcodeproj/project.pbxproj[0m edit: "				1A0000000000000000000042 /* RadialLayoutTests...." → "				1A0000000000000000000042 /* RadialLayoutTests...."
+Project wired. Now add the `onChordReleased` callback to `MouseChordMonitor` (additive — the pure detector and its tests stay untouched).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m edit: "@MainActor
+final class MouseChordMonitor {
+    pri..." → "@MainActor
+final class MouseChordMonitor {
+    pri..."
+Now update the tap callback to track physical button state and fire `onChordReleased` when the chord fully releases.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m edit: "        guard let button = Self.button(for: type),..." → "        guard let button = Self.button(for: type),..."
+Now set `chordActive` on summon and reset the new state in `stop()`.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m edit: "        case .summon:
+            cancelHoldTimer(..." → "        case .summon:
+            cancelHoldTimer(..."
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/MouseChordActivation.swift[0m edit: "        eventTap = nil
+        runLoopSource = nil..." → "        eventTap = nil
+        runLoopSource = nil..."
+Now wire the AppDelegate to the new controller entry points.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/AppDelegate.swift[0m edit: "    private func startActivationMonitor() {
+      ..." → "    private func startActivationMonitor() {
+      ..."
+Now update the menu-bar item in `BringrApp.swift` to use the click-to-stay fallback entry.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/BringrApp.swift[0m edit: "        if let radialMenu {
+            Button("Op..." → "        if let radialMenu {
+            Button("Op..."
+The SourceKit diagnostics are index churn from the project structure change — the real check is `xcodebuild`. Now let me add the Interaction section to Preferences.
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/Bringr/PreferencesView.swift[0m edit: "/// The Preferences window. v1 surfaces Accessibil..." → "/// The Preferences window. v1 surfaces Accessibil..."
+Now let me write comprehensive tests for the state machine and mode persistence.
+[94m[Write][0m [95m/Users/nikita/Projects/Bringr/BringrTests/InteractionModeTests.swift[0m "import XCTest
+@testable import Bringr
+
+/// Exercises the interaction-mode state machine in isolation (AC5): every test
+/// drives `InteractionStateMachine` with synthetic inputs and asserts the outcom... (7242 chars)"
+All SourceKit errors trace to the index not yet seeing the new file. Let me run the actual build to verify.
+[94m[Bash][0m Build the app to verify compilation $ xcodebuild -project Bringr.xcodeproj -scheme Bringr -configuration Debug -derivedDataPath build buil...
+Build succeeded. The SourceKit `XCTest` warning is index churn. Now let me run SwiftLint and the tests in parallel.
+[94m[Bash][0m Run SwiftLint strict check $ swiftlint lint --strict 2>&1 | tail -20
+One line is 1 char over. Let me read and fix it.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/BringrTests/InteractionModeTests.swift[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/BringrTests/InteractionModeTests.swift[0m edit: "        XCTAssertEqual(machine.handle(.triggerRele..." → "        XCTAssertEqual(machine.handle(.triggerRele..."
+Now re-run SwiftLint and run the tests in parallel.
+[94m[Bash][0m Re-run SwiftLint strict check $ swiftlint lint --strict 2>&1 | tail -3
+SwiftLint clean. Now run the test suite.
+[94m[Bash][0m Run the full XCTest suite $ xcodebuild test -project Bringr.xcodeproj -scheme Bringr -destination 'platform=macOS' 2>&1 | tail -...
+All 88 tests pass (20 new). All three quality gates green. Per the workflow, let me launch the build and confirm it runs stably.
+[94m[Bash][0m Launch the fresh build and confirm it is running $ open build/Build/Products/Debug/Bringr.app && sleep 2 && pgrep -x Bringr
+App is running (PID 46139). Let me confirm it stays alive (no delayed crash from the new wiring), then clean up.
+[94m[Bash][0m Confirm stability then clean up the running app $ sleep 3 && pgrep -x Bringr && echo "STILL ALIVE" && pkill -x Bringr && echo "cleaned up"
+App launches and stays alive cleanly. Let me verify no stale references to the removed `toggle(trigger:at:)` remain.
+[94m[Grep][0m pattern: [96m\.toggle\(trigger|func toggle\([0m
+No stale references. Let me update `progress.md` — add a reusable pattern and a dated entry. First, the pattern (inserted before the patterns-section closing divider).
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **Headless verification of the live tap:** os_lo..." → "- **Headless verification of the live tap:** os_lo..."
+Now append the dated entry at the end of the file.
+[94m[Read][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m
+[94m[Edit][0m [95m/Users/nikita/Projects/Bringr/.ralph-tui/progress.md[0m edit: "- **Learnings:** see the new "Global mouse-chord a..." → "- **Learnings:** see the new "Global mouse-chord a..."
+Now close the bead.
+[94m[Bash][0m Close the US-009 bead $ bd close Bringr-93j.9 --db /Users/nikita/Projects/Bringr/.beads/beads.db --reason "Implemented hold-...
+US-009 is complete. All quality gates pass and the bead is closed.
+
+## Summary
+
+Implemented the two interaction modes (hold-to-select and click-to-stay) around a pure, fully-tested state machine.
+
+**Core (`Bringr/InteractionMode.swift`, new):**
+- `InteractionStateMachine` — a value-type that decides `open`/`select`/`cancel` for both modes. Both modes funnel commits through one `commit(for:)` helper; the *only* difference is which gesture commits — hold-to-select on trigger-**release**, click-to-stay on a **click** (release ignored, menu persists). Re-trigger while open dismisses (toggle parity). (AC1, AC2, AC4)
+- `InteractionMode` enum with a single-source-of-truth `defaultsKey` and `current(from:)` reader; default `.holdToSelect`. (AC3)
+
+**Wiring:**
+- `RadialMenuController` now delegates all decisions to the machine; reads the persisted mode per summon (`modeProvider`) so a Preferences change takes effect on the next summon. Resolves cursor→slice via `RadialLayout.hitTest` in both global (chord-release) and local (overlay-click) coordinate spaces.
+- `MouseChordMonitor` gained an additive `onChordReleased` (the signal hold-mode needs) without touching the pure detector or its 15 tests; `AppDelegate` wires press→`triggerPressed`, release→`triggerReleased`.
+- `RadialMenuView` reports click location via a zero-distance drag; menu-bar item forces click-to-stay (a menu click has no "hold").
+- `PreferencesView` adds an Interaction section with a radio-group picker bound to `@AppStorage`. (AC3)
+
+**Tests:** 20 new in `InteractionModeTests.swift` (AC5), covering both modes' select/cancel paths, Esc, persistence read/fallback, and re-summon-with-new-mode.
+
+**Gates:** Build SUCCEEDED · SwiftLint `--strict` 0 violations · 88 tests pass (20 new) · app launches stably.
+
+**Scope note:** Live Esc-keypress and click-*outside-the-window* monitors are US-015's explicit charter ("Esc, click-outside, release-in-dead-zone, trigger-loss all cancel cleanly"), so I deliberately left those unwired — the state machine already *handles* `.escape`/`.click(.none)` (tested), and in-window cancels work now. Interactive mode-switching can't be GUI-verified headlessly (no display, can't grant TCC), consistent with US-007.
+
+<promise>COMPLETE</promise>

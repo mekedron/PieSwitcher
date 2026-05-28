@@ -28,42 +28,60 @@ final class RadialMenuWindow: NSPanel {
     }
 }
 
-/// Owns the pre-warmed overlay window and resolves the menu tree for each summon.
+/// Owns the pre-warmed overlay window and drives the menu for each summon.
 ///
 /// The window and its SwiftUI host are built once in `init` (the pre-warm); a
 /// summon only resolves the live tree, repositions the window at the cursor, and
-/// orders it in — no allocation on the hot path. `slices` is published so the
-/// pre-built `RadialMenuView` re-renders when a new summon swaps the contents.
+/// orders it in — no allocation on the hot path. `rings`/`hovered` are published
+/// so the pre-built `RadialMenuView` re-renders as hover drills through the tree.
 ///
-/// All open/select/cancel decisions are delegated to a pure `InteractionStateMachine`
-/// (US-009): the controller only translates live triggers/clicks into machine inputs
-/// and performs the side effects the machine asks for.
+/// Two pure cores carry the policy: `InteractionStateMachine` (US-009) decides
+/// open/select/cancel, and `RadialNavigator` (US-010) decides app isolation and
+/// the windows sub-wheel. The controller is the thin shell that feeds them live
+/// triggers, clicks, and cursor moves and performs the side effects they ask for.
 @MainActor
 final class RadialMenuController: ObservableObject {
-    /// The resolved top-level nodes shown as slices for the current summon.
-    @Published private(set) var slices: [MenuNode] = []
+    /// Concentric rings to render for the current summon (apps, then the hovered
+    /// app's windows). Mirrors `navigator.rings`.
+    @Published private(set) var rings: [RadialRing] = []
+    /// The slice the cursor is currently over, for highlighting. Mirrors
+    /// `navigator.hovered`.
+    @Published private(set) var hovered: HoverRegion = .none
     /// Whether the overlay is currently on screen.
     @Published private(set) var isVisible = false
 
-    let geometry: RadialGeometry
+    /// Fixed overlay side length, sized to fit every concentric ring at full depth.
+    var overallDiameter: CGFloat { navigator.overallDiameter }
 
     private let registry: MenuRegistry
+    private let navigator: RadialNavigator
     private let window: RadialMenuWindow
     private var machine = InteractionStateMachine()
     /// Reads the persisted interaction mode at summon time so a Preferences change
-    /// takes effect on the next summon without a relaunch (AC3).
+    /// takes effect on the next summon without a relaunch (AC3 of US-009).
     private let modeProvider: () -> InteractionMode
+    /// Global mouse monitor that feeds cursor moves/drags to the navigator while the
+    /// menu is open, so hover works in both interaction modes (during a held chord
+    /// the moves arrive as drags). Installed on summon, removed on dismiss.
+    private var hoverMonitor: Any?
 
     init(
         registry: MenuRegistry,
         geometry: RadialGeometry = .default,
+        windowControl: WindowController? = nil,
         modeProvider: @escaping () -> InteractionMode = { InteractionMode.current() }
     ) {
         self.registry = registry
-        self.geometry = geometry
         self.modeProvider = modeProvider
+        self.navigator = RadialNavigator(
+            windowControl: windowControl ?? WindowController(),
+            baseGeometry: geometry
+        )
         self.window = RadialMenuWindow(
-            contentSize: CGSize(width: geometry.diameter, height: geometry.diameter)
+            contentSize: CGSize(
+                width: navigator.overallDiameter,
+                height: navigator.overallDiameter
+            )
         )
         // Pre-warm the SwiftUI host now so summon never allocates it.
         window.contentView = NSHostingView(rootView: RadialMenuView(controller: self))
@@ -115,57 +133,101 @@ final class RadialMenuController: ObservableObject {
     // MARK: - Side effects
 
     /// Show the menu registered for `trigger` centred at `cursor` (the global mouse
-    /// location). Resolves the tree fresh so the wheel reflects live state.
+    /// location). Resolves the tree fresh so the wheel reflects live state, and
+    /// starts tracking the cursor so hover can drill into apps.
     private func summon(trigger: MenuTrigger, at cursor: CGPoint) {
         guard let root = registry.makeMenu(for: trigger) else { return }
-        slices = root.resolvedChildren()
+        navigator.open(appNodes: root.resolvedChildren())
+        syncFromNavigator()
         let origin = RadialMenuPlacement.windowOrigin(forCursor: cursor, windowSize: window.frame.size)
         window.setFrameOrigin(origin)
         window.orderFrontRegardless()
         isVisible = true
+        startHoverTracking()
     }
 
-    /// Commit the slice at `index`. v1 just closes the wheel; US-010 (expand to a
-    /// sub-wheel) and US-012 (focus the window + remember it) act on the selected
-    /// node here.
+    /// Commit the slice at `index`. v1 closes the wheel and restores the windows it
+    /// moved out of the way; US-012 will raise/focus the chosen window first.
     private func commitSelection(at index: Int) {
         _ = index
         dismiss()
     }
 
-    /// Cancel the interaction. v1 just closes the wheel; US-015 restores the
-    /// pre-summon window state here.
+    /// Cancel the interaction, restoring the pre-summon window state.
     private func cancelInteraction() {
         dismiss()
     }
 
-    /// Hide the overlay.
+    /// Hide the overlay and restore every app/window the hover moved out of the way.
     private func dismiss() {
+        stopHoverTracking()
+        navigator.close()
+        syncFromNavigator()
         window.orderOut(nil)
         isVisible = false
     }
 
+    private func syncFromNavigator() {
+        rings = navigator.rings
+        hovered = navigator.hovered
+    }
+
+    // MARK: - Hover tracking
+
+    /// Observe global cursor movement (moves and, while a chord is held, drags) so
+    /// hover drives app isolation in both interaction modes. The overlay is
+    /// non-activating, so these events go to the app underneath and a global
+    /// monitor is what sees them.
+    private func startHoverTracking() {
+        guard hoverMonitor == nil else { return }
+        hoverMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
+        ) { [weak self] _ in
+            self?.updateHover(forGlobalCursor: NSEvent.mouseLocation)
+        }
+    }
+
+    private func stopHoverTracking() {
+        if let hoverMonitor { NSEvent.removeMonitor(hoverMonitor) }
+        hoverMonitor = nil
+    }
+
+    private func updateHover(forGlobalCursor cursor: CGPoint) {
+        navigator.updateHover(navigator.region(forOffset: offset(forGlobalCursor: cursor)))
+        syncFromNavigator()
+    }
+
     // MARK: - Cursor → target resolution
 
-    /// Resolve a global (AppKit y-up) cursor into the slice it falls in, flipping to
-    /// the layout's y-down space relative to the window centre.
     private func target(forGlobalCursor cursor: CGPoint) -> SliceTarget {
-        let frame = window.frame
-        let offset = CGPoint(x: cursor.x - frame.midX, y: frame.midY - cursor.y)
-        return target(forOffset: offset)
+        sliceTarget(navigator.region(forOffset: offset(forGlobalCursor: cursor)))
     }
 
-    /// Resolve a point in the overlay view's local (y-down, top-left origin) space
-    /// into the slice it falls in, relative to the ring centre.
     private func target(forLocalPoint local: CGPoint) -> SliceTarget {
-        let center = geometry.diameter / 2
-        let offset = CGPoint(x: local.x - center, y: local.y - center)
-        return target(forOffset: offset)
+        sliceTarget(navigator.region(forOffset: offset(forLocalPoint: local)))
     }
 
-    private func target(forOffset offset: CGPoint) -> SliceTarget {
-        let layout = RadialLayout(itemCount: slices.count, geometry: geometry)
-        if let index = layout.hitTest(offset) { return .slice(index) }
-        return .none
+    /// Collapse a hover region to the commit vocabulary: any ring slice is a target,
+    /// the dead zone / outside is none. The committing path (US-012) reads the live
+    /// hovered node; the index here only distinguishes "a slice" from "none".
+    private func sliceTarget(_ region: HoverRegion) -> SliceTarget {
+        switch region {
+        case .slice(_, let index): return .slice(index)
+        case .none: return .none
+        }
+    }
+
+    /// Offset from the ring centre for a global (AppKit y-up) cursor, flipped into
+    /// the layout's y-down space.
+    private func offset(forGlobalCursor cursor: CGPoint) -> CGPoint {
+        let frame = window.frame
+        return CGPoint(x: cursor.x - frame.midX, y: frame.midY - cursor.y)
+    }
+
+    /// Offset from the ring centre for a point in the overlay view's local (y-down,
+    /// top-left origin) space.
+    private func offset(forLocalPoint local: CGPoint) -> CGPoint {
+        let center = overallDiameter / 2
+        return CGPoint(x: local.x - center, y: local.y - center)
     }
 }

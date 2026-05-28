@@ -1,21 +1,46 @@
 import AppKit
 import SwiftUI
 
-/// Renders the radial wheel: one wedge per top-level node, each carrying its
-/// placeholder content (app icon + name for app slices; index + title for window
-/// slices). No animations — wedges and labels are placed directly from the tested
-/// `RadialLayout` geometry. Hover-reveal lands in US-010/US-011.
+/// Renders the radial wheel: one concentric ring per navigation level (apps, then
+/// the hovered app's windows sub-wheel), each slice carrying its placeholder
+/// content. The hovered slice is emphasised. No animations — wedges and labels are
+/// placed directly from the tested `RadialLayout` geometry.
 struct RadialMenuView: View {
     @ObservedObject var controller: RadialMenuController
 
     var body: some View {
-        let slices = controller.slices
-        let layout = RadialLayout(itemCount: slices.count, geometry: controller.geometry)
+        let diameter = controller.overallDiameter
 
         ZStack {
-            ForEach(Array(slices.enumerated()), id: \.element.id) { index, node in
+            ForEach(controller.rings) { ring in
+                RadialRingView(ring: ring, hovered: controller.hovered)
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .contentShape(Rectangle())
+        // A zero-distance drag reports the click location so the controller can map
+        // it to a slice (click-to-stay select) or the dead zone (cancel).
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onEnded { value in controller.clickInOverlay(atLocalPoint: value.location) }
+        )
+    }
+}
+
+/// One concentric ring: a wedge + label per node, with the hovered slice filled
+/// more strongly so isolation is visible at a glance.
+struct RadialRingView: View {
+    let ring: RadialRing
+    let hovered: HoverRegion
+
+    var body: some View {
+        let layout = RadialLayout(itemCount: ring.nodes.count, geometry: ring.geometry)
+
+        ZStack {
+            ForEach(Array(ring.nodes.enumerated()), id: \.element.id) { index, node in
+                let isHovered = hovered == .slice(level: ring.level, index: index)
                 RadialWedge(layout: layout, index: index)
-                    .fill(Color.accentColor.opacity(0.18))
+                    .fill(Color.accentColor.opacity(isHovered ? 0.42 : 0.18))
                     .overlay(
                         RadialWedge(layout: layout, index: index)
                             .stroke(Color.primary.opacity(0.15), lineWidth: 1)
@@ -28,14 +53,6 @@ struct RadialMenuView: View {
                     )
             }
         }
-        .frame(width: controller.geometry.diameter, height: controller.geometry.diameter)
-        .contentShape(Rectangle())
-        // A zero-distance drag reports the click location so the controller can map
-        // it to a slice (click-to-stay select) or the dead zone (cancel).
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onEnded { value in controller.clickInOverlay(atLocalPoint: value.location) }
-        )
     }
 }
 
