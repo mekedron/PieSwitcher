@@ -30,7 +30,8 @@ final class RadialNavigatorCommitTests: XCTestCase {
         // AC2: the other apps and the app's other window are restored.
         XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
         XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 30)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertNotEqual(fixture.fake.position(of: WindowID(app: AppID(pid: 10), token: 11)),
+                          WindowController.offScreenPoint, "the app's parked window is un-parked")
         // The wheel is cleared and the session ended.
         XCTAssertTrue(fixture.navigator.rings.isEmpty)
         XCTAssertNil(fixture.navigator.expandedAppIndex)

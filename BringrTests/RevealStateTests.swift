@@ -55,17 +55,22 @@ final class RevealStateTests: XCTestCase {
         let store = makeStore()
         let appA = AppID(pid: 1)
         let fake = FakeWindowSystem(apps: [appState(1, windowTokens: [10, 11])], frontmost: appA)
+        fake.apps[0].windows[0].position = CGPoint(x: 5, y: 6) // window 10's pre-summon spot
         fake.setMinimized(WindowID(app: appA, token: 11), true)
         let controller = WindowController(system: fake, store: store)
 
         controller.hideOtherWindows(besides: WindowID(app: appA, token: 10))
 
         let snapshot = try XCTUnwrap(store.load())
+        // Window 10's origin is journalled so a crash can un-park it; window 11 was
+        // already minimized, so it carries no position (it was never parked).
         XCTAssertEqual(
             snapshot.windows.sorted { $0.token < $1.token },
             [
-                RevealSnapshot.WindowEntry(pid: 1, token: 10, wasMinimized: false),
-                RevealSnapshot.WindowEntry(pid: 1, token: 11, wasMinimized: true)
+                RevealSnapshot.WindowEntry(pid: 1, token: 10, wasMinimized: false,
+                                           originalPosition: CGPoint(x: 5, y: 6)),
+                RevealSnapshot.WindowEntry(pid: 1, token: 11, wasMinimized: true,
+                                           originalPosition: nil)
             ]
         )
     }
@@ -131,6 +136,30 @@ final class RevealStateTests: XCTestCase {
             fake.isMinimized(WindowID(app: appA, token: 10)),
             "the stranded minimized window is restored"
         )
+        XCTAssertNil(store.load(), "the journal is cleared once replayed")
+    }
+
+    func testRestoreFromSnapshotMovesAParkedWindowBack() {
+        // A previous session parked window 10 off-screen to isolate a sibling, then
+        // died. The journal carries its pre-summon origin so the safety net restores it.
+        let store = makeStore()
+        let appA = AppID(pid: 1)
+        let fake = FakeWindowSystem(apps: [appState(1, windowTokens: [10, 11])], frontmost: appA)
+        fake.setPosition(WindowID(app: appA, token: 10), WindowController.offScreenPoint)
+        store.save(RevealSnapshot(
+            frontmostPID: 1,
+            apps: [],
+            windows: [
+                .init(pid: 1, token: 10, wasMinimized: false, originalPosition: CGPoint(x: 100, y: 10)),
+                .init(pid: 1, token: 11, wasMinimized: false, originalPosition: CGPoint(x: 110, y: 11))
+            ]
+        ))
+
+        let recovered = WindowController(system: fake, store: store).restoreFromSnapshotIfNeeded()
+
+        XCTAssertTrue(recovered)
+        XCTAssertEqual(fake.position(of: WindowID(app: appA, token: 10)), CGPoint(x: 100, y: 10),
+                       "the stranded off-screen window is moved back to its captured origin")
         XCTAssertNil(store.load(), "the journal is cleared once replayed")
     }
 

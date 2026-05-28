@@ -117,6 +117,24 @@ final class LiveWindowSystem: WindowControlling {
         )
     }
 
+    func position(of window: WindowID) -> CGPoint? {
+        guard let element = elementCache[window] else { return nil }
+        // Native AX top-left coords (y-down), not flipped to AppKit — capture and the
+        // off-screen park are symmetric in this space, so no flip is needed.
+        return axPoint(element, kAXPositionAttribute)
+    }
+
+    func setPosition(_ window: WindowID, _ point: CGPoint) {
+        guard let element = cachedElement(for: window, operation: "set position") else { return }
+        var mutablePoint = point
+        guard let value = AXValueCreate(.cgPoint, &mutablePoint) else {
+            log.error("AX could not create position value for window \(window.token)")
+            return
+        }
+        let result = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
+        logAXFailure(result, operation: "set position", window: window)
+    }
+
     private func axPoint(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
         guard let value = copyAXValue(element, attribute) else { return nil }
         var point = CGPoint.zero

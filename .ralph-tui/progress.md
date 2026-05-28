@@ -73,6 +73,25 @@ after each iteration and it's included in prompts for context.
   unit-tested while the live panel is verified only by build & run. When the tested core
   needs live geometry (window frames for the dim cutout), add it to the existing
   `WindowControlling` protocol (`frame(of:)`) rather than reaching into AppKit from the core.
+- **To get a window out of the way instantly, park it off-screen via AX position — never
+  AX minimize.** Setting `kAXMinimizedAttribute` triggers macOS's slow genie animation, so
+  minimizing every sibling on window-hover felt sluggish (Bringr-93j.24). `hideOtherWindows`
+  now `setPosition`s each non-minimized sibling to `WindowController.offScreenPoint` (a far
+  down-right `static let`, so tests assert against it deterministically) and captures each
+  one's pre-summon `position(of:)` in the `WindowSnapshot` (and the persisted
+  `RevealSnapshot.WindowEntry`); `restore`/`restoreWindows`/the crash safety-net move them
+  back to that origin. The `position(of:)`/`setPosition` primitives live on
+  `WindowControlling`; the live impl reads/writes `kAXPositionAttribute` in **native
+  top-left coords with NO AppKit flip** (capture and park share that space — unlike
+  `frame(of:)`, which flips for the dim cutout). App-level hide is untouched
+  (`NSRunningApplication.hide()` has no per-window animation, already fast). Windows the user
+  minimized *before* the summon are left alone (`originalPosition == nil` → never parked).
+- **A `var` Codable property with a default value is the no-churn way to add a field to a
+  persisted struct.** `RevealSnapshot.WindowEntry.originalPosition: CGPoint? = nil` keeps the
+  synthesized memberwise init's old call sites compiling (the param defaults) AND decodes an
+  older on-disk snapshot that lacks the key as `nil` (synthesized `Codable` treats a missing
+  optional key as `nil`). `CGPoint` is `Codable`/`Equatable`/`Sendable` via Foundation, so it
+  drops straight into such a struct.
 
 ---
 
@@ -349,5 +368,60 @@ out of the way (raise-to-front / hide-others / dim-others).
     covered by the `FakeDimmer`-backed tests. Build + launch verified (no crash).
   - Quality gates: build SUCCEEDED, `swiftlint --strict` 0 violations, all 200 tests pass
     (16 new; confirmed via `-only-testing:BringrTests/RevealStrategyTests` → 16 run).
+---
+
+## 2026-05-28 - Bringr-93j.24
+
+"Hide others" felt slow at the window level because it AX-minimized each sibling — replaced
+the minimize with an instant off-screen park.
+
+- **What:** `hideOtherWindows(besides:)` no longer `setMinimized(…, true)`s the app's other
+  windows (which fires macOS's slow genie animation, making the window sub-wheel feel
+  sluggish). It now `setPosition`s each non-minimized sibling to `WindowController.offScreenPoint`
+  (`(50_000, 50_000)`, far down-right of any display, y-down), un-parks + raises the target,
+  and leaves user-pre-minimized windows alone. The capture-once `WindowSnapshot` gained
+  `originalPosition` (nil for pre-minimized windows); `restore`/`restoreWindows` move parked
+  windows back to that origin (de-duped into a `restoreWindowBaseline` helper). The persisted
+  `RevealSnapshot.WindowEntry` gained `originalPosition` too, so a crash mid-reveal un-parks
+  windows on next launch (US-015 safety net). App-level "hide others" is unchanged
+  (`NSRunningApplication.hide()` is already fast — no per-window animation, which is why the
+  bead said the app level "works well").
+- **Files changed:**
+  - `Bringr/WindowControl.swift` — `position(of:)`/`setPosition` on the protocol; `offScreenPoint`;
+    `WindowSnapshot.originalPosition`; rewritten `hideOtherWindows` + `restoreCapturedPosition`;
+    `restoreWindowBaseline` (shared by `restore`/`restoreWindows`); position-aware `applySnapshot`,
+    capture, and `persistSnapshot`.
+  - `Bringr/LiveWindowSystem.swift` — `position(of:)` (raw `kAXPosition`, NO AppKit flip),
+    `setPosition` (`AXValueCreate(.cgPoint, …)`).
+  - `Bringr/RevealState.swift` — `WindowEntry.originalPosition: CGPoint? = nil` (+ `import CoreGraphics`).
+  - `BringrTests/FakeWindowSystem.swift` — `WindowState.position`, `.setPosition` op, `position`/`setPosition`.
+  - `BringrTests/WindowControlTests.swift` — minimize→park rewrite (one combined park/re-target/
+    restore test); `makeApp` gives token-derived positions.
+  - `BringrTests/RevealStateTests.swift` — baseline-persist expects position; new safety-net
+    "un-park a stranded window" test.
+  - `BringrTests/RadialNavigatorTests.swift` — window-visibility asserts switched to
+    `assertParked`/`assertOnScreen` helpers (off-screen vs not), since siblings are no longer minimized.
+  - `BringrTests/RadialNavigatorCommitTests.swift` — parked-sibling-restored assert.
+- **Learnings:**
+  - The genie animation is the whole problem: `setMinimized` is the *only* place v1 played a
+    slow animation on hover. After this change nothing minimizes to hide — minimize is used
+    only to surface/restore a window the *user* had minimized.
+  - Off-screen point is a `static let` (not screen-derived) on purpose: deterministic for unit
+    tests (`fake.position(of:) == WindowController.offScreenPoint`) and the live "is it really
+    invisible / does any app clamp the position" can only be eyeballed by a human anyway — same
+    "visuals need a human, dispatch is unit-tested" split as the dim strategy.
+  - **AX position has no flip here**: `frame(of:)` flips to AppKit-global for the dim cutout, but
+    park/restore are symmetric in AX's native top-left space, so `position`/`setPosition` skip the
+    flip entirely. Don't reuse `frame(of:)` for the park round-trip — the flip needs the window
+    height and would be error-prone on multi-monitor.
+  - Length gates bite when you add to `WindowControl.swift` (was 376/400) and `WindowControlTests`
+    (was at the 250 type-body limit). Budget for it: condense your own doc comments and merge
+    near-duplicate tests rather than fighting the formatter at the end.
+  - Couldn't verify the *felt* instantness or that every real app accepts an off-screen AX position
+    in the headless env — needs a human hovering windows in "Hide others" mode (Chrome/Ghostty/
+    Telegram). The park/un-park *dispatch* is fully unit-tested; app build + launch verified (no crash).
+  - Quality gates: build SUCCEEDED, `swiftlint lint --strict` 0 violations, all 207 tests pass
+    (was 206; net +1 — a new safety-net test, after merging two park tests into one for the
+    type-body-length budget).
 ---
 

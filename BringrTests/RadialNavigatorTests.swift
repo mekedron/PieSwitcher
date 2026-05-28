@@ -114,8 +114,9 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.updateHover(.slice(level: 1, index: 0)) // Inbox
 
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11))) // Inbox stays
-        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))  // Docs hidden
+        assertOnScreen(11, fixture.fake) // Inbox stays visible
+        assertParked(12, fixture.fake)   // Docs parked off-screen...
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12))) // ...not minimized
         XCTAssertEqual(fixture.navigator.expandedWindowIndex, 0)
     }
 
@@ -129,8 +130,8 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.updateHover(.slice(level: 1, index: 1)) // Docs
 
-        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))  // Inbox now hidden
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12))) // Docs now stays
+        assertParked(11, fixture.fake)   // Inbox now parked off-screen
+        assertOnScreen(12, fixture.fake) // Docs now stays visible
         XCTAssertEqual(fixture.navigator.expandedWindowIndex, 1)
     }
 
@@ -144,9 +145,9 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.updateHover(.slice(level: 0, index: 0)) // back to the apps ring
 
-        // AC3: both windows are visible again...
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        // AC3: both windows are visible again (un-parked)...
+        assertOnScreen(11, fixture.fake)
+        assertOnScreen(12, fixture.fake)
         XCTAssertNil(fixture.navigator.expandedWindowIndex)
         // ...but the app stays isolated and its sub-wheel stays open.
         XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20)))
@@ -162,8 +163,8 @@ final class RadialNavigatorTests: XCTestCase {
         fixture.navigator.updateHover(.slice(level: 1, index: 1)) // again
 
         XCTAssertEqual(fixture.navigator.expandedWindowIndex, 1)
-        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        assertParked(11, fixture.fake)
+        assertOnScreen(12, fixture.fake)
     }
 
     // MARK: - re-targeting a different app from a window restores the old windows
@@ -176,9 +177,9 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.updateHover(.slice(level: 0, index: 1)) // jump to Ghostty
 
-        // Chrome's windows are no longer minimized...
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        // Chrome's windows are back on-screen (un-parked)...
+        assertOnScreen(11, fixture.fake)
+        assertOnScreen(12, fixture.fake)
         XCTAssertNil(fixture.navigator.expandedWindowIndex)
         // ...and Ghostty is now the isolated app with its own sub-wheel.
         XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
@@ -197,8 +198,8 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.updateHover(.none)
 
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        assertOnScreen(11, fixture.fake)
+        assertOnScreen(12, fixture.fake)
         XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
         XCTAssertEqual(fixture.navigator.rings.count, 1)
         XCTAssertNil(fixture.navigator.expandedWindowIndex)
@@ -213,8 +214,8 @@ final class RadialNavigatorTests: XCTestCase {
 
         fixture.navigator.close()
 
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
-        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+        assertOnScreen(11, fixture.fake)
+        assertOnScreen(12, fixture.fake)
         XCTAssertNil(fixture.navigator.expandedWindowIndex)
     }
 
@@ -321,6 +322,20 @@ final class RadialNavigatorTests: XCTestCase {
 
     private func win(_ pid: pid_t, _ token: Int) -> FakeWindowSystem.WindowState {
         FakeWindowSystem.WindowState(id: WindowID(app: AppID(pid: pid), token: token), minimized: false)
+    }
+
+    /// The window-level hide-others reveal parks siblings off-screen instead of
+    /// minimizing them (Bringr-93j.24); every window here belongs to Chrome (pid 10).
+    private func assertParked(_ token: Int, _ fake: FakeWindowSystem, line: UInt = #line) {
+        XCTAssertEqual(fake.position(of: WindowID(app: AppID(pid: 10), token: token)),
+                       WindowController.offScreenPoint,
+                       "window \(token) should be parked off-screen", line: line)
+    }
+
+    private func assertOnScreen(_ token: Int, _ fake: FakeWindowSystem, line: UInt = #line) {
+        XCTAssertNotEqual(fake.position(of: WindowID(app: AppID(pid: 10), token: token)),
+                          WindowController.offScreenPoint,
+                          "window \(token) should be on-screen", line: line)
     }
 
     private func raw(number: Int, pid: pid_t, name: String, title: String = "") -> RawWindow {
