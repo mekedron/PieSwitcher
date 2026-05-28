@@ -97,6 +97,10 @@ final class RadialMenuController: ObservableObject {
     /// Preferences appearance change applies on the next summon without a relaunch
     /// (US-014 AC2).
     private let appearanceProvider: () -> RadialAppearance
+    /// Reads the persisted reveal strategy at summon time, mirroring `modeProvider`,
+    /// so a Preferences strategy change applies on the next summon without a relaunch
+    /// (US-013 AC4).
+    private let strategyProvider: () -> RevealStrategy
     /// Installs the while-open NSEvent monitors. `.live` in production; a test injects
     /// a recorder to assert hover is wired with both a global and a local monitor.
     private let monitorInstaller: EventMonitorInstaller
@@ -118,11 +122,13 @@ final class RadialMenuController: ObservableObject {
         windowControl: WindowController? = nil,
         modeProvider: @escaping () -> InteractionMode = { InteractionMode.current() },
         appearanceProvider: @escaping () -> RadialAppearance = { RadialAppearance.current() },
+        strategyProvider: @escaping () -> RevealStrategy = { RevealStrategy.current() },
         monitorInstaller: EventMonitorInstaller = .live
     ) {
         self.registry = registry
         self.modeProvider = modeProvider
         self.appearanceProvider = appearanceProvider
+        self.strategyProvider = strategyProvider
         self.monitorInstaller = monitorInstaller
         self.navigator = RadialNavigator(
             windowControl: windowControl ?? WindowController(),
@@ -206,6 +212,9 @@ final class RadialMenuController: ObservableObject {
         // geometry, so they stay in lock-step at any size (US-014 AC3).
         appearance = appearanceProvider()
         navigator.setBaseGeometry(appearance.geometry)
+        // Apply the persisted reveal strategy for this summon too (US-013 AC4), so a
+        // Preferences change takes effect on the next open without a relaunch.
+        navigator.setRevealStrategy(strategyProvider())
         navigator.open(appNodes: root.resolvedChildren())
         syncFromNavigator()
         let side = navigator.overallDiameter

@@ -3,10 +3,10 @@
   "sessionId": "acbe5cb7-4f38-4700-8c1e-4947c4db4521",
   "status": "running",
   "startedAt": "2026-05-28T15:11:17.160Z",
-  "updatedAt": "2026-05-28T15:47:42.655Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-05-28T16:13:02.494Z",
+  "currentIteration": 3,
   "maxIterations": 10,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -140,8 +140,8 @@
       {
         "id": "Bringr-toj",
         "title": "Add Launch at Login option to Bringr",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "Bringr-93j.20",
@@ -171,6 +171,16 @@
       "durationMs": 1017232,
       "startedAt": "2026-05-28T15:20:21.556Z",
       "endedAt": "2026-05-28T15:37:18.788Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "Bringr-toj",
+      "taskTitle": "Add Launch at Login option to Bringr",
+      "taskCompleted": true,
+      "durationMs": 611457,
+      "startedAt": "2026-05-28T15:37:30.307Z",
+      "endedAt": "2026-05-28T15:47:41.764Z"
     }
   ],
   "skippedTaskIds": [],

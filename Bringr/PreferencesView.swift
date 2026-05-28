@@ -16,6 +16,10 @@ struct PreferencesView: View {
     private var fillOpacity = RadialAppearance.defaultFillOpacity
     @AppStorage(RadialAppearance.labelsDefaultsKey)
     private var showsLabels = RadialAppearance.defaultShowsLabels
+    /// The persisted reveal strategy. The same key is read by `RadialMenuController`
+    /// (via `RevealStrategy.current`) at each summon, so a change here takes effect on
+    /// the next summon without a relaunch (US-013 AC4).
+    @AppStorage(RevealStrategy.defaultsKey) private var revealStrategyRaw = RevealStrategy.default.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -43,6 +47,14 @@ struct PreferencesView: View {
 
             Divider()
 
+            Text("Reveal")
+                .font(.title2)
+                .bold()
+
+            revealSection
+
+            Divider()
+
             Text("Appearance")
                 .font(.title2)
                 .bold()
@@ -52,7 +64,7 @@ struct PreferencesView: View {
             Spacer(minLength: 0)
         }
         .padding(28)
-        .frame(width: 460, height: 620)
+        .frame(width: 460, height: 720)
     }
 
     private var startupSection: some View {
@@ -119,6 +131,22 @@ struct PreferencesView: View {
             return "Release the trigger over a slice to choose it; release on the centre to cancel."
         case .clickToStay:
             return "The wheel stays open after release. Click a slice to choose it, or the centre to cancel."
+        }
+    }
+
+    private var revealSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("When hovering:", selection: $revealStrategyRaw) {
+                ForEach(RevealStrategy.allCases, id: \.rawValue) { strategy in
+                    Text(strategy.displayName).tag(strategy.rawValue)
+                }
+            }
+            .pickerStyle(.radioGroup)
+
+            Text((RevealStrategy(rawValue: revealStrategyRaw) ?? .default).detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

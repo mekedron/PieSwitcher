@@ -103,6 +103,15 @@ final class RadialNavigator {
         baseGeometry = geometry
     }
 
+    /// Set the reveal strategy for the next summon (US-013). Read fresh from the
+    /// persisted setting just before `open` (mirroring `setBaseGeometry`), so a
+    /// Preferences change applies on the next summon without a relaunch (AC4). The
+    /// navigator stays strategy-agnostic — `WindowController` maps the strategy onto
+    /// its primitives — so the hover/drill-in policy is identical for all three.
+    func setRevealStrategy(_ strategy: RevealStrategy) {
+        windowControl.setStrategy(strategy)
+    }
+
     // MARK: - Lifecycle
 
     /// Begin a summon: show the apps ring, nothing expanded, nothing revealed.
@@ -222,7 +231,7 @@ final class RadialNavigator {
               index >= 0, index < appsRing.nodes.count else { return }
         let appNode = appsRing.nodes[index]
         if let appID = appNode.representedApp {
-            windowControl.hideOtherApps(besides: appID)
+            windowControl.revealApp(appID)
         }
         let windowNodes = appNode.resolvedChildren()
         let subRing = RadialRing(level: 1, geometry: ringGeometry(forLevel: 1), nodes: windowNodes)
@@ -250,7 +259,7 @@ final class RadialNavigator {
         let windowsRing = rings[1]
         guard index >= 0, index < windowsRing.nodes.count,
               case .focusWindow(let windowID) = windowsRing.nodes[index].action else { return }
-        windowControl.hideOtherWindows(besides: windowID)
+        windowControl.revealWindow(windowID)
         expandedWindowIndex = index
     }
 

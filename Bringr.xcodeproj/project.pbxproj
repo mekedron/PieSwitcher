@@ -48,6 +48,9 @@
 		1A0000000000000000000066 /* RadialMenuControllerHoverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000065 /* RadialMenuControllerHoverTests.swift */; };
 		1A0000000000000000000067 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000068 /* LaunchAtLogin.swift */; };
 		1A0000000000000000000069 /* LaunchAtLoginTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000006A /* LaunchAtLoginTests.swift */; };
+		1A000000000000000000006D /* RevealStrategy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000006E /* RevealStrategy.swift */; };
+		1A000000000000000000006F /* Dimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000070 /* Dimming.swift */; };
+		1A0000000000000000000071 /* RevealStrategyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000072 /* RevealStrategyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +81,9 @@
 		1A0000000000000000000068 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		1A000000000000000000006A /* LaunchAtLoginTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginTests.swift; sourceTree = "<group>"; };
 		1A000000000000000000006C /* WindowActivationShim.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WindowActivationShim.m; sourceTree = "<group>"; };
+		1A000000000000000000006E /* RevealStrategy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevealStrategy.swift; sourceTree = "<group>"; };
+		1A0000000000000000000070 /* Dimming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dimming.swift; sourceTree = "<group>"; };
+		1A0000000000000000000072 /* RevealStrategyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevealStrategyTests.swift; sourceTree = "<group>"; };
 		1A000000000000000000002D /* WindowEnumeration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeration.swift; sourceTree = "<group>"; };
 		1A000000000000000000002F /* WindowEnumerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumerationTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000031 /* MenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModel.swift; sourceTree = "<group>"; };
@@ -168,6 +174,8 @@
 				1A000000000000000000004F /* WindowMemory.swift */,
 				1A0000000000000000000059 /* RevealState.swift */,
 				1A000000000000000000005D /* RadialAppearance.swift */,
+				1A000000000000000000006E /* RevealStrategy.swift */,
+				1A0000000000000000000070 /* Dimming.swift */,
 			);
 			path = Bringr;
 			sourceTree = "<group>";
@@ -193,6 +201,7 @@
 				1A0000000000000000000055 /* ThreeFingerTests.swift */,
 				1A000000000000000000005B /* RevealStateTests.swift */,
 				1A000000000000000000005F /* RadialAppearanceTests.swift */,
+				1A0000000000000000000072 /* RevealStrategyTests.swift */,
 			);
 			path = BringrTests;
 			sourceTree = "<group>";
@@ -318,6 +327,8 @@
 				1A0000000000000000000050 /* WindowMemory.swift in Sources */,
 				1A000000000000000000005A /* RevealState.swift in Sources */,
 				1A000000000000000000005E /* RadialAppearance.swift in Sources */,
+				1A000000000000000000006D /* RevealStrategy.swift in Sources */,
+				1A000000000000000000006F /* Dimming.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -343,6 +354,7 @@
 				1A0000000000000000000056 /* ThreeFingerTests.swift in Sources */,
 				1A000000000000000000005C /* RevealStateTests.swift in Sources */,
 				1A0000000000000000000060 /* RadialAppearanceTests.swift in Sources */,
+				1A0000000000000000000071 /* RevealStrategyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -44,6 +44,22 @@ after each iteration and it's included in prompts for context.
   `PermissionsManager` shape: `@Published private(set)` state + injected
   probe/action closures, `nonisolated static` live impls) so the logic is unit-tested
   without touching real system state. Don't credit a package you didn't bundle.
+- **Per-summon settings share one shape; push them through the same seam.** A setting
+  that changes a *future* summon (interaction mode, appearance, reveal strategy) is a
+  `String`-raw `CaseIterable enum` with `static default` / `defaultsKey` /
+  `current(from:)`, surfaced in Preferences via `@AppStorage(key)` and read in
+  `RadialMenuController.summon` through an injected `provider` closure (default
+  `{ X.current() }`), then pushed into the navigator/`WindowController` *before*
+  `navigator.open(...)` — never mid-session, so a Preferences change can't switch
+  behaviour halfway through a reveal. To add one, copy `RevealStrategy` + its
+  `strategyProvider` wiring.
+- **A visual side effect that needs its own AppKit window goes behind a protocol seam,
+  like `EventMonitorInstaller`/`PermissionsManager`.** `Dimming` (show/clear) is injected
+  into `WindowController`; production wires `LiveDimmer` (a reused click-through `NSPanel`),
+  tests wire a recording `FakeDimmer` and assert the calls — so the strategy *dispatch* is
+  unit-tested while the live panel is verified only by build & run. When the tested core
+  needs live geometry (window frames for the dim cutout), add it to the existing
+  `WindowControlling` protocol (`frame(of:)`) rather than reaching into AppKit from the core.
 
 ---
 
@@ -175,5 +191,59 @@ Added a "Launch at login" option to Preferences.
     tests pass (was 177; +7 new). Confirmed the new class executes via
     `-only-testing:BringrTests/LaunchAtLoginTests` (7 run) to dodge the silent
     "0 tests" trap.
+---
+
+## 2026-05-28 - Bringr-93j.13
+
+US-013: reveal-strategy setting — let the user choose how "other" apps/windows get
+out of the way (raise-to-front / hide-others / dim-others).
+
+- **What:** Added `RevealStrategy` (default `hideOthers`), persisted and read fresh
+  per summon exactly like `InteractionMode`/`RadialAppearance`. `WindowController` now
+  dispatches the active strategy onto its primitives at BOTH levels via
+  `revealApp(_:)` / `revealWindow(_:)` — the navigator's two reveal call sites switched
+  to these from `hideOtherApps`/`hideOtherWindows`:
+  - raise = activate target app / AX-raise target window, hide nothing;
+  - hide = the existing minimize/hide behaviour (still the default);
+  - dim = raise the target + a spotlight overlay (`Dimming` seam → `LiveDimmer`) that
+    darkens the desktop with the target window(s) cut out. `restore()` clears the dim;
+    `restoreWindows(of:)` re-cuts it to the app's windows when leaving the sub-wheel.
+  Added a "Reveal" radio-group section to Preferences; `RadialMenuController` reads a
+  `strategyProvider` at summon and pushes it via `navigator.setRevealStrategy`.
+- **Files changed:**
+  - `Bringr/RevealStrategy.swift` (new) — enum + persistence (mirrors `InteractionMode`).
+  - `Bringr/Dimming.swift` (new) — `Dimming` protocol + `LiveDimmer` (reused click-through
+    `NSPanel` just below `.floating`, even-odd `NSBezierPath` cutout fill).
+  - `Bringr/WindowControl.swift` — `frame(of:)` on the protocol; `strategy`/`dimmer`
+    state; `setStrategy`, `revealApp`/`revealWindow` dispatch + raise/dim impls; dim-aware
+    `restoreWindows`/`restore`.
+  - `Bringr/LiveWindowSystem.swift` — `frame(of:)` via AX position/size → AppKit-global flip.
+  - `Bringr/RadialNavigator.swift` — `setRevealStrategy`; the two reveal calls renamed.
+  - `Bringr/RadialMenuWindow.swift` — `strategyProvider`, pushed in `summon`.
+  - `Bringr/PreferencesView.swift` — "Reveal" picker; window height 620 → 720.
+  - `Bringr/AppDelegate.swift` — inject `LiveDimmer` into the production `WindowController`.
+  - `BringrTests/FakeWindowSystem.swift` — `frame(of:)` + `frames` fixture; recording `FakeDimmer`.
+  - `BringrTests/RevealStrategyTests.swift` (new) — 16 tests (8 persistence, 8 dispatch).
+  - `Bringr.xcodeproj/project.pbxproj` — registered 3 new files (IDs `…006D`–`…0072`).
+- **Learnings:**
+  - **Merge-under-you variant of the concurrent hazard:** the engine merged another
+    iteration's app-commit work (new `RadialCommitResult`, `commit -> RadialCommitResult?`)
+    into my working tree *between* my first reads and my edits — my mental model of
+    `RadialNavigator`/`commit` was stale and an Edit failed "modified since read". Tell:
+    `git diff HEAD -- <file>` shows ONLY your own hunks even though the file contains
+    types you never wrote (they're already in HEAD). Re-read a file right before editing
+    once a session has been running a while; don't trust an early read.
+  - dim can't be a flat panel "between" same-level normal windows (window levels are
+    global, so a panel above normal dims the target too). The working spotlight = a panel
+    just below `.floating` covering the screen union, with the target frame(s) punched out
+    and the target AX-raised so it fills the hole. No frame → empty holes = uniform dim
+    (graceful; target is still raised, so it reads as frontmost).
+  - AX `kAXPosition`/`kAXSize` are top-left/y-down off the primary screen; flip to AppKit
+    via `primaryHeight - y - h` (`NSScreen.screens.first`). Untestable headlessly — a wrong
+    flip misplaces the cutout but never fails a gate. The dim/raise visuals (and the hover
+    sweep) need a human; the strategy *dispatch* (which ops fire, with what frames) is fully
+    covered by the `FakeDimmer`-backed tests. Build + launch verified (no crash).
+  - Quality gates: build SUCCEEDED, `swiftlint --strict` 0 violations, all 200 tests pass
+    (16 new; confirmed via `-only-testing:BringrTests/RevealStrategyTests` → 16 run).
 ---
 

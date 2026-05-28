@@ -110,6 +110,41 @@ final class LiveWindowSystem: WindowControlling {
         setBool(element, kAXFocusedAttribute, true, window: window)
     }
 
+    func frame(of window: WindowID) -> CGRect? {
+        guard let element = elementCache[window],
+              let position = axPoint(element, kAXPositionAttribute),
+              let size = axSize(element, kAXSizeAttribute) else { return nil }
+        // AX reports a top-left origin (y-down) relative to the primary screen's top.
+        // Flip into AppKit-global coordinates (bottom-left origin, y-up) for the dim
+        // overlay; the primary screen (index 0) defines that shared origin.
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGRect(
+            x: position.x,
+            y: primaryHeight - position.y - size.height,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private func axPoint(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
+        guard let value = copyAXValue(element, attribute) else { return nil }
+        var point = CGPoint.zero
+        return AXValueGetValue(value, .cgPoint, &point) ? point : nil
+    }
+
+    private func axSize(_ element: AXUIElement, _ attribute: String) -> CGSize? {
+        guard let value = copyAXValue(element, attribute) else { return nil }
+        var size = CGSize.zero
+        return AXValueGetValue(value, .cgSize, &size) ? size : nil
+    }
+
+    private func copyAXValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let ref = value, CFGetTypeID(ref) == AXValueGetTypeID() else { return nil }
+        return (ref as! AXValue) // swiftlint:disable:this force_cast
+    }
+
     private func runningApplication(_ app: AppID) -> NSRunningApplication? {
         NSRunningApplication(processIdentifier: app.pid)
     }

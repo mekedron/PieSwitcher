@@ -40,6 +40,10 @@ protocol WindowControlling {
     func raise(_ window: WindowID)
     /// Make `window` main and focused (its app should already be active).
     func focusWindow(_ window: WindowID)
+    /// The window's frame in AppKit-global coordinates (bottom-left origin, y-up),
+    /// or `nil` if it can't be resolved — used to cut the target out of the dim
+    /// overlay (US-013 dim-others).
+    func frame(of window: WindowID) -> CGRect?
 }
 
 /// Low-level window/app control primitives that the reveal strategies (US-013)
@@ -75,11 +79,26 @@ final class WindowController {
     /// fake-backed unit tests and the navigator's default controller; production
     /// injects a real store.
     private let store: RevealStateStore?
+    /// Draws/clears the "dim others" spotlight (US-013). `nil` means no dimming —
+    /// the default for unit tests and non-dim strategies; production injects a
+    /// `LiveDimmer`. Tests inject a recording double to assert dim dispatch.
+    private let dimmer: Dimming?
+    /// The reveal strategy in force for the current summon. Set by the navigator
+    /// before any reveal call (read fresh from the persisted setting at summon time)
+    /// and held for the session, so a Preferences change can't switch mid-reveal.
+    private var strategy: RevealStrategy = .default
     private var session: Session?
 
-    init(system: WindowControlling? = nil, store: RevealStateStore? = nil) {
+    init(system: WindowControlling? = nil, store: RevealStateStore? = nil, dimmer: Dimming? = nil) {
         self.system = system ?? LiveWindowSystem()
         self.store = store
+        self.dimmer = dimmer
+    }
+
+    /// Set the strategy for the next reveal. Called once per summon before any
+    /// isolate call; restore undoes whatever the active strategy did.
+    func setStrategy(_ strategy: RevealStrategy) {
+        self.strategy = strategy
     }
 
     /// Whether a capture/restore session is currently open.
@@ -153,6 +172,70 @@ final class WindowController {
         }
     }
 
+    // MARK: - Reveal strategies (US-013)
+
+    /// Isolate `target` against the other apps (app-hover, US-010) using the active
+    /// strategy. The navigator calls this on each app (re-)target; whatever the
+    /// strategy does here, `restore()` undoes. All three share the captured baseline.
+    func revealApp(_ target: AppID) {
+        switch strategy {
+        case .hideOthers: hideOtherApps(besides: target)
+        case .raiseToFront: raiseAppToFront(target)
+        case .dimOthers: dimApp(target)
+        }
+    }
+
+    /// Isolate `target` against its app's other windows (window-hover, US-011) using
+    /// the active strategy.
+    func revealWindow(_ target: WindowID) {
+        switch strategy {
+        case .hideOthers: hideOtherWindows(besides: target)
+        case .raiseToFront: raiseWindowToFront(target)
+        case .dimOthers: dimWindow(target)
+        }
+    }
+
+    /// Raise `target` to the front, leaving every other app where it is. Capturing the
+    /// baseline records the prior frontmost so `restore()` can re-activate it.
+    private func raiseAppToFront(_ target: AppID) {
+        captureAppBaselineIfNeeded()
+        if system.isHidden(target) { system.setHidden(target, false) }
+        system.activate(target)
+    }
+
+    /// Raise `target` to the front and dim everything else, cutting the target app's
+    /// windows out of the spotlight so they alone stay bright.
+    private func dimApp(_ target: AppID) {
+        captureAppBaselineIfNeeded()
+        if system.isHidden(target) { system.setHidden(target, false) }
+        system.activate(target)
+        dimmer?.dim(excluding: frames(of: target))
+    }
+
+    /// Raise `target` window to the front within its app, leaving the app's other
+    /// windows where they are.
+    private func raiseWindowToFront(_ target: WindowID) {
+        captureWindowBaselineIfNeeded(for: target.app)
+        if system.isMinimized(target) { system.setMinimized(target, false) }
+        system.raise(target)
+    }
+
+    /// Raise `target` window to the front and dim everything else, cutting just this
+    /// window out of the spotlight. Falls back to a uniform dim if its frame is
+    /// unavailable (the window is still raised, so it reads as the frontmost one).
+    private func dimWindow(_ target: WindowID) {
+        captureWindowBaselineIfNeeded(for: target.app)
+        if system.isMinimized(target) { system.setMinimized(target, false) }
+        system.raise(target)
+        dimmer?.dim(excluding: system.frame(of: target).map { [$0] } ?? [])
+    }
+
+    /// The frames of `app`'s current windows, for the dim cutout; windows whose frame
+    /// can't be resolved are skipped (their region simply stays dimmed).
+    private func frames(of app: AppID) -> [CGRect] {
+        system.windows(of: app).compactMap { system.frame(of: $0) }
+    }
+
     /// Restore just `app`'s windows to their captured baseline — un-minimize and
     /// re-raise back-to-front — and drop that one baseline, leaving app-level
     /// hiding and the session itself intact. Used when the cursor leaves the
@@ -168,6 +251,12 @@ final class WindowController {
             system.raise(snapshot.id)
         }
         session?.windowBaseline[app] = nil
+        // Dim strategy: leaving the windows sub-wheel returns to the app-level
+        // spotlight, so re-cut the dim to all of the app's windows. The app is still
+        // frontmost, so it stays bright while the other apps remain dimmed.
+        if strategy == .dimOthers {
+            dimmer?.dim(excluding: frames(of: app))
+        }
     }
 
     /// Restore every app/window touched this session to its pre-summon
@@ -175,6 +264,9 @@ final class WindowController {
     /// active session. (AC5)
     func restore(reactivatingFrontmost: Bool = true) {
         guard let session else { return }
+
+        // 0. Remove any dim spotlight first (a no-op for the other strategies).
+        dimmer?.clear()
 
         // 1. App visibility first, so windows are operated on while their app is shown.
         for snapshot in session.appBaseline {
