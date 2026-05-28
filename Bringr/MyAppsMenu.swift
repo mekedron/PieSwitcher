@@ -13,10 +13,11 @@ import Foundation
 ///   bundle id, so committing starts/raises the app (Bringr-93j.39) and the slice still
 ///   shows the on-disk icon (Bringr-93j.38).
 ///
-/// An empty list falls straight through to the unchanged full wheel, so a user who has
-/// curated nothing sees exactly the current behavior. Appending the *other* running apps
-/// after the pinned block is a separate, defaulted-on toggle (Bringr-93j.42); this layer
-/// shows only the curated apps.
+/// When the "show all other running apps" toggle is on (the default, Bringr-93j.42), the
+/// remaining running apps on the summon screen — those not already shown by a curated entry
+/// — follow the pinned block as the raw wheel's plain expand-to-windows nodes. When it is
+/// off, only the curated apps appear. An empty list with the toggle on falls straight through
+/// to the unchanged full wheel, so a user who has curated nothing sees the current behavior.
 @MainActor
 struct MyAppsMenu: MenuDefinition {
     private let enumerator: WindowEnumerator
@@ -30,10 +31,15 @@ struct MyAppsMenu: MenuDefinition {
     /// running-vs-launch decision is unit-testable without a live `NSRunningApplication`
     /// lookup; the default consults the live workspace.
     private let runningPID: (String) -> pid_t?
+    /// Whether to append the other running apps after the curated block, read through a
+    /// closure so each summon picks up the persisted toggle fresh (like `curatedApps`); tests
+    /// inject a fixed value (Bringr-93j.42).
+    private let showOtherRunningApps: () -> Bool
 
     init(
         enumerator: WindowEnumerator,
         curatedApps: @escaping () -> [CuratedApp] = { CuratedApps.current() },
+        showOtherRunningApps: @escaping () -> Bool = { CuratedApps.showsOtherRunningApps() },
         runningPID: @escaping (String) -> pid_t? = {
             CuratedApp.runningApplication(forBundleIdentifier: $0)?.processIdentifier
         }
@@ -41,15 +47,19 @@ struct MyAppsMenu: MenuDefinition {
         self.enumerator = enumerator
         self.fallback = WindowSwitcherMenu(enumerator: enumerator)
         self.curatedApps = curatedApps
+        self.showOtherRunningApps = showOtherRunningApps
         self.runningPID = runningPID
     }
 
     func makeRoot(onScreen screenBounds: CGRect?) -> MenuNode {
         let curated = curatedApps()
-        // Empty list → the current full wheel, unchanged (AC: "an empty list reproduces
-        // the current wheel"). Decided per summon, since `makeRoot` is called fresh each
-        // time and the list is read above.
-        guard !curated.isEmpty else { return fallback.makeRoot(onScreen: screenBounds) }
+        let showOthers = showOtherRunningApps()
+        // Empty list + show-others (the default) → the current full wheel, unchanged (AC:
+        // "an empty list reproduces the current wheel"). The general path below would build
+        // the same nodes, but routing this documented case straight through the fallback keeps
+        // the no-regression guarantee literal. Empty list + others-off intentionally yields an
+        // empty ring — "show only the curated apps", of which there are none.
+        if curated.isEmpty && showOthers { return fallback.makeRoot(onScreen: screenBounds) }
 
         let enumerator = self.enumerator
         let runningPID = self.runningPID
@@ -61,12 +71,23 @@ struct MyAppsMenu: MenuDefinition {
             action: .expand,
             children: .dynamic {
                 let live = enumerator.enumerate(onScreen: screenBounds)
-                return curated.map {
+                let curatedNodes = curated.map {
                     Self.node(
                         for: $0, live: live, onScreen: screenBounds,
                         enumerator: enumerator, runningPID: runningPID
                     )
                 }
+                guard showOthers else { return curatedNodes }
+                // Append every other running app on this screen — those whose pid no curated
+                // entry already represents. A curated app running with windows resolves to a
+                // live pid (and an expand node above), so excluding those pids avoids listing
+                // it twice; a curated launch node owns no live window here, so it never
+                // collides. The appended nodes are the raw wheel's app nodes (no bundle id).
+                let curatedPIDs = Set(curated.compactMap { runningPID($0.bundleIdentifier) })
+                let others = live
+                    .filter { !curatedPIDs.contains($0.id.pid) }
+                    .map { WindowSwitcherMenu.appNode($0, onScreen: screenBounds, enumerator: enumerator) }
+                return curatedNodes + others
             }
         )
     }

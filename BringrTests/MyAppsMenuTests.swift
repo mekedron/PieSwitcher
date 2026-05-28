@@ -13,7 +13,10 @@ final class MyAppsMenuTests: XCTestCase {
             raw(number: 21, pid: 20, name: "Ghostty")
         ])
         let enumerator = makeEnumerator(source)
-        let curated = MyAppsMenu(enumerator: enumerator, curatedApps: { [] }, runningPID: { _ in nil })
+        let curated = MyAppsMenu(
+            enumerator: enumerator, curatedApps: { [] },
+            showOtherRunningApps: { true }, runningPID: { _ in nil }
+        )
 
         let rawWheel = WindowSwitcherMenu(enumerator: enumerator).makeRoot().resolvedChildren()
         let curatedWheel = curated.makeRoot().resolvedChildren()
@@ -37,6 +40,7 @@ final class MyAppsMenuTests: XCTestCase {
         let menu = MyAppsMenu(
             enumerator: makeEnumerator(source),
             curatedApps: { curated },
+            showOtherRunningApps: { false },
             runningPID: { $0 == "com.google.Chrome" ? 10 : nil }
         )
 
@@ -57,9 +61,9 @@ final class MyAppsMenuTests: XCTestCase {
         XCTAssertEqual(apps[1].resolvedChildren().map(\.title), ["Inbox", "Docs"])
     }
 
-    // MARK: - .41 boundary: only curated apps appear (others are Bringr-93j.42)
+    // MARK: - Toggle OFF: show only the curated apps
 
-    func testOnlyCuratedAppsAppearNotOtherRunningApps() {
+    func testShowOthersOffShowsOnlyTheCuratedApps() {
         let source = stub([
             raw(number: 11, pid: 10, name: "Chrome"),
             raw(number: 21, pid: 20, name: "Ghostty")     // running but not curated
@@ -67,10 +71,12 @@ final class MyAppsMenuTests: XCTestCase {
         let menu = MyAppsMenu(
             enumerator: makeEnumerator(source),
             curatedApps: { [CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")] },
+            showOtherRunningApps: { false },
             runningPID: { $0 == "com.google.Chrome" ? 10 : nil }
         )
 
-        XCTAssertEqual(menu.makeRoot().resolvedChildren().map(\.title), ["Chrome"])
+        XCTAssertEqual(menu.makeRoot().resolvedChildren().map(\.title), ["Chrome"],
+                       "with the toggle off, the running-but-not-curated Ghostty is not appended")
     }
 
     // MARK: - Bringr-93j.30: a running app with no window on the summon screen launches
@@ -81,6 +87,7 @@ final class MyAppsMenuTests: XCTestCase {
         let menu = MyAppsMenu(
             enumerator: makeEnumerator(source),
             curatedApps: { [CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")] },
+            showOtherRunningApps: { false },
             runningPID: { _ in 10 }                         // Chrome IS running...
         )
 
@@ -97,6 +104,7 @@ final class MyAppsMenuTests: XCTestCase {
         let menu = MyAppsMenu(
             enumerator: makeEnumerator(source),
             curatedApps: { [CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")] },
+            showOtherRunningApps: { false },
             runningPID: { _ in chromePID }
         )
         let root = menu.makeRoot()
@@ -111,6 +119,64 @@ final class MyAppsMenuTests: XCTestCase {
         let apps = root.resolvedChildren()
         XCTAssertEqual(apps.map(\.action), [.expand])
         XCTAssertEqual(apps[0].resolvedChildren().map(\.title), ["Inbox"])
+    }
+
+    // MARK: - Toggle ON (default): append the other running apps after the curated block
+
+    func testShowOthersAppendsNonCuratedRunningAppsAfterTheCuratedBlock() {
+        let source = stub([
+            raw(number: 11, pid: 10, name: "Chrome"),
+            raw(number: 21, pid: 20, name: "Ghostty"),    // running, not curated
+            raw(number: 31, pid: 30, name: "Mail")        // running, not curated
+        ])
+        let menu = MyAppsMenu(
+            enumerator: makeEnumerator(source),
+            curatedApps: { [CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")] },
+            showOtherRunningApps: { true },
+            runningPID: { $0 == "com.google.Chrome" ? 10 : nil }
+        )
+
+        let apps = menu.makeRoot().resolvedChildren()
+        XCTAssertEqual(apps.map(\.title), ["Chrome", "Ghostty", "Mail"],
+                       "curated Chrome leads; the other running apps follow in enumeration order")
+        // The appended apps are the raw wheel's expand nodes — a running pid, no bundle id.
+        XCTAssertEqual(apps[1].action, .expand)
+        XCTAssertEqual(apps[1].representedApp, AppID(pid: 20))
+        XCTAssertNil(apps[1].bundleIdentifier)
+        XCTAssertEqual(apps[2].representedApp, AppID(pid: 30))
+    }
+
+    func testCuratedRunningAppIsNotDuplicatedInTheOthersBlock() {
+        let source = stub([
+            raw(number: 11, pid: 10, name: "Chrome"),
+            raw(number: 21, pid: 20, name: "Ghostty")
+        ])
+        let menu = MyAppsMenu(
+            enumerator: makeEnumerator(source),
+            curatedApps: { [CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")] },
+            showOtherRunningApps: { true },
+            runningPID: { $0 == "com.google.Chrome" ? 10 : nil }
+        )
+
+        let apps = menu.makeRoot().resolvedChildren()
+        XCTAssertEqual(apps.map(\.title), ["Chrome", "Ghostty"])
+        XCTAssertEqual(apps.filter { $0.title == "Chrome" }.count, 1,
+                       "the curated, running Chrome shows once — not again in the others block")
+        XCTAssertEqual(apps[0].bundleIdentifier, "com.google.Chrome",
+                       "and that single Chrome is the curated node, carrying its bundle id")
+    }
+
+    func testEmptyListWithOthersOffYieldsAnEmptyRing() {
+        let source = stub([raw(number: 11, pid: 10, name: "Chrome")])
+        let menu = MyAppsMenu(
+            enumerator: makeEnumerator(source),
+            curatedApps: { [] },
+            showOtherRunningApps: { false },
+            runningPID: { _ in nil }
+        )
+
+        XCTAssertTrue(menu.makeRoot().resolvedChildren().isEmpty,
+                      "no curated apps and others off → nothing to show")
     }
 
     // MARK: - Fixtures

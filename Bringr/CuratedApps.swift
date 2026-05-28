@@ -103,6 +103,28 @@ enum CuratedApps {
         defaults.set(data, forKey: defaultsKey)
     }
 
+    /// `UserDefaults` key backing the "show all other running apps" toggle (Bringr-93j.42).
+    /// Single source of truth shared by the Preferences `@AppStorage` and
+    /// `showsOtherRunningApps(from:)`, so the two cannot drift.
+    static let showOtherRunningAppsDefaultsKey = "myApps.showOtherRunningApps"
+
+    /// Default for the toggle: ON. With it on, an empty list reproduces the full
+    /// all-running-apps wheel, so a user who has curated nothing sees no regression.
+    static let showOtherRunningAppsDefault = true
+
+    /// Whether the wheel appends the remaining running apps — those with a window on the
+    /// summon screen and not already curated — after the pinned block. Read fresh at each
+    /// summon, so a Preferences change applies on the next open without a relaunch. Falls
+    /// back to the ON default when unset: `bool(forKey:)` alone returns `false` for an absent
+    /// key, which would silently flip the intended default, so the unset case is checked
+    /// explicitly (mirroring `RadialAppearance.showsLabels`).
+    static func showsOtherRunningApps(from defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: showOtherRunningAppsDefaultsKey) != nil else {
+            return showOtherRunningAppsDefault
+        }
+        return defaults.bool(forKey: showOtherRunningAppsDefaultsKey)
+    }
+
     /// Merge bundles picked or dropped into the editor (Bringr-93j.40) onto an existing
     /// list, appending in drop order only those whose bundle id isn't already listed — so
     /// re-adding an app is a no-op and the user's manual order is preserved. URLs that

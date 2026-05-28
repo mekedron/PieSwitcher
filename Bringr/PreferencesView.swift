@@ -25,6 +25,11 @@ struct PreferencesView: View {
     /// next open without a relaunch.
     @AppStorage(AppSortOrder.defaultsKey) private var appSortOrderRaw = AppSortOrder.default.rawValue
     @AppStorage(WindowSortOrder.defaultsKey) private var windowSortOrderRaw = WindowSortOrder.default.rawValue
+    /// Whether the wheel appends the other running apps after the curated block
+    /// (Bringr-93j.42). `MyAppsMenu` reads the same key via `CuratedApps.showsOtherRunningApps`
+    /// fresh at each summon, so a change here applies on the next open without a relaunch.
+    @AppStorage(CuratedApps.showOtherRunningAppsDefaultsKey)
+    private var showsOtherRunningApps = CuratedApps.showOtherRunningAppsDefault
     /// How the mouse and trackpad summon the menu (Bringr-93j.35). The same keys are read
     /// fresh by the activation monitors, so a change here takes effect with no relaunch.
     @AppStorage(MouseActivationMethod.defaultsKey)
@@ -44,7 +49,7 @@ struct PreferencesView: View {
                 section("Interaction") { interactionSection }
                 section("Reveal") { revealSection }
                 section("Sorting") { sortingSection }
-                section("My Apps") { MyAppsEditor() }
+                section("My Apps") { myAppsSection }
                 section("Appearance") { appearanceSection }
             }
             .padding(28)
@@ -228,6 +233,22 @@ struct PreferencesView: View {
                 .pickerStyle(.radioGroup)
 
                 Text((WindowSortOrder(rawValue: windowSortOrderRaw) ?? .default).detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var myAppsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MyAppsEditor()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Show all other running apps", isOn: $showsOtherRunningApps)
+
+                Text("When on, every other app with a window on the current screen follows your "
+                     + "pinned apps. When off, the wheel shows only your pinned apps.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

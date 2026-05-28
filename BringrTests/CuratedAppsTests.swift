@@ -69,6 +69,32 @@ final class CuratedAppsTests: XCTestCase {
         XCTAssertEqual(app.id, "com.apple.Safari")
     }
 
+    // MARK: - "Show all other running apps" toggle (Bringr-93j.42)
+
+    func testShowsOtherRunningAppsDefaultsToTrueWhenUnset() {
+        XCTAssertTrue(CuratedApps.showsOtherRunningApps(from: makeDefaults()),
+                      "unset → ON, so an empty list reproduces the full wheel with no regression")
+    }
+
+    func testShowsOtherRunningAppsReadsPersistedFalse() {
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: CuratedApps.showOtherRunningAppsDefaultsKey)
+
+        XCTAssertFalse(CuratedApps.showsOtherRunningApps(from: defaults),
+                       "an explicit false must survive — not be mistaken for the unset ON default")
+    }
+
+    func testShowsOtherRunningAppsReadsPersistedTrue() {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: CuratedApps.showOtherRunningAppsDefaultsKey)
+
+        XCTAssertTrue(CuratedApps.showsOtherRunningApps(from: defaults))
+    }
+
+    func testShowOtherRunningAppsDefaultsKeyIsStable() {
+        XCTAssertEqual(CuratedApps.showOtherRunningAppsDefaultsKey, "myApps.showOtherRunningApps")
+    }
+
     // MARK: - Resolution helpers (AC: known bundle id → bundle URL and running app)
 
     func testKnownBundleIdResolvesToABundleURL() throws {
