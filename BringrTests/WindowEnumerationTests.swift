@@ -323,22 +323,24 @@ final class WindowEnumerationTests: XCTestCase {
 final class FakeWindowEnumerationSource: WindowEnumerationSource {
     let selfPID: pid_t
     private let windows: [RawWindow]
-    /// Windows to return when asked for all Spaces (Bringr-93j.48); `nil` serves the base
-    /// `windows` for both modes, so the single-list tests are unaffected.
-    private let allSpacesWindows: [RawWindow]?
-    /// The `includingAllSpaces` of the most recent call, so a test can assert the
-    /// enumerator forwarded the scope's Space flag.
-    private(set) var lastIncludedAllSpaces: Bool?
+    /// Windows to return when asked for the broadened (offscreen-inclusive) list — the
+    /// wider set the live source's all-windows query surfaces, already classified with
+    /// `isOnscreen`/`isMinimized`/`isHidden` (Bringr-93j.48 / Bringr-93j.50). `nil` serves
+    /// the base `windows` for both modes, so the single-list tests are unaffected.
+    private let offscreenWindows: [RawWindow]?
+    /// The `includingOffscreen` of the most recent call, so a test can assert the enumerator
+    /// broadened the query when a Space/minimized/hidden flag was set.
+    private(set) var lastIncludedOffscreen: Bool?
 
-    init(selfPID: pid_t, windows: [RawWindow], allSpacesWindows: [RawWindow]? = nil) {
+    init(selfPID: pid_t, windows: [RawWindow], offscreenWindows: [RawWindow]? = nil) {
         self.selfPID = selfPID
         self.windows = windows
-        self.allSpacesWindows = allSpacesWindows
+        self.offscreenWindows = offscreenWindows
     }
 
-    func rawWindows(includingAllSpaces: Bool) -> [RawWindow] {
-        lastIncludedAllSpaces = includingAllSpaces
-        if includingAllSpaces, let allSpacesWindows { return allSpacesWindows }
+    func rawWindows(includingOffscreen: Bool) -> [RawWindow] {
+        lastIncludedOffscreen = includingOffscreen
+        if includingOffscreen, let offscreenWindows { return offscreenWindows }
         return windows
     }
 }

@@ -12,6 +12,10 @@ struct CollectionSettings: View {
     @AppStorage(CollectionPreferences.appsAllSpacesDefaultsKey) private var appsAllSpaces = false
     @AppStorage(CollectionPreferences.windowsAllScreensDefaultsKey) private var windowsAllScreens = false
     @AppStorage(CollectionPreferences.windowsAllSpacesDefaultsKey) private var windowsAllSpaces = false
+    /// Global across both levels (Bringr-93j.50); read fresh at summon via
+    /// `CollectionPreferences.current`, so a change applies on the next open without relaunch.
+    @AppStorage(CollectionPreferences.includeMinimizedDefaultsKey) private var includeMinimized = false
+    @AppStorage(CollectionPreferences.includeHiddenDefaultsKey) private var includeHidden = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -29,6 +33,17 @@ struct CollectionSettings: View {
                 detail: "Which of an app's windows fill its sub-ring. When both are off, it shows "
                     + "only that app's windows on the screen and Space you summon from."
             )
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Minimized & hidden").font(.headline)
+                Toggle("Include minimized windows", isOn: $includeMinimized)
+                Toggle("Include hidden windows", isOn: $includeHidden)
+                Text("Minimized windows and windows of apps you've hidden (Hide, ⌘H — including "
+                    + "ones Bringr hides for you) are normally left out. Turn these on to include "
+                    + "them in the wheel.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

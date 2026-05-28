@@ -13,11 +13,24 @@ final class CollectionScopeTests: XCTestCase {
     func testEveryFlagDefaultsToFalseWhenUnset() {
         let prefs = CollectionPreferences.current(from: ephemeralDefaults())
 
-        // All off → collection stays on the summon screen/Space (the Bringr-93j.30 behaviour).
+        // All off → collection stays on the summon screen/Space (the Bringr-93j.30 behaviour),
+        // with minimized/hidden windows left out (Bringr-93j.50).
         XCTAssertFalse(prefs.appsAllScreens)
         XCTAssertFalse(prefs.appsAllSpaces)
         XCTAssertFalse(prefs.windowsAllScreens)
         XCTAssertFalse(prefs.windowsAllSpaces)
+        XCTAssertFalse(prefs.includeMinimized)
+        XCTAssertFalse(prefs.includeHidden)
+    }
+
+    func testMinimizedAndHiddenFlagsRoundTrip() {
+        let defaults = ephemeralDefaults()
+        defaults.set(true, forKey: CollectionPreferences.includeMinimizedDefaultsKey)
+        defaults.set(true, forKey: CollectionPreferences.includeHiddenDefaultsKey)
+
+        let prefs = CollectionPreferences.current(from: defaults)
+        XCTAssertTrue(prefs.includeMinimized)
+        XCTAssertTrue(prefs.includeHidden)
     }
 
     func testEachFlagRoundTripsIndependently() {
@@ -37,9 +50,11 @@ final class CollectionScopeTests: XCTestCase {
             CollectionPreferences.appsAllScreensDefaultsKey,
             CollectionPreferences.appsAllSpacesDefaultsKey,
             CollectionPreferences.windowsAllScreensDefaultsKey,
-            CollectionPreferences.windowsAllSpacesDefaultsKey
+            CollectionPreferences.windowsAllSpacesDefaultsKey,
+            CollectionPreferences.includeMinimizedDefaultsKey,
+            CollectionPreferences.includeHiddenDefaultsKey
         ])
-        XCTAssertEqual(keys.count, 4)
+        XCTAssertEqual(keys.count, 6)
     }
 
     // MARK: - Resolution against the summon display
@@ -89,9 +104,25 @@ final class CollectionScopeTests: XCTestCase {
         XCTAssertTrue(windows.allSpaces)
     }
 
+    func testMinimizedAndHiddenFlagsRideIntoBothScopes() {
+        // The two flags are global, so they resolve identically into the apps ring and the
+        // windows sub-wheel — unlike the per-level screen/Space decisions (Bringr-93j.50).
+        let prefs = CollectionPreferences(
+            appsAllScreens: false, appsAllSpaces: false,
+            windowsAllScreens: false, windowsAllSpaces: false,
+            includeMinimized: true, includeHidden: true
+        )
+        for scope in [prefs.appsScope(forDisplay: display), prefs.windowsScope(forDisplay: display)] {
+            XCTAssertTrue(scope.includeMinimized)
+            XCTAssertTrue(scope.includeHidden)
+        }
+    }
+
     func testAllScreensCurrentSpaceConstant() {
         XCTAssertNil(CollectionScope.allScreensCurrentSpace.screenBounds)
         XCTAssertFalse(CollectionScope.allScreensCurrentSpace.allSpaces)
+        XCTAssertFalse(CollectionScope.allScreensCurrentSpace.includeMinimized)
+        XCTAssertFalse(CollectionScope.allScreensCurrentSpace.includeHidden)
     }
 
     private func ephemeralDefaults() -> UserDefaults {

@@ -23,9 +23,15 @@ struct AppWindows: Equatable, Sendable {
     let windows: [WindowInfo]
 }
 
-/// A raw on-screen window record straight from the system window list, before
-/// any filtering or grouping. Plain values so `WindowEnumerator`'s logic can be
-/// exercised with fixtures and never touches the live window server in tests.
+/// A raw window record straight from the system window list, before any filtering or
+/// grouping. Plain values so `WindowEnumerator`'s logic can be exercised with fixtures and
+/// never touches the live window server in tests.
+///
+/// `isOnscreen`/`isMinimized`/`isHidden` classify a record once a broadened (all-windows)
+/// query has surfaced windows the current-Space query hides (Bringr-93j.50): `isOnscreen`
+/// is the system's "on the active Space, not minimized, not hidden" flag; the other two are
+/// stamped by the live source from AX / `NSRunningApplication`. They default to a plain
+/// on-screen window, so the current-Space query and existing fixtures need not set them.
 struct RawWindow: Equatable, Sendable {
     let windowNumber: Int
     let ownerPID: pid_t
@@ -34,6 +40,36 @@ struct RawWindow: Equatable, Sendable {
     let layer: Int
     let alpha: Double
     let bounds: CGRect
+    let isOnscreen: Bool
+    let isMinimized: Bool
+    let isHidden: Bool
+
+    init(
+        windowNumber: Int, ownerPID: pid_t, ownerName: String, title: String,
+        layer: Int, alpha: Double, bounds: CGRect,
+        isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false
+    ) {
+        self.windowNumber = windowNumber
+        self.ownerPID = ownerPID
+        self.ownerName = ownerName
+        self.title = title
+        self.layer = layer
+        self.alpha = alpha
+        self.bounds = bounds
+        self.isOnscreen = isOnscreen
+        self.isMinimized = isMinimized
+        self.isHidden = isHidden
+    }
+
+    /// A copy carrying the per-window minimized/hidden classification the live source
+    /// resolves after the raw list is parsed (Bringr-93j.50).
+    func classified(isMinimized: Bool, isHidden: Bool) -> RawWindow {
+        RawWindow(
+            windowNumber: windowNumber, ownerPID: ownerPID, ownerName: ownerName, title: title,
+            layer: layer, alpha: alpha, bounds: bounds,
+            isOnscreen: isOnscreen, isMinimized: isMinimized, isHidden: isHidden
+        )
+    }
 }
 
 /// Source of raw on-screen window records, behind a seam (mirrors
@@ -42,11 +78,15 @@ struct RawWindow: Equatable, Sendable {
 /// system dependency and no permission prompt during tests.
 @MainActor
 protocol WindowEnumerationSource {
-    /// Every window record, front-to-back, as the system reports them. `includingAllSpaces`
-    /// widens the query from the current Space to every Space (Bringr-93j.48): only the
-    /// source can do this, because the public window list decides which Spaces it covers at
-    /// query time — there is no per-record Space tag to post-filter on.
-    func rawWindows(includingAllSpaces: Bool) -> [RawWindow]
+    /// Every window record, front-to-back, as the system reports them. `includingOffscreen`
+    /// widens the query beyond the current Space's on-screen windows to also surface the
+    /// off-Space, minimized, and hidden ones (Bringr-93j.48 / Bringr-93j.50): only the source
+    /// can do this, because the public window list decides at query time which windows it
+    /// covers — there is no per-record tag to post-filter on. When broadened, the source also
+    /// classifies each record (`isOnscreen`/`isMinimized`/`isHidden`) so `WindowEnumerator`
+    /// can keep only the categories the caller asked for; the narrow query needs no
+    /// classification (every record is on-screen).
+    func rawWindows(includingOffscreen: Bool) -> [RawWindow]
     /// This process's pid, so Bringr's own windows can be excluded.
     var selfPID: pid_t { get }
 }
@@ -101,11 +141,14 @@ final class WindowEnumerator {
     /// screen the menu was summoned on; an app drops out entirely if none of its windows
     /// are on that display. `nil` spans every display (the menu-bar summon, tests).
     ///
-    /// `allSpaces` widens the underlying query from the current Space to every Space
-    /// (Bringr-93j.48); it is forwarded to the source, since only the window-list query
-    /// decides which Spaces it covers. Independent of `screenBounds`, so a caller can ask
-    /// for, say, every Space on just the current display. Default `false` keeps the
-    /// current-Space behaviour every existing caller and test relies on.
+    /// `allSpaces` spans every Space (virtual desktop) versus only the current one
+    /// (Bringr-93j.48); `includeMinimized` and `includeHidden` additionally keep minimized
+    /// windows and windows of hidden apps (Bringr-93j.50). All three are off by default,
+    /// preserving the current-Space, visible-only behaviour every existing caller and test
+    /// relies on. Any of them widens the source query to all windows (the only way to reach
+    /// those the on-screen query omits) and then a per-window keep-rule drops the categories
+    /// not asked for — so, e.g., turning on `allSpaces` alone no longer drags minimized
+    /// windows along. Independent of `screenBounds`, which still filters geometrically after.
     ///
     /// `recordingRecency` distinguishes the one authoritative summon-time read (the apps
     /// ring) from the per-app sub-wheel re-reads that hover triggers (Bringr-93j.46). Only
@@ -116,11 +159,20 @@ final class WindowEnumerator {
     func enumerate(
         onScreen screenBounds: CGRect? = nil,
         allSpaces: Bool = false,
+        includeMinimized: Bool = false,
+        includeHidden: Bool = false,
         recordingRecency: Bool = false
     ) -> [AppWindows] {
         let start = DispatchTime.now().uptimeNanoseconds
-        let normal = source.rawWindows(includingAllSpaces: allSpaces).filter(isNormalWindow)
-        let onScreen = filter(normal, toScreen: screenBounds)
+        // Any broadening flag needs the all-windows query (the only one that surfaces
+        // off-Space / minimized / hidden windows); with none set, the cheap current-Space
+        // query suffices and every record is already on-screen.
+        let includingOffscreen = allSpaces || includeMinimized || includeHidden
+        let normal = source.rawWindows(includingOffscreen: includingOffscreen).filter(isNormalWindow)
+        let collected = normal.filter {
+            shouldCollect($0, allSpaces: allSpaces, includeMinimized: includeMinimized, includeHidden: includeHidden)
+        }
+        let onScreen = filter(collected, toScreen: screenBounds)
         let grouped = group(onScreen)
         if recordingRecency { recency?.observe(grouped) }
         let result = sorted(grouped)
@@ -128,6 +180,21 @@ final class WindowEnumerator {
         lastDuration = elapsed
         log.debug("Enumerated \(result.count) app(s) in \(Int((elapsed * 1000).rounded())) ms")
         return result
+    }
+
+    /// Whether to keep a (normal) window given the broadening flags (Bringr-93j.50). An
+    /// on-screen window is always kept (the default set). An off-screen one is classified by
+    /// precedence — a hidden app's windows count as hidden even if also minimized, since
+    /// `includeHidden` is meant to bring a whole hidden app back — then kept only if the
+    /// matching flag is on; anything left (off-Space) rides on `allSpaces`. With every flag
+    /// off the source returned only on-screen windows, so this keeps them all unchanged.
+    private func shouldCollect(
+        _ window: RawWindow, allSpaces: Bool, includeMinimized: Bool, includeHidden: Bool
+    ) -> Bool {
+        if window.isOnscreen { return true }
+        if window.isHidden { return includeHidden }
+        if window.isMinimized { return includeMinimized }
+        return allSpaces
     }
 
     private func isNormalWindow(_ window: RawWindow) -> Bool {
@@ -229,22 +296,49 @@ final class WindowEnumerator {
 @MainActor
 final class CGWindowSource: WindowEnumerationSource {
     let selfPID = ProcessInfo.processInfo.processIdentifier
+    /// The live AX / `NSRunningApplication` wrapper, reused only to read per-window minimized
+    /// state and per-app hidden state when classifying a broadened list (Bringr-93j.50). This
+    /// is read-only here; window control mutates its own separate instance.
+    private let stateProbe = LiveWindowSystem()
 
-    func rawWindows(includingAllSpaces: Bool) -> [RawWindow] {
-        // `.optionOnScreenOnly` limits the list to windows visible on the current Space;
-        // dropping it (an all-windows query) is the only public way to reach windows on
-        // other Spaces (Bringr-93j.48). The all-windows form also surfaces minimized
-        // windows — controlling those is the separate Bringr-93j.50 — but the default
-        // current-Space form stays exactly as before.
-        let options: CGWindowListOption = includingAllSpaces
+    func rawWindows(includingOffscreen: Bool) -> [RawWindow] {
+        // `.optionOnScreenOnly` limits the list to windows on the current Space that aren't
+        // minimized or hidden; dropping it (an all-windows query) is the only public way to
+        // reach all three groups (Bringr-93j.48 / Bringr-93j.50). The narrow form is left
+        // exactly as before, so the unbroadened default is unchanged.
+        let options: CGWindowListOption = includingOffscreen
             ? [.excludeDesktopElements]
             : [.optionOnScreenOnly, .excludeDesktopElements]
         guard let infoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
             as? [[String: Any]] else { return [] }
-        return infoList.compactMap(rawWindow(from:))
+        let raws = infoList.compactMap { rawWindow(from: $0, assumeOnscreen: !includingOffscreen) }
+        return includingOffscreen ? classify(raws) : raws
     }
 
-    private func rawWindow(from info: [String: Any]) -> RawWindow? {
+    /// Stamp each broadened record with its minimized/hidden state so the enumerator's
+    /// keep-rule can split off-Space from minimized from hidden. Minimized state comes from
+    /// each app's AX windows (which include minimized ones, and expose the stable window
+    /// number); hidden state is the app's `NSRunningApplication.isHidden`. Done once per
+    /// summon, only when broadened, so the cheap default never pays the AX cost.
+    private func classify(_ raws: [RawWindow]) -> [RawWindow] {
+        var minimizedNumbers: Set<Int> = []
+        var hiddenPIDs: Set<pid_t> = []
+        for pid in Set(raws.map(\.ownerPID)) {
+            let app = AppID(pid: pid)
+            if stateProbe.isHidden(app) { hiddenPIDs.insert(pid) }
+            for window in stateProbe.windows(of: app) where stateProbe.isMinimized(window) {
+                minimizedNumbers.insert(window.token)
+            }
+        }
+        return raws.map {
+            $0.classified(
+                isMinimized: minimizedNumbers.contains($0.windowNumber),
+                isHidden: hiddenPIDs.contains($0.ownerPID)
+            )
+        }
+    }
+
+    private func rawWindow(from info: [String: Any], assumeOnscreen: Bool) -> RawWindow? {
         guard let windowNumber = (info[kCGWindowNumber as String] as? NSNumber)?.intValue,
               let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
               let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue,
@@ -252,6 +346,10 @@ final class CGWindowSource: WindowEnumerationSource {
               let bounds = CGRect(dictionaryRepresentation: boundsDict as CFDictionary)
         else { return nil }
 
+        // The narrow query returns only on-screen windows; the broadened one mixes in
+        // off-screen records, so read the system flag there (absent → off-screen).
+        let isOnscreen = assumeOnscreen
+            || ((info[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false)
         return RawWindow(
             windowNumber: windowNumber,
             ownerPID: ownerPID,
@@ -259,7 +357,8 @@ final class CGWindowSource: WindowEnumerationSource {
             title: (info[kCGWindowName as String] as? String) ?? "",
             layer: layer,
             alpha: (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1,
-            bounds: bounds
+            bounds: bounds,
+            isOnscreen: isOnscreen
         )
     }
 }

@@ -12,6 +12,26 @@ import Foundation
 struct CollectionScope: Equatable, Sendable {
     let screenBounds: CGRect?
     let allSpaces: Bool
+    /// Whether to also gather currently-minimized windows (Bringr-93j.50). Off → minimized
+    /// windows are left out, the prior behaviour. `.optionOnScreenOnly` already drops them,
+    /// so turning this on widens the underlying query (see `WindowEnumerator`).
+    let includeMinimized: Bool
+    /// Whether to also gather windows of hidden apps — Cmd-H'd, including those Bringr's own
+    /// "hide everything else" hid (Bringr-93j.50). Off → such windows are left out, the prior
+    /// behaviour. Like `includeMinimized`, turning it on widens the query.
+    let includeHidden: Bool
+
+    init(
+        screenBounds: CGRect?,
+        allSpaces: Bool,
+        includeMinimized: Bool = false,
+        includeHidden: Bool = false
+    ) {
+        self.screenBounds = screenBounds
+        self.allSpaces = allSpaces
+        self.includeMinimized = includeMinimized
+        self.includeHidden = includeHidden
+    }
 
     /// Every display, current Space only — the unscoped basis (the old `onScreen: nil`,
     /// `.optionOnScreenOnly` behaviour). The fallback when no display resolves, and what
@@ -19,9 +39,11 @@ struct CollectionScope: Equatable, Sendable {
     static let allScreensCurrentSpace = CollectionScope(screenBounds: nil, allSpaces: false)
 }
 
-/// The persisted "where to collect from" settings (Bringr-93j.48): one pair of toggles
-/// per menu level — whether the apps ring and each app's windows sub-wheel span all
-/// displays / all Spaces, or stay on the display and Space the menu was summoned on.
+/// The persisted "where to collect from" settings: one pair of toggles per menu level
+/// (Bringr-93j.48) — whether the apps ring and each app's windows sub-wheel span all
+/// displays / all Spaces, or stay on the display and Space the menu was summoned on —
+/// plus two global flags (Bringr-93j.50) for whether to also gather minimized and hidden
+/// windows at both levels.
 ///
 /// Mirrors `RadialAppearance` — a pure value type bundling several `UserDefaults`-backed
 /// flags behind one `current(from:)`, read fresh at each summon so a Preferences change
@@ -36,6 +58,12 @@ struct CollectionPreferences: Equatable, Sendable {
     /// The second-level windows sub-wheel: span every display? every Space?
     let windowsAllScreens: Bool
     let windowsAllSpaces: Bool
+    /// Global across both levels (Bringr-93j.50), unlike the per-level screen/Space flags
+    /// above: whether collection also gathers minimized windows and windows of hidden apps.
+    /// Both default `false` (left out, as before). Resolved into both `appsScope` and
+    /// `windowsScope`, so the apps ring and windows sub-wheel honour them alike.
+    let includeMinimized: Bool
+    let includeHidden: Bool
 
     /// `UserDefaults` keys — the single source of truth shared by the Preferences
     /// `@AppStorage` bindings and `current(from:)` so the two cannot drift.
@@ -43,27 +71,55 @@ struct CollectionPreferences: Equatable, Sendable {
     static let appsAllSpacesDefaultsKey = "collection.apps.allSpaces"
     static let windowsAllScreensDefaultsKey = "collection.windows.allScreens"
     static let windowsAllSpacesDefaultsKey = "collection.windows.allSpaces"
+    static let includeMinimizedDefaultsKey = "collection.includeMinimized"
+    static let includeHiddenDefaultsKey = "collection.includeHidden"
+
+    init(
+        appsAllScreens: Bool,
+        appsAllSpaces: Bool,
+        windowsAllScreens: Bool,
+        windowsAllSpaces: Bool,
+        includeMinimized: Bool = false,
+        includeHidden: Bool = false
+    ) {
+        self.appsAllScreens = appsAllScreens
+        self.appsAllSpaces = appsAllSpaces
+        self.windowsAllScreens = windowsAllScreens
+        self.windowsAllSpaces = windowsAllSpaces
+        self.includeMinimized = includeMinimized
+        self.includeHidden = includeHidden
+    }
 
     /// The apps ring's scope, resolved against the summon `display`: that display unless
-    /// "all screens" is on, when it becomes `nil` (span every display).
+    /// "all screens" is on, when it becomes `nil` (span every display). The global
+    /// minimized/hidden flags ride along unchanged (Bringr-93j.50).
     func appsScope(forDisplay display: CGRect?) -> CollectionScope {
-        CollectionScope(screenBounds: appsAllScreens ? nil : display, allSpaces: appsAllSpaces)
+        CollectionScope(
+            screenBounds: appsAllScreens ? nil : display, allSpaces: appsAllSpaces,
+            includeMinimized: includeMinimized, includeHidden: includeHidden
+        )
     }
 
     /// The windows sub-wheel's scope, resolved against the summon `display`, mirroring
-    /// `appsScope(forDisplay:)` so the two levels can be scoped independently.
+    /// `appsScope(forDisplay:)` so the two levels can be scoped independently — while the
+    /// global minimized/hidden flags apply identically to both.
     func windowsScope(forDisplay display: CGRect?) -> CollectionScope {
-        CollectionScope(screenBounds: windowsAllScreens ? nil : display, allSpaces: windowsAllSpaces)
+        CollectionScope(
+            screenBounds: windowsAllScreens ? nil : display, allSpaces: windowsAllSpaces,
+            includeMinimized: includeMinimized, includeHidden: includeHidden
+        )
     }
 
     /// The persisted preferences, each flag read fresh and defaulting to `false`
-    /// (stay on the summon screen/Space).
+    /// (stay on the summon screen/Space; leave minimized/hidden windows out).
     static func current(from defaults: UserDefaults = .standard) -> CollectionPreferences {
         CollectionPreferences(
             appsAllScreens: defaults.bool(forKey: appsAllScreensDefaultsKey),
             appsAllSpaces: defaults.bool(forKey: appsAllSpacesDefaultsKey),
             windowsAllScreens: defaults.bool(forKey: windowsAllScreensDefaultsKey),
-            windowsAllSpaces: defaults.bool(forKey: windowsAllSpacesDefaultsKey)
+            windowsAllSpaces: defaults.bool(forKey: windowsAllSpacesDefaultsKey),
+            includeMinimized: defaults.bool(forKey: includeMinimizedDefaultsKey),
+            includeHidden: defaults.bool(forKey: includeHiddenDefaultsKey)
         )
     }
 }

@@ -192,7 +192,9 @@ struct WindowSwitcherMenu: MenuDefinition {
                 // so it records the recent-use order (Bringr-93j.46); the per-app
                 // sub-wheels re-read on hover and must not (`recordingRecency` defaults off).
                 enumerator.enumerate(
-                    onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces, recordingRecency: true
+                    onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces,
+                    includeMinimized: appsScope.includeMinimized, includeHidden: appsScope.includeHidden,
+                    recordingRecency: true
                 ).map {
                     Self.appNode($0, windowsScope: windowsScope, enumerator: enumerator)
                 }
@@ -219,7 +221,8 @@ struct WindowSwitcherMenu: MenuDefinition {
             bundleIdentifier: bundleIdentifier,
             children: .dynamic {
                 let current = enumerator.enumerate(
-                    onScreen: windowsScope.screenBounds, allSpaces: windowsScope.allSpaces
+                    onScreen: windowsScope.screenBounds, allSpaces: windowsScope.allSpaces,
+                    includeMinimized: windowsScope.includeMinimized, includeHidden: windowsScope.includeHidden
                 ).first { $0.id == appID }
                 return (current?.windows ?? []).map { Self.windowNode($0) }
             }

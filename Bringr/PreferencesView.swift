@@ -50,7 +50,7 @@ struct PreferencesView: View {
                 section("Interaction") { interactionSection }
                 section("Reveal") { revealSection }
                 section("Sorting") { sortingSection }
-                section("Screens & Spaces") { collectionSection }
+                section("Collection") { collectionSection }
                 section("My Apps") { myAppsSection }
                 section("Appearance") { appearanceSection }
             }
