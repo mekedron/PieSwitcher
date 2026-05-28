@@ -1,65 +1,5 @@
 import Foundation
 
-/// Identifies a running application by its process id.
-struct AppID: Hashable, Sendable {
-    let pid: pid_t
-}
-
-/// Identifies a window. `token` is the window's `kCGWindowNumber` — the same value the
-/// enumeration service (US-003) uses — so a `WindowID` from `WindowEnumerator` and one
-/// from `LiveWindowSystem` for the same window are equal and interchangeable. `app` ties
-/// it to its owning application; `WindowController` only relies on `Hashable`.
-struct WindowID: Hashable, Sendable {
-    let app: AppID
-    let token: Int
-}
-
-/// The window-system operations `WindowController` needs, behind a seam so the
-/// orchestration logic can be unit-tested with an in-memory fake — no live
-/// Accessibility calls and no real windows during tests. Mirrors the injectable
-/// design of `PermissionsManager`.
-@MainActor
-protocol WindowControlling {
-    /// Apps that are candidates for control (regular apps, excluding Bringr).
-    func runningApps() -> [AppID]
-    /// Windows of `app`, front-to-back.
-    func windows(of app: AppID) -> [WindowID]
-    /// The frontmost app, if any.
-    func frontmostApp() -> AppID?
-
-    func isHidden(_ app: AppID) -> Bool
-    func setHidden(_ app: AppID, _ hidden: Bool)
-    func activate(_ app: AppID)
-
-    func isMinimized(_ window: WindowID) -> Bool
-    func setMinimized(_ window: WindowID, _ minimized: Bool)
-    /// Bring `window` to the front within its application.
-    func raise(_ window: WindowID)
-    /// Make `window` main and focused (its app should already be active).
-    func focusWindow(_ window: WindowID)
-    /// The window's frame in AppKit-global coordinates (bottom-left origin, y-up),
-    /// or `nil` if it can't be resolved — used to cut the target out of the dim
-    /// overlay (US-013 dim-others).
-    func frame(of window: WindowID) -> CGRect?
-
-    /// The window's top-left in its native (y-down) space, or `nil`. Captured before
-    /// parking a window off-screen so it can be moved back exactly (Bringr-93j.24);
-    /// not flipped to AppKit-global like `frame(of:)`, since capture and park share it.
-    func position(of window: WindowID) -> CGPoint?
-    /// Move `window`'s top-left to `point` (same space as `position(of:)`). Instant,
-    /// unlike AX minimize's slow genie animation — the window-level hide-others reveal
-    /// parks the app's other windows off-screen with this instead (Bringr-93j.24).
-    func setPosition(_ window: WindowID, _ point: CGPoint)
-
-    /// The window's size, or `nil`. Captured with `position(of:)` so a parked window's
-    /// exact frame can be restored: macOS clamps a window's height when it's moved off
-    /// the bottom of every screen, so position alone leaves it shorter (Bringr-93j.28).
-    func size(of window: WindowID) -> CGSize?
-    /// Set `window`'s size (anchored at its top-left), undoing that off-screen height
-    /// clamp on restore (Bringr-93j.28).
-    func setSize(_ window: WindowID, _ size: CGSize)
-}
-
 /// Low-level window/app control primitives that the reveal strategies (US-013) and
 /// selection (US-012) build on. Every mutating primitive captures the pre-mutation
 /// state it touches once per session; `restore()` replays that baseline, returning to
@@ -98,6 +38,10 @@ final class WindowController {
     private let dimmer: Dimming?
     /// The reveal strategy for the current summon, held so a Preferences change can't switch it mid-reveal.
     private var strategy: RevealStrategy = .default
+    /// Whether a commit should clear every other app/window off the screen, leaving only the
+    /// selection (Bringr-93j.27). Held for the summon like `strategy`, so a Preferences change
+    /// can't flip it mid-interaction.
+    private var hideOnCommit = false
     private var session: Session?
 
     init(system: WindowControlling? = nil, store: RevealStateStore? = nil, dimmer: Dimming? = nil) {
@@ -110,6 +54,12 @@ final class WindowController {
     /// isolate call; restore undoes whatever the active strategy did.
     func setStrategy(_ strategy: RevealStrategy) {
         self.strategy = strategy
+    }
+
+    /// Enable/disable "leave only my selection on screen" for the next summon
+    /// (Bringr-93j.27). Set once per summon before commit, mirroring `setStrategy`.
+    func setHideOnCommit(_ enabled: Bool) {
+        hideOnCommit = enabled
     }
 
     /// Whether a capture/restore session is currently open.
@@ -142,6 +92,7 @@ final class WindowController {
         _ = system.windows(of: window.app)
         system.setMinimized(window, false)
         raiseAndFocus(window)
+        if hideOnCommit { clearEverythingElse(keeping: window) }
     }
 
     /// Commit `app` as the user's choice from the first-level apps ring. This is
@@ -152,8 +103,37 @@ final class WindowController {
         if let frontWindow = system.windows(of: app).first {
             system.setMinimized(frontWindow, false)
             raiseAndFocus(frontWindow)
+            // "Leave only my selection" at the app level clears everything else away too,
+            // down to just this app's front window (Bringr-93j.27).
+            if hideOnCommit { clearEverythingElse(keeping: frontWindow) }
         } else {
             system.activate(app)
+            // No window to keep — still hide the other apps so only the chosen one remains.
+            if hideOnCommit { hideEveryAppExcept(app) }
+        }
+    }
+
+    // MARK: - Leave-only-my-selection on commit (Bringr-93j.27)
+
+    /// Sweep every other app/window off the screen so only `window` remains: hide every
+    /// other app (Cmd-H) and minimize this app's other windows. Runs after `commit` has
+    /// already restored the reveal and ended the session, so these are deliberate,
+    /// permanent, user-recoverable state changes — not journaled and never auto-undone,
+    /// unlike the reveal's temporary off-screen park. Re-enumerating the app first refills
+    /// the AX element cache so the minimize calls resolve.
+    private func clearEverythingElse(keeping window: WindowID) {
+        hideEveryAppExcept(window.app)
+        for other in system.windows(of: window.app)
+        where other != window && !system.isMinimized(other) {
+            system.setMinimized(other, true)
+        }
+    }
+
+    /// Hide every app except `target` (Cmd-H), skipping those already hidden. The permanent,
+    /// outside-a-session counterpart to `hideOtherApps`, which captures a baseline to restore.
+    private func hideEveryAppExcept(_ target: AppID) {
+        for app in system.runningApps() where app != target && !system.isHidden(app) {
+            system.setHidden(app, true)
         }
     }
 

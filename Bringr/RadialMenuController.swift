@@ -52,6 +52,10 @@ final class RadialMenuController: ObservableObject {
     /// Reads the persisted second-level cursor-lock setting at summon time, mirroring
     /// `modeProvider`, so a Preferences change applies on the next summon (Bringr-93j.29).
     private let cursorLockProvider: () -> Bool
+    /// Reads the persisted "leave only my selection on screen" setting at summon time,
+    /// mirroring `modeProvider`, so a Preferences change applies on the next summon
+    /// without a relaunch (Bringr-93j.27).
+    private let hideOnCommitProvider: () -> Bool
     /// The last global cursor position seen inside the cursor-lock region while it is
     /// engaged — the point a rejected (out-of-region) move is snapped back to. Refreshed
     /// on every allowed move, so it is always a valid in-region anchor (Bringr-93j.29).
@@ -82,6 +86,7 @@ final class RadialMenuController: ObservableObject {
         appearanceProvider: @escaping () -> RadialAppearance = { RadialAppearance.current() },
         strategyProvider: @escaping () -> RevealStrategy = { RevealStrategy.current() },
         cursorLockProvider: @escaping () -> Bool = { CursorLock.isEnabled() },
+        hideOnCommitProvider: @escaping () -> Bool = { HideOnCommit.isEnabled() },
         monitorInstaller: EventMonitorInstaller = .live
     ) {
         self.registry = registry
@@ -89,6 +94,7 @@ final class RadialMenuController: ObservableObject {
         self.appearanceProvider = appearanceProvider
         self.strategyProvider = strategyProvider
         self.cursorLockProvider = cursorLockProvider
+        self.hideOnCommitProvider = hideOnCommitProvider
         self.monitorInstaller = monitorInstaller
         self.navigator = RadialNavigator(
             windowControl: windowControl ?? WindowController(),
@@ -180,6 +186,9 @@ final class RadialMenuController: ObservableObject {
         navigator.setRevealStrategy(strategyProvider())
         // Apply the persisted second-level cursor-lock setting for this summon (Bringr-93j.29).
         navigator.setCursorLockEnabled(cursorLockProvider())
+        // Apply the persisted "leave only my selection on screen" setting for this summon
+        // so a commit can clear everything else away (Bringr-93j.27).
+        navigator.setHideOnCommitEnabled(hideOnCommitProvider())
         navigator.open(appNodes: root.resolvedChildren())
         syncFromNavigator()
         let side = navigator.overallDiameter

@@ -94,6 +94,42 @@ final class RadialNavigatorCommitTests: XCTestCase {
         XCTAssertEqual(fixture.navigator.rings.count, 2)
     }
 
+    // MARK: - Bringr-93j.27: "leave only my selection on screen" forwarded through commit
+
+    func testWindowCommitWithHideOnCommitClearsEverythingElseAway() {
+        let fixture = makeFixture()
+        fixture.navigator.setHideOnCommitEnabled(true)
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome isolated
+        fixture.navigator.updateHover(.slice(level: 1, index: 1)) // Docs isolated
+
+        let committed = fixture.navigator.commit(.slice(level: 1, index: 1))
+
+        XCTAssertEqual(committed, .window(WindowID(app: AppID(pid: 10), token: 12)))
+        XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 10), token: 12))
+        // Only the chosen window remains: the other apps stay hidden and Chrome's other
+        // window is minimized — the reveal's restore is overridden by the clear-on-commit.
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20)))
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 30)))
+        XCTAssertTrue(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
+        XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 12)))
+    }
+
+    func testAppCommitWithHideOnCommitHidesTheOtherApps() {
+        let fixture = makeFixture()
+        fixture.navigator.setHideOnCommitEnabled(true)
+        fixture.navigator.open(appNodes: fixture.appNodes)
+        fixture.navigator.updateHover(.slice(level: 0, index: 1)) // Ghostty expanded
+
+        let committed = fixture.navigator.commit(.slice(level: 0, index: 1))
+
+        XCTAssertEqual(committed, .app(AppID(pid: 20)))
+        XCTAssertEqual(fixture.fake.frontmost, AppID(pid: 20))
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 10)))
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 30)))
+        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
+    }
+
     // MARK: - AC4: pre-highlight the app's remembered window on expand
 
     func testExpandingAnAppPreHighlightsItsRememberedWindow() {

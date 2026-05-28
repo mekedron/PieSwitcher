@@ -141,6 +141,12 @@ final class RadialNavigator {
         windowControl.setStrategy(strategy)
     }
 
+    /// Enable/disable "leave only my selection on screen" for the next summon, pushed in
+    /// per summon like `setRevealStrategy`; forwarded to `WindowController` (Bringr-93j.27).
+    func setHideOnCommitEnabled(_ enabled: Bool) {
+        windowControl.setHideOnCommit(enabled)
+    }
+
     /// Enable or disable the optional second-level cursor lock for the next summon
     /// (Bringr-93j.29). Read fresh from the persisted setting just before `open`
     /// (mirroring `setRevealStrategy`), so a Preferences change applies on the next
