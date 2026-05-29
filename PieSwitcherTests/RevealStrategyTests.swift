@@ -106,11 +106,14 @@ final class RevealStrategyTests: XCTestCase {
         ], "restore returns the original front-to-back order")
     }
 
-    func testRaiseToFrontCommitReturnsPreviewedWindowsToTheirOriginalOrder() {
-        // Raise-to-front leaves each hovered window raised (nothing parked/hidden), so
-        // browsing the sub-wheel drifts the live order. Committing a *different* window
-        // must drop the windows hovered along the way back to their pre-summon order
-        // behind the choice, not leave them stacked in hover order (Bringr-93j.47).
+    func testRaiseToFrontCommitLeavesPreviewedWindowsInHoverDriftOrder() {
+        // Bringr-93j.88: preview = commit. Raise-to-front leaves each hovered window
+        // raised (nothing parked/hidden), so browsing the sub-wheel drifts the live
+        // order. Commit no longer restores the pre-summon order on top of the choice —
+        // the hover-drift order is the final order (the choice raised, then whichever
+        // sibling was raised most recently behind it). This obsoletes the .47 "siblings
+        // return to original order on commit" behaviour: preview = commit, restore is
+        // reserved for cancel paths.
         let appA = AppID(pid: 1)
         let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11, 12])], frontmost: appA)
         let controller = WindowController(system: fake)
@@ -125,9 +128,9 @@ final class RevealStrategyTests: XCTestCase {
 
         controller.commit(w11)
 
-        // Chosen window on top; w10 sits ahead of w12 again — their pre-summon order —
-        // rather than w12 staying raised from the preview.
-        XCTAssertEqual(fake.windows(of: appA), [w11, w10, w12])
+        // Chosen window on top; w12 stays raised from the preview behind it (hover-
+        // drift order), w10 last — the pre-summon order is NOT reinstated.
+        XCTAssertEqual(fake.windows(of: appA), [w11, w12, w10])
         XCTAssertEqual(fake.focusedWindow, w11)
     }
 

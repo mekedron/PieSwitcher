@@ -149,9 +149,9 @@ final class WindowControlTests: XCTestCase {
         XCTAssertFalse(fake.isHidden(AppID(pid: 1)))
     }
 
-    // MARK: - US-012 commit: restore everything else, then raise + focus the target
+    // MARK: - US-012 commit: raise + focus the target; reveal state IS the final state (Bringr-93j.88)
 
-    func testCommitRestoresOthersThenRaisesAndFocusesTarget() {
+    func testCommitRaisesAndFocusesTargetAndKeepsRevealStateAsFinal() {
         let appA = AppID(pid: 1)
         let target = WindowID(app: appA, token: 11)
         let fake = FakeWindowSystem(
@@ -166,10 +166,12 @@ final class WindowControlTests: XCTestCase {
 
         controller.commit(target)
 
-        // AC2: every app moved out of the way is restored, session ended.
-        XCTAssertFalse(fake.isHidden(AppID(pid: 2)))
+        // Bringr-93j.88: preview = commit. App 2 was hidden by the reveal and STAYS
+        // hidden; the session ends without unhiding it. Only cancel restores. AC1: the
+        // target is raised, focused, and its app active.
+        XCTAssertTrue(fake.isHidden(AppID(pid: 2)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
         XCTAssertFalse(controller.hasActiveSession)
-        // AC1: the target is raised, focused, and its app active — over the restore.
         XCTAssertEqual(fake.frontmost, appA)
         XCTAssertEqual(fake.focusedWindow, target)
         XCTAssertEqual(fake.windows(of: appA).first, target)
@@ -241,9 +243,12 @@ final class WindowControlTests: XCTestCase {
         XCTAssertEqual(fake.windows(of: target).first, targetWindow)
     }
 
-    func testCommitFocusesTargetAfterRestoredFrontSiblingIsRaised() {
+    func testCommitRaisesTargetBeforeActivatingItsApp() {
+        // Bringr-93j.18 race guard: the target window must be AX-raised before app
+        // activation, so async activation can't bury the choice. (The earlier .47
+        // sibling-restore order assertion no longer applies: under Bringr-93j.88,
+        // commit doesn't restore the window baseline — the hover-drift order stays.)
         let appA = AppID(pid: 1)
-        let frontSibling = WindowID(app: appA, token: 10)
         let target = WindowID(app: appA, token: 11)
         let fake = FakeWindowSystem(
             apps: [makeApp(1, windowTokens: [10, 11])],
@@ -268,11 +273,6 @@ final class WindowControlTests: XCTestCase {
             operations.firstIndex(of: .raise(target)) ?? -1,
             operations.firstIndex(of: .activate(appA)) ?? -1,
             "selected window must be AX-raised before app activation"
-        )
-        XCTAssertLessThan(
-            operations.firstIndex(of: .raise(frontSibling)) ?? -1,
-            operations.lastIndex(of: .raise(target)) ?? -1,
-            "the restored original front sibling must be raised before the chosen window wins"
         )
     }
 

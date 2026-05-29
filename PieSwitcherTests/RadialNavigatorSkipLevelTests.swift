@@ -60,8 +60,10 @@ final class RadialNavigatorSkipLevelTests: XCTestCase {
         let result = fixture.navigator.commit(.slice(level: 0, index: 1))
 
         XCTAssertEqual(result, .app(AppID(pid: 20)))
-        // Everything moved out of the way is restored on commit.
-        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 10)))
+        // Bringr-93j.88: preview = commit. The default hide-others reveal hid Chrome
+        // (pid 10); commit keeps it hidden — only cancel restores.
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 10)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
         XCTAssertTrue(fixture.navigator.rings.isEmpty)
     }
 

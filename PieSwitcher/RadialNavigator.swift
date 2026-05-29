@@ -257,11 +257,11 @@ final class RadialNavigator {
 
         // A curated entry with no window to focus (not running, or running window-less)
         // launches by bundle id instead of activating a front window (Bringr-93j.39).
-        // Restore first so any reveal left from hovering other apps is undone — this
-        // node carried no pid, so its own hover never revealed anything — then start it;
-        // the launched app comes forward on its own.
+        // End the session without restoring (preview = commit, Bringr-93j.88) — any
+        // reveal left from hovering other apps stays as-is, and the launched app comes
+        // forward on its own.
         if case .launchApp(let bundleIdentifier) = appNode.action {
-            windowControl.restore()
+            windowControl.endSession()
             appLauncher.launch(bundleIdentifier: bundleIdentifier)
             clearState()
             return .launch(bundleIdentifier: bundleIdentifier)

@@ -33,7 +33,11 @@ final class RadialNavigatorLaunchTests: XCTestCase {
         XCTAssertNil(navigator.expandedAppIndex)
     }
 
-    func testLaunchCommitRestoresAppsRevealedByHoveringOtherSlicesFirst() {
+    func testLaunchCommitEndsSessionWithoutRestoringRevealedApps() {
+        // Bringr-93j.88: preview = commit. A launch slice ends the session WITHOUT
+        // restoring the apps a prior hover revealed — the launched app comes forward
+        // on its own, and any reveal state (hidden apps, raised windows) stays as the
+        // final state. Only cancel paths call restore now.
         let launcher = FakeAppLauncher()
         let fake = FakeWindowSystem(
             apps: [
@@ -59,7 +63,8 @@ final class RadialNavigatorLaunchTests: XCTestCase {
 
         XCTAssertEqual(committed, .launch(bundleIdentifier: "com.example.calendar"))
         XCTAssertEqual(launcher.launched, ["com.example.calendar"])
-        XCTAssertFalse(fake.isHidden(AppID(pid: 20)), "the launch commit restored the hidden app first")
+        XCTAssertTrue(fake.isHidden(AppID(pid: 20)),
+                      "Bringr-93j.88: launch commit no longer unhides apps the reveal hid")
         XCTAssertTrue(navigator.rings.isEmpty)
     }
 

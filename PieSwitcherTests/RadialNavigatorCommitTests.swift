@@ -13,9 +13,9 @@ import XCTest
 @MainActor
 final class RadialNavigatorCommitTests: XCTestCase {
 
-    // MARK: - AC1/AC2/AC3: commit a window — focus, restore, remember
+    // MARK: - AC1/AC3: commit a window — focus, remember; reveal state stays (Bringr-93j.88)
 
-    func testCommittingAWindowRaisesItRestoresOthersClearsAndRemembers() {
+    func testCommittingAWindowRaisesItKeepsRevealStateClearsAndRemembers() {
         let fixture = makeFixture()
         fixture.navigator.open(appNodes: fixture.appNodes)
         fixture.navigator.updateHover(.slice(level: 0, index: 0)) // Chrome isolated
@@ -27,10 +27,14 @@ final class RadialNavigatorCommitTests: XCTestCase {
         XCTAssertEqual(committed, .window(WindowID(app: AppID(pid: 10), token: 12)))
         XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 10), token: 12))
         XCTAssertEqual(fixture.fake.frontmost, AppID(pid: 10))
-        // AC2: the other apps are restored; no window-level reveal parks/minimizes
-        // siblings now, so the app's other window stayed on-screen throughout.
-        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 20)))
-        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 30)))
+        // Bringr-93j.88: preview = commit. The default hide-others reveal hid the
+        // other apps; commit leaves them hidden — only cancel restores. The chosen
+        // app's other window stayed on-screen throughout (Bringr-93j.83 — no window-
+        // level parking/minimizing) so it's still visible (not minimized).
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 20)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 30)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
         XCTAssertFalse(fixture.fake.isMinimized(WindowID(app: AppID(pid: 10), token: 11)))
         // The wheel is cleared and the session ended.
         XCTAssertTrue(fixture.navigator.rings.isEmpty)
@@ -69,24 +73,26 @@ final class RadialNavigatorCommitTests: XCTestCase {
         XCTAssertEqual(committed, .app(AppID(pid: 20)))
         XCTAssertEqual(fixture.fake.frontmost, AppID(pid: 20))
         XCTAssertEqual(fixture.fake.focusedWindow, WindowID(app: AppID(pid: 20), token: 21))
-        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 10)))
-        XCTAssertFalse(fixture.fake.isHidden(AppID(pid: 30)))
+        // Bringr-93j.88: preview = commit. The default hide-others reveal hid Chrome
+        // (pid 10) and the windowless app (pid 30); commit keeps them hidden — only
+        // cancel restores. This also obsoletes the Bringr-93j.86 "blink" entirely:
+        // no unhide runs on commit, so no flash is possible.
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 10)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
+        XCTAssertTrue(fixture.fake.isHidden(AppID(pid: 30)),
+                      "Bringr-93j.88: commit no longer unhides apps the reveal hid")
         XCTAssertNil(fixture.store.remembered(forAppName: "Ghostty"))
         XCTAssertTrue(fixture.navigator.rings.isEmpty)
         XCTAssertFalse(fixture.fake.activationLog.contains(AppID(pid: 10)))
         XCTAssertTrue(fixture.fake.activationLog.allSatisfy { $0 == AppID(pid: 20) })
-        // Bringr-93j.86 (blink fix): target activation now comes BEFORE unhiding the
-        // other apps. Restoring first was the cause of the visible flash on every commit
-        // — every hidden app appeared for a frame before the chosen one was raised. With
-        // the new order the chosen window is already on top when others reappear behind
-        // it. Correctness (the chosen app still wins) is covered by the frontmost +
-        // activationLog assertions above; this guards the new order so a regression that
-        // re-introduces the blink also flips this assertion.
-        XCTAssertLessThan(
-            operations.firstIndex(of: .activate(AppID(pid: 20))) ?? -1,
-            operations.firstIndex(of: .setHidden(AppID(pid: 10), false)) ?? -1,
-            "post-Bringr-93j.86: target activation must precede unhiding the hidden apps"
-        )
+        // Regression guard: commit must never emit a `setHidden(_, false)` for an app
+        // the reveal had hidden — that's what produced both the .86 blink and the .88
+        // "extra apps raised on top" bug. Asserting the absence (not an order) makes
+        // this hold regardless of iteration / ordering details.
+        XCTAssertFalse(operations.contains(.setHidden(AppID(pid: 10), false)),
+                       "Bringr-93j.88: commit must not unhide an app the reveal hid")
+        XCTAssertFalse(operations.contains(.setHidden(AppID(pid: 30), false)),
+                       "Bringr-93j.88: commit must not unhide an app the reveal hid")
     }
 
     func testCommitReturnsNilForDeadZoneWithoutTouchingState() {
