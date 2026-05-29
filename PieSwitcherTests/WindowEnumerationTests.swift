@@ -55,16 +55,23 @@ final class WindowEnumerationTests: XCTestCase {
         XCTAssertEqual(apps.map(\.id), [AppID(pid: 10)])
     }
 
-    // MARK: - AC3: excludes PieSwitcher itself
+    // MARK: - AC3 / Bringr-93j.82: own windows appear only while a Dock app
 
-    func testExcludesOwnWindows() {
-        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
-            raw(number: 1, pid: selfPID, name: "PieSwitcher"),
+    func testOwnWindowAppearsOnlyWhenItIsADockApp() {
+        // Menu-bar-only (accessory): our window isn't a Dock app — dropped, like our overlay.
+        let accessory = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: selfPID, name: "PieSwitcher", isDockApp: false),
             raw(number: 2, pid: 10, name: "Chrome")
         ])
-        let apps = WindowEnumerator(source: source).enumerate()
+        XCTAssertEqual(WindowEnumerator(source: accessory).enumerate().map(\.id), [AppID(pid: 10)])
 
-        XCTAssertEqual(apps.map(\.id), [AppID(pid: 10)])
+        // Preferences/About open → Dock icon shown (Bringr-93j.82): our window is a Dock app
+        // and appears in the wheel like any other app's.
+        let regular = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
+            raw(number: 1, pid: selfPID, name: "PieSwitcher", isDockApp: true),
+            raw(number: 2, pid: 10, name: "Chrome")
+        ])
+        XCTAssertEqual(WindowEnumerator(source: regular).enumerate().map(\.id), [AppID(pid: selfPID), AppID(pid: 10)])
     }
 
     // MARK: - AC2: stable identifier, title, owning app
@@ -304,7 +311,7 @@ final class WindowEnumerationTests: XCTestCase {
         y: CGFloat = 0,
         width: CGFloat = 800,
         height: CGFloat = 600,
-        isManagedWindow: Bool = false
+        isDockApp: Bool = true, isManagedWindow: Bool = false
     ) -> RawWindow {
         RawWindow(
             windowNumber: number,
@@ -314,7 +321,7 @@ final class WindowEnumerationTests: XCTestCase {
             layer: layer,
             alpha: alpha,
             bounds: CGRect(x: x, y: y, width: width, height: height),
-            isManagedWindow: isManagedWindow
+            isDockApp: isDockApp, isManagedWindow: isManagedWindow
         )
     }
 }

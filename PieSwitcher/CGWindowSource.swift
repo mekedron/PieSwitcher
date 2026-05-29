@@ -28,9 +28,15 @@ final class CGWindowSource: WindowEnumerationSource {
         // The Dock apps (regular activation policy) currently running — the only apps the
         // wheel shows. Stamped onto every record so the enumerator can drop the rest, on the
         // narrow path too, so "all screens" alone is filtered even though it doesn't broaden
-        // the query (Bringr-93j.51). One workspace scan, reusing `runningApps()`' `.regular`
-        // rule, regardless of window count.
-        let dockPIDs = Set(stateProbe.runningApps().map(\.pid))
+        // the query (Bringr-93j.51). One workspace scan, regardless of window count. Unlike the
+        // control path's `runningApps()` this keeps PieSwitcher itself: while a Dock-worthy
+        // window (Preferences/About) is open its policy is `.regular` (Bringr-93j.45), so that
+        // window appears in the pie like any other app's (Bringr-93j.82).
+        let dockPIDs = Set(
+            NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular }
+                .map(\.processIdentifier)
+        )
         let ignoredPIDs = ignoredPIDs()
         let raws = infoList.compactMap {
             rawWindow(

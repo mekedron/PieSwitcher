@@ -103,7 +103,7 @@ final class WindowEnumerator {
     }
 
     /// Apps that currently own at least one normal, on-screen window, each with
-    /// its windows front-to-back. Excludes PieSwitcher itself and apps whose only
+    /// its windows front-to-back. Excludes PieSwitcher's overlay and apps whose only
     /// on-screen surfaces are non-normal (menu-bar items, panels, agents).
     ///
     /// `screenBounds` restricts the result to one display (Bringr-93j.30): when set,
@@ -296,7 +296,10 @@ final class WindowEnumerator {
     }
 
     private func isNormalWindow(_ window: RawWindow) -> Bool {
-        window.ownerPID != source.selfPID
+        // Keep our own windows out — except a Dock-worthy one (Preferences/About), a real
+        // focusable window that should appear like any Dock app's (Bringr-93j.82); the overlay
+        // and dim panels aren't layer 0, so the `layer == 0` check below drops them regardless.
+        (window.ownerPID != source.selfPID || window.isDockApp)
             && window.layer == 0
             && window.alpha > 0
             && !window.ownerName.isEmpty
