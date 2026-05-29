@@ -1,47 +1,73 @@
 import AppKit
 import SwiftUI
 
-/// Renders the radial wheel: one concentric ring per navigation level (apps, then
-/// the hovered app's windows sub-wheel), each slice drawn as macOS Liquid Glass.
-/// The hovered slice is emphasised. No animations — wedges and labels are placed
-/// directly from the tested `RadialLayout` geometry.
+/// Renders the radial wheel as three strictly separated z-layers, in this order:
 ///
-/// The look is deliberately neutral glass rather than a tinted accent: a translucent
-/// frosted ring with adaptive (`.primary`) rims and high-contrast labels, so the
-/// wheel reads on any desktop without leaning on a saturated colour.
+///   1. **Glass backdrop** — one continuous Liquid Glass shape *per ring* (the union
+///      of that ring's wedges), blended in a single `GlassEffectContainer`.
+///   2. **Structure + emphasis** — per-slice hairline separators and the hover /
+///      pre-highlight cue, drawn on top of the glass.
+///   3. **Content** — app icons and labels, drawn last so they are always sharp.
+///
+/// The layering is load-bearing, not cosmetic. Liquid Glass *blurs whatever is behind
+/// it*, and a `GlassEffectContainer` *merges adjacent glass shapes at rest*. The prior
+/// design applied `.glassEffect` per wedge and interleaved each wedge with its label,
+/// so (a) 8+ touching wedge-glasses morphed into one another — a stray wedge bulged
+/// out of the ring — and (b) every icon sat *behind* a neighbouring wedge's glass and
+/// was smeared. Collapsing each ring to a single glass shape removes the merge, and
+/// hoisting all content above all glass keeps icons and text crisp.
+///
+/// No animations. Wedge geometry comes straight from the tested `RadialLayout`, shared
+/// with hit-testing, so rendering and selection can never desync.
 struct RadialMenuView: View {
     @ObservedObject var controller: RadialMenuController
 
     var body: some View {
         let diameter = controller.overallDiameter
 
-        rings
-            .frame(width: diameter, height: diameter)
-            .contentShape(Rectangle())
-            // A zero-distance drag reports the click location so the controller can map
-            // it to a slice (click-to-stay select) or the dead zone (cancel).
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onEnded { value in controller.clickInOverlay(atLocalPoint: value.location) }
-            )
+        ZStack {
+            glass
+            emphasis
+            content
+        }
+        .frame(width: diameter, height: diameter)
+        .contentShape(Rectangle())
+        // A zero-distance drag reports the click location so the controller can map
+        // it to a slice (click-to-stay select) or the dead zone (cancel).
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onEnded { value in controller.clickInOverlay(atLocalPoint: value.location) }
+        )
     }
 
-    /// Every concentric ring, wrapped in a `GlassEffectContainer` on macOS 26+ so the
-    /// per-slice glass blends into one continuous frosted ring and renders efficiently.
-    /// Before macOS 26 the same ring stack renders with a material fallback.
+    /// Layer 1 — the glass. One shape per ring keeps each ring a *single* glass
+    /// element, so the container only ever blends the (concentric, abutting) ring
+    /// annuli into one continuous frosted surface — never a field of wedges that
+    /// morph apart. A cohesive drop shadow seats the whole wheel as a floating glass
+    /// object so its silhouette reads on any desktop.
+    private var glass: some View {
+        glassRings.shadow(color: .black.opacity(0.28), radius: 10, y: 3)
+    }
+
     @ViewBuilder
-    private var rings: some View {
+    private var glassRings: some View {
         if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: 2) { ringStack }
+            GlassEffectContainer(spacing: 0) {
+                ForEach(controller.rings) { ring in RadialRingGlass(ring: ring) }
+            }
         } else {
-            ringStack
+            ZStack {
+                ForEach(controller.rings) { ring in RadialRingGlass(ring: ring) }
+            }
         }
     }
 
-    private var ringStack: some View {
+    /// Layer 2 — per-slice separators and the hover / pre-highlight cue, above the
+    /// glass and below the content.
+    private var emphasis: some View {
         ZStack {
             ForEach(controller.rings) { ring in
-                RadialRingView(
+                RadialRingEmphasis(
                     ring: ring,
                     hovered: controller.hovered,
                     prehighlighted: controller.prehighlighted,
@@ -50,94 +76,113 @@ struct RadialMenuView: View {
             }
         }
     }
-}
 
-/// One concentric ring: a glass wedge + label per node. The hovered slice gets the
-/// strongest emphasis; a pre-highlighted slice (the app's remembered last selection)
-/// gets a medium emphasis so the suggested choice reads before the cursor reaches it
-/// (US-012 AC4).
-struct RadialRingView: View {
-    let ring: RadialRing
-    let hovered: HoverRegion
-    let prehighlighted: HoverRegion
-    let appearance: RadialAppearance
-
-    var body: some View {
-        let layout = ring.layout
-
+    /// Layer 3 — sharp icons and labels, on top of everything so the glass never
+    /// blurs them.
+    private var content: some View {
         ZStack {
-            ForEach(Array(ring.nodes.enumerated()), id: \.element.id) { index, node in
-                let region = HoverRegion.slice(level: ring.level, index: index)
-                let isHovered = hovered == region
-                let isPrehighlighted = !isHovered && prehighlighted == region
-
-                RadialGlassWedge(
-                    layout: layout,
-                    index: index,
-                    fillOpacity: appearance.fillOpacity(hovered: isHovered, prehighlighted: isPrehighlighted),
-                    emphasis: emphasis(hovered: isHovered, prehighlighted: isPrehighlighted)
-                )
-
-                RadialSliceLabel(node: node, index: index, showsLabels: appearance.showsLabels)
-                    .offset(
-                        x: layout.sliceCenterOffset(at: index).x,
-                        y: layout.sliceCenterOffset(at: index).y
-                    )
+            ForEach(controller.rings) { ring in
+                RadialRingContent(ring: ring, showsLabels: controller.appearance.showsLabels)
             }
         }
     }
-
-    private func emphasis(hovered: Bool, prehighlighted: Bool) -> RadialGlassWedge.Emphasis {
-        if hovered { return .hovered }
-        if prehighlighted { return .prehighlighted }
-        return .resting
-    }
 }
 
-/// One slice rendered as Liquid Glass: a translucent glass base clipped to the
-/// wedge, a neutral (white) "lit" fill whose strength is the emphasis opacity — so
-/// US-014's single opacity knob still tunes the whole resting/pre-highlight/hover
-/// ladder — and an adaptive `.primary` rim that separates slices and carries the
-/// selection cue independently of the fill's luminance, so it reads in light and
-/// dark alike. No accent-blue and no animation. Falls back to `.ultraThinMaterial`
+/// The Liquid Glass backdrop for one ring: glass clipped to the union of that ring's
+/// wedges (an annulus, or annulus-with-gaps for an uneven window sub-wheel), so it is
+/// exactly one glass element. `Color.clear` carries the effect because glass is a
+/// backdrop layer, independent of content alpha. Falls back to `.ultraThinMaterial`
 /// before macOS 26.
-struct RadialGlassWedge: View {
-    enum Emphasis { case resting, prehighlighted, hovered }
-
-    let layout: RadialLayout
-    let index: Int
-    let fillOpacity: Double
-    let emphasis: Emphasis
+struct RadialRingGlass: View {
+    let ring: RadialRing
 
     var body: some View {
-        let shape = RadialWedge(layout: layout, index: index)
-
-        glassBase(in: shape)
-            .overlay(shape.fill(Color.white.opacity(fillOpacity)))
-            .overlay(shape.stroke(rimColor, lineWidth: rimWidth))
-    }
-
-    @ViewBuilder
-    private func glassBase(in shape: RadialWedge) -> some View {
+        let shape = RadialRingShape(layout: ring.layout)
         if #available(macOS 26.0, *) {
             Color.clear.glassEffect(.regular, in: shape)
         } else {
             Color.clear.background(.ultraThinMaterial, in: shape)
         }
     }
+}
 
-    /// Adaptive rim: `.primary` flips with the appearance, so the outline always
-    /// contrasts the glass beneath. Hover is the strongest cue, pre-highlight next.
-    private var rimColor: Color {
-        switch emphasis {
-        case .resting: return Color.primary.opacity(0.15)
-        case .prehighlighted: return Color.primary.opacity(0.5)
-        case .hovered: return Color.primary.opacity(0.7)
+/// One ring's structure and emphasis, drawn over the glass: every slice gets a faint
+/// adaptive hairline so the wheel reads as discrete slices, and the hovered (then
+/// pre-highlighted) slice gets a brighter `.primary` rim plus a stronger "lit" white
+/// fill. The fill strength is the *unchanged* `RadialAppearance` opacity ladder, so
+/// US-014's single opacity knob still tunes resting/pre-highlight/hover together. The
+/// rim is adaptive `.primary` (flips with light/dark) so the selection cue contrasts
+/// the glass in either appearance; both fill and rim are clipped to the wedge, so the
+/// cue can never spill past the slice it marks.
+struct RadialRingEmphasis: View {
+    let ring: RadialRing
+    let hovered: HoverRegion
+    let prehighlighted: HoverRegion
+    let appearance: RadialAppearance
+
+    var body: some View {
+        ZStack {
+            ForEach(ring.nodes.indices, id: \.self) { index in
+                let region = HoverRegion.slice(level: ring.level, index: index)
+                let isHovered = hovered == region
+                let isPrehighlighted = !isHovered && prehighlighted == region
+                let wedge = RadialWedge(layout: ring.layout, index: index)
+
+                wedge.fill(Color.white.opacity(
+                    appearance.fillOpacity(hovered: isHovered, prehighlighted: isPrehighlighted)
+                ))
+                wedge.stroke(
+                    rimColor(hovered: isHovered, prehighlighted: isPrehighlighted),
+                    lineWidth: rimWidth(hovered: isHovered, prehighlighted: isPrehighlighted)
+                )
+            }
         }
     }
 
-    private var rimWidth: CGFloat {
-        emphasis == .resting ? 1 : 2
+    private func rimColor(hovered: Bool, prehighlighted: Bool) -> Color {
+        if hovered { return Color.primary.opacity(0.85) }
+        if prehighlighted { return Color.primary.opacity(0.5) }
+        return Color.primary.opacity(0.14)
+    }
+
+    private func rimWidth(hovered: Bool, prehighlighted: Bool) -> CGFloat {
+        if hovered { return 2 }
+        if prehighlighted { return 1.5 }
+        return 0.75
+    }
+}
+
+/// One ring's content: an icon/label per node, placed at its slice's mid-ring point
+/// and rendered last so the glass never blurs it.
+struct RadialRingContent: View {
+    let ring: RadialRing
+    let showsLabels: Bool
+
+    var body: some View {
+        ZStack {
+            ForEach(Array(ring.nodes.enumerated()), id: \.element.id) { index, node in
+                RadialSliceLabel(node: node, index: index, showsLabels: showsLabels)
+                    .offset(
+                        x: ring.layout.sliceCenterOffset(at: index).x,
+                        y: ring.layout.sliceCenterOffset(at: index).y
+                    )
+            }
+        }
+    }
+}
+
+/// The union of a ring's wedges, used as the single glass clip-shape for that ring.
+/// Built by summing the tested `RadialWedge` paths, so the glass edge lands exactly on
+/// the same geometry the slices and hit-testing use.
+struct RadialRingShape: Shape {
+    let layout: RadialLayout
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for index in 0..<layout.itemCount {
+            path.addPath(RadialWedge(layout: layout, index: index).path(in: rect))
+        }
+        return path
     }
 }
 
@@ -172,9 +217,9 @@ struct RadialWedge: Shape {
 }
 
 /// Placeholder slice content for v1: app slices show the app icon and name; window
-/// slices show a 1-based index and the (best-effort) title. No live preview. Labels
-/// use full-strength `.primary` text with a soft shadow so they stay legible over
-/// the translucent glass on any background (the readability goal of this redesign).
+/// slices show a 1-based index and the (best-effort) title. No live preview. Content
+/// sits in the top z-layer (never behind glass) and carries a soft shadow, so icons
+/// and text stay sharp and legible over the translucent ring on any background.
 struct RadialSliceLabel: View {
     let node: MenuNode
     let index: Int
@@ -188,7 +233,7 @@ struct RadialSliceLabel: View {
                 appIcon
                 if showsLabels {
                     Text(node.title)
-                        .font(.caption.weight(.medium))
+                        .font(.caption.weight(.semibold))
                         .lineLimit(1)
                         .foregroundStyle(.primary)
                 }
@@ -205,7 +250,7 @@ struct RadialSliceLabel: View {
             }
         }
         .frame(maxWidth: 84)
-        .shadow(color: .black.opacity(0.4), radius: 1.5, y: 0.5)
+        .shadow(color: .black.opacity(0.55), radius: 2, y: 0.5)
     }
 
     @ViewBuilder
@@ -213,10 +258,12 @@ struct RadialSliceLabel: View {
         if let icon = node.appSliceIcon {
             Image(nsImage: icon)
                 .resizable()
-                .frame(width: 32, height: 32)
+                .interpolation(.high)
+                .frame(width: 34, height: 34)
+                .shadow(color: .black.opacity(0.35), radius: 2.5, y: 1)
         } else {
             Image(systemName: "app.dashed")
-                .font(.system(size: 28))
+                .font(.system(size: 30))
                 .foregroundStyle(.primary)
         }
     }
