@@ -3,9 +3,10 @@ import Foundation
 
 /// The user-tunable look of the radial wheel (US-014): overall size (the apps
 /// ring's outer radius), how far the ring sits out from the summon point (the
-/// inner-radius padding), the resting slice fill opacity, and whether text labels
-/// show. A pure value type with no AppKit/SwiftUI dependency, so the defaults
-/// round-trip and the geometry it derives are unit-tested directly.
+/// inner-radius padding), the resting slice fill opacity, whether text labels
+/// show, and whether the Liquid Glass material is used. A pure value type with no
+/// AppKit/SwiftUI dependency, so the defaults round-trip and the geometry it
+/// derives are unit-tested directly.
 ///
 /// Read fresh at each summon (like `InteractionMode.current`), so a Preferences
 /// change takes effect on the next summon without a relaunch (AC2). The geometry
@@ -26,6 +27,12 @@ struct RadialAppearance: Equatable, Sendable {
     /// icon and the window index number always show, so a slice stays identifiable
     /// even with labels off.
     var showsLabels: Bool
+    /// Whether the wheel renders with the genuine Liquid Glass material (macOS 26+).
+    /// When off — or on any OS before macOS 26, which has no Liquid Glass — it uses
+    /// the same frosted `.ultraThinMaterial` fallback: a plain look for users who
+    /// prefer it, and a way to exercise that fallback on a current OS without an
+    /// older machine.
+    var usesLiquidGlass: Bool = defaultUsesLiquidGlass
     /// Extra distance, in points, between the summon point and the slices — added to
     /// both the dead-zone (inner) and outer radius, so the whole ring slides outward
     /// at constant thickness while staying centred on the cursor. Beyond taste this
@@ -39,6 +46,9 @@ struct RadialAppearance: Equatable, Sendable {
     /// frosted ring (the range now reaches a near-solid slice).
     static let defaultFillOpacity = 0.1
     static let defaultShowsLabels = true
+    /// On by default, so the wheel ships with the Liquid Glass look; the user opts
+    /// out to the plain frosted fallback.
+    static let defaultUsesLiquidGlass = true
     /// Zero by default, so the wheel ships exactly where US-006 placed it; the user
     /// opts into pushing it further out.
     static let defaultInnerRadiusPadding: CGFloat = 0
@@ -47,6 +57,7 @@ struct RadialAppearance: Equatable, Sendable {
         outerRadius: defaultOuterRadius,
         fillOpacity: defaultFillOpacity,
         showsLabels: defaultShowsLabels,
+        usesLiquidGlass: defaultUsesLiquidGlass,
         innerRadiusPadding: defaultInnerRadiusPadding
     )
 
@@ -64,6 +75,7 @@ struct RadialAppearance: Equatable, Sendable {
     static let radiusDefaultsKey = "appearance.outerRadius"
     static let opacityDefaultsKey = "appearance.fillOpacity"
     static let labelsDefaultsKey = "appearance.showsLabels"
+    static let glassDefaultsKey = "appearance.usesLiquidGlass"
     static let innerPaddingDefaultsKey = "appearance.innerRadiusPadding"
 
     /// Dead-zone-to-outer-radius ratio, taken from the shipped default so scaling
@@ -104,6 +116,9 @@ struct RadialAppearance: Equatable, Sendable {
         }
         if defaults.object(forKey: labelsDefaultsKey) != nil {
             appearance.showsLabels = defaults.bool(forKey: labelsDefaultsKey)
+        }
+        if defaults.object(forKey: glassDefaultsKey) != nil {
+            appearance.usesLiquidGlass = defaults.bool(forKey: glassDefaultsKey)
         }
         if defaults.object(forKey: innerPaddingDefaultsKey) != nil {
             let stored = defaults.double(forKey: innerPaddingDefaultsKey)

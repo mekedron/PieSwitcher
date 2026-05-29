@@ -22,13 +22,28 @@ final class RadialAppearanceTests: XCTestCase {
         defaults.set(200.0, forKey: RadialAppearance.radiusDefaultsKey)
         defaults.set(0.4, forKey: RadialAppearance.opacityDefaultsKey)
         defaults.set(false, forKey: RadialAppearance.labelsDefaultsKey)
+        defaults.set(false, forKey: RadialAppearance.glassDefaultsKey)
         defaults.set(40.0, forKey: RadialAppearance.innerPaddingDefaultsKey)
 
         let appearance = RadialAppearance.current(from: defaults)
         XCTAssertEqual(appearance.outerRadius, 200, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, 0.4, accuracy: opacityAccuracy)
         XCTAssertFalse(appearance.showsLabels)
+        XCTAssertFalse(appearance.usesLiquidGlass)
         XCTAssertEqual(appearance.innerRadiusPadding, 40, accuracy: accuracy)
+    }
+
+    func testUsesLiquidGlassDefaultsOnAndRoundTrips() {
+        // Ships on, so the wheel defaults to the Liquid Glass look.
+        XCTAssertTrue(RadialAppearance.default.usesLiquidGlass)
+        XCTAssertTrue(RadialAppearance.current(from: makeDefaults()).usesLiquidGlass)
+
+        // Persists both ways, so the toggle (and the fallback preview it enables) sticks.
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: RadialAppearance.glassDefaultsKey)
+        XCTAssertFalse(RadialAppearance.current(from: defaults).usesLiquidGlass)
+        defaults.set(true, forKey: RadialAppearance.glassDefaultsKey)
+        XCTAssertTrue(RadialAppearance.current(from: defaults).usesLiquidGlass)
     }
 
     func testEachFieldFallsBackToItsDefaultIndependently() {
@@ -40,6 +55,7 @@ final class RadialAppearanceTests: XCTestCase {
         XCTAssertEqual(appearance.outerRadius, RadialAppearance.defaultOuterRadius, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, RadialAppearance.defaultFillOpacity, accuracy: opacityAccuracy)
         XCTAssertFalse(appearance.showsLabels)
+        XCTAssertEqual(appearance.usesLiquidGlass, RadialAppearance.defaultUsesLiquidGlass)
         XCTAssertEqual(
             appearance.innerRadiusPadding, RadialAppearance.defaultInnerRadiusPadding, accuracy: accuracy
         )

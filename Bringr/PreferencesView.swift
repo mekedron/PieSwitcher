@@ -5,18 +5,6 @@ import SwiftUI
 struct PreferencesView: View {
     @EnvironmentObject private var permissions: PermissionsManager
     @EnvironmentObject private var launchAtLogin: LaunchAtLoginManager
-    /// The persisted interaction mode. The same key is read by `RadialMenuController`
-    /// (via `InteractionMode.current`), so a change here takes effect on the next summon.
-    /// Persisted appearance. The same keys are read by `RadialAppearance.current` at
-    /// each summon, so changes apply on the next summon without a relaunch (AC2).
-    @AppStorage(RadialAppearance.radiusDefaultsKey)
-    private var outerRadius = Double(RadialAppearance.defaultOuterRadius)
-    @AppStorage(RadialAppearance.opacityDefaultsKey)
-    private var fillOpacity = RadialAppearance.defaultFillOpacity
-    @AppStorage(RadialAppearance.labelsDefaultsKey)
-    private var showsLabels = RadialAppearance.defaultShowsLabels
-    @AppStorage(RadialAppearance.innerPaddingDefaultsKey)
-    private var innerRadiusPadding = Double(RadialAppearance.defaultInnerRadiusPadding)
     /// Whether the wheel appends the other running apps after the curated block
     /// (Bringr-93j.42). `MyAppsMenu` reads the same key via `CuratedApps.showsOtherRunningApps`
     /// fresh at each summon, so a change here applies on the next open without a relaunch.
@@ -44,7 +32,7 @@ struct PreferencesView: View {
                 section("Collection") { collectionSection }
                 section("Excluded Apps") { IgnoreListSettings() }
                 section("My Apps") { myAppsSection }
-                section("Appearance") { appearanceSection }
+                section("Appearance") { AppearanceSettings() }
             }
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,42 +129,6 @@ struct PreferencesView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             TrackpadHapticsSettings()
-        }
-    }
-
-    private var appearanceSection: some View {
-        let minRadius = Double(RadialAppearance.radiusRange.lowerBound)
-        let maxRadius = Double(RadialAppearance.radiusRange.upperBound)
-        let minPadding = Double(RadialAppearance.innerPaddingRange.lowerBound)
-        let maxPadding = Double(RadialAppearance.innerPaddingRange.upperBound)
-        let opacityRange = RadialAppearance.opacityRange
-
-        return VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Size")
-                Slider(value: $outerRadius, in: minRadius...maxRadius)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Distance from center")
-                Slider(value: $innerRadiusPadding, in: minPadding...maxPadding)
-                Text("Pushes the whole wheel out from where it opens. Larger slices are easier to aim at.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Slice fill opacity")
-                Slider(value: $fillOpacity, in: opacityRange)
-            }
-
-            Toggle("Show labels", isOn: $showsLabels)
-
-            Text("Changes apply the next time you summon the wheel.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

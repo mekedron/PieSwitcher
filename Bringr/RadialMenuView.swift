@@ -48,9 +48,12 @@ struct RadialMenuView: View {
     /// the apps annulus to apps-plus-windows. A cohesive drop shadow seats the whole
     /// wheel as a floating glass object so its silhouette reads on any desktop.
     private var glass: some View {
-        RadialGlassBackdrop(shape: RadialGlassShape(layouts: controller.rings.map(\.layout)))
-            .frame(width: controller.overallDiameter, height: controller.overallDiameter)
-            .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+        RadialGlassBackdrop(
+            shape: RadialGlassShape(layouts: controller.rings.map(\.layout)),
+            usesLiquidGlass: controller.appearance.usesLiquidGlass
+        )
+        .frame(width: controller.overallDiameter, height: controller.overallDiameter)
+        .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
     }
 
     /// Layer 2 — per-slice separators and the hover / pre-highlight cue, above the
@@ -81,15 +84,20 @@ struct RadialMenuView: View {
 
 /// The wheel's single Liquid Glass backdrop, clipped to `shape` (the union of every
 /// visible ring's wedges). `Color.clear` carries the genuine `.regular` material on
-/// macOS 26+ because glass is a backdrop layer, independent of content alpha. Before
-/// macOS 26 there is no Liquid Glass, so it falls back to a frosted `.ultraThinMaterial`
-/// in the same shape, lifted with a soft top-down sheen so the wheel still reads as a
-/// defined translucent object rather than a flat blur.
+/// macOS 26+ because glass is a backdrop layer, independent of content alpha. When the
+/// user turns Liquid Glass off (`usesLiquidGlass == false`), or on any OS before macOS
+/// 26 which has no Liquid Glass, it falls back to a frosted `.ultraThinMaterial` in the
+/// same shape, lifted with a soft top-down sheen so the wheel still reads as a defined
+/// translucent object rather than a flat blur. The toggle reuses that fallback verbatim,
+/// so it doubles as a way to preview the pre-macOS-26 look on a current OS.
 struct RadialGlassBackdrop: View {
     let shape: RadialGlassShape
+    /// US-014: when false, skip the genuine Liquid Glass material and use the frosted
+    /// fallback even on macOS 26+.
+    let usesLiquidGlass: Bool
 
     var body: some View {
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, *), usesLiquidGlass {
             GlassEffectContainer(spacing: 0) {
                 Color.clear.glassEffect(.regular, in: shape)
             }

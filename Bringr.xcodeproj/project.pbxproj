@@ -13,6 +13,7 @@
 		1A0000000000000000000022 /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000021 /* PermissionsManager.swift */; };
 		1A0000000000000000000024 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000023 /* AppDelegate.swift */; };
 		1A0000000000000000000026 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000025 /* PreferencesView.swift */; };
+		1A00000000000000000000CF /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000D0 /* AppearanceSettingsView.swift */; };
 		1A0000000000000000000028 /* PermissionsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000027 /* PermissionsManagerTests.swift */; };
 		1A000000000000000000002A /* WindowControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000029 /* WindowControl.swift */; };
 		1A000000000000000000002C /* WindowControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000002B /* WindowControlTests.swift */; };
@@ -117,6 +118,7 @@
 		1A0000000000000000000021 /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
 		1A0000000000000000000023 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1A0000000000000000000025 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		1A00000000000000000000D0 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		1A0000000000000000000027 /* PermissionsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManagerTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000029 /* WindowControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControl.swift; sourceTree = "<group>"; };
 		1A000000000000000000002B /* WindowControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControlTests.swift; sourceTree = "<group>"; };
@@ -245,6 +247,7 @@
 				1A0000000000000000000023 /* AppDelegate.swift */,
 				1A0000000000000000000012 /* AboutView.swift */,
 				1A0000000000000000000025 /* PreferencesView.swift */,
+				1A00000000000000000000D0 /* AppearanceSettingsView.swift */,
 				1A0000000000000000000035 /* PermissionAlertWindow.swift */,
 				1A0000000000000000000037 /* PermissionAlertView.swift */,
 				1A0000000000000000000021 /* PermissionsManager.swift */,
@@ -443,6 +446,7 @@
 				1A0000000000000000000024 /* AppDelegate.swift in Sources */,
 				1A0000000000000000000013 /* AboutView.swift in Sources */,
 				1A0000000000000000000026 /* PreferencesView.swift in Sources */,
+				1A00000000000000000000CF /* AppearanceSettingsView.swift in Sources */,
 				1A0000000000000000000036 /* PermissionAlertWindow.swift in Sources */,
 				1A0000000000000000000038 /* PermissionAlertView.swift in Sources */,
 				1A0000000000000000000022 /* PermissionsManager.swift in Sources */,
