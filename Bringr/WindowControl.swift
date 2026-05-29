@@ -111,7 +111,10 @@ final class WindowController {
             system.setMinimized(frontWindow, false)
             raiseAndFocus(frontWindow)
         } else {
-            system.activate(app)
+            // No window to focus (the app is running window-less, e.g. closed to the menu
+            // bar): reopen it like a Dock click so it gets a fresh window, rather than just
+            // activating an empty app (Bringr-93j.61).
+            system.reopen(app)
         }
         // "Leave only my selection" hides the OTHER apps but never touches this app's own
         // windows — every window of the chosen app stays on screen (Bringr-93j.49).

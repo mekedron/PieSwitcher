@@ -30,6 +30,11 @@ protocol WindowControlling {
     func isHidden(_ app: AppID) -> Bool
     func setHidden(_ app: AppID, _ hidden: Bool)
     func activate(_ app: AppID)
+    /// Reopen `app` like a Dock click: a windowless app opens a fresh window, a windowed
+    /// one just comes forward (Bringr-93j.61). Distinct from `activate`, which only raises
+    /// an app and must never spawn a window — it runs on restore paths. Used by `commit(_:)`
+    /// when the chosen app turns out to have no window to focus.
+    func reopen(_ app: AppID)
 
     func isMinimized(_ window: WindowID) -> Bool
     func setMinimized(_ window: WindowID, _ minimized: Bool)

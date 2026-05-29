@@ -76,6 +76,13 @@ final class LiveWindowSystem: WindowControlling {
         setBool(appElement, kAXFrontmostAttribute, true, app: app)
     }
 
+    func reopen(_ app: AppID) {
+        // Post the Dock's reopen event so a windowless app opens a new window, then activate
+        // so it comes forward whether or not it made one (Bringr-93j.61).
+        AppReopen.send(toPID: app.pid)
+        activate(app)
+    }
+
     func isMinimized(_ window: WindowID) -> Bool {
         guard let element = elementCache[window] else { return false }
         return boolAttribute(element, kAXMinimizedAttribute)

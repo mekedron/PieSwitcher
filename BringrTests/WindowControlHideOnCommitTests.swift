@@ -89,6 +89,43 @@ final class WindowControlHideOnCommitTests: XCTestCase {
         XCTAssertFalse(fake.isHidden(appA))
     }
 
+    // MARK: - Bringr-93j.61: a windowless app commit reopens (opens a new window)
+
+    func testAppCommitWithNoWindowsReopensTheAppInsteadOfBareActivate() {
+        // An app picked from the wheel that currently has no window (e.g. Calendar closed to
+        // the menu bar) must get a fresh window like a Dock click, not just be activated.
+        let appA = AppID(pid: 1)
+        let fake = FakeWindowSystem(
+            apps: [makeApp(1), makeApp(2, windowTokens: [20])],
+            frontmost: AppID(pid: 2)
+        )
+        let controller = WindowController(system: fake)
+
+        controller.commit(appA)
+
+        XCTAssertTrue(fake.operationLog.contains(.reopen(appA)),
+                      "committing a windowless app reopens it to make a new window")
+        XCTAssertEqual(fake.frontmost, appA, "the reopened app comes to the front")
+    }
+
+    func testAppCommitWithAWindowFocusesItAndNeverReopens() {
+        // The other side of the branch: an app that still has a window focuses it through the
+        // normal path and never posts a reopen, so no spurious extra window is made.
+        let appA = AppID(pid: 1)
+        let window = WindowID(app: appA, token: 10)
+        let fake = FakeWindowSystem(
+            apps: [makeApp(1, windowTokens: [10]), makeApp(2, windowTokens: [20])],
+            frontmost: AppID(pid: 2)
+        )
+        let controller = WindowController(system: fake)
+
+        controller.commit(appA)
+
+        XCTAssertEqual(fake.focusedWindow, window)
+        XCTAssertFalse(fake.operationLog.contains(.reopen(appA)),
+                       "an app with a window focuses it; it is never reopened")
+    }
+
     // MARK: - Fixtures
 
     private func makeApp(_ pid: pid_t, windowTokens: [Int] = []) -> FakeWindowSystem.AppState {

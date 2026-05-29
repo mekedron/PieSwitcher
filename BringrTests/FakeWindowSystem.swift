@@ -9,6 +9,7 @@ final class FakeWindowSystem: WindowControlling {
         case windows(AppID)
         case setHidden(AppID, Bool)
         case activate(AppID)
+        case reopen(AppID)
         case setMinimized(WindowID, Bool)
         case setPosition(WindowID, CGPoint)
         case setSize(WindowID, CGSize)
@@ -104,6 +105,14 @@ final class FakeWindowSystem: WindowControlling {
         guard let index = apps.firstIndex(where: { $0.id == app }) else { return }
         let state = apps.remove(at: index)
         apps.insert(state, at: 0)
+    }
+
+    /// Models the Dock-style reopen: records the call, then brings the app forward via
+    /// `activate` (a reopened app comes to the front). The "new window" the live system makes
+    /// has no fake analogue; tests assert on the recorded `.reopen` instead.
+    func reopen(_ app: AppID) {
+        operationLog.append(.reopen(app))
+        activate(app)
     }
 
     func isMinimized(_ window: WindowID) -> Bool {
