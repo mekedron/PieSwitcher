@@ -131,51 +131,6 @@ final class LiveWindowSystem: WindowControlling {
         )
     }
 
-    func position(of window: WindowID) -> CGPoint? {
-        guard let element = elementCache[window] else { return nil }
-        // Native AX top-left coords (y-down), not flipped to AppKit — capture and the
-        // off-screen park are symmetric in this space, so no flip is needed.
-        return axPoint(element, kAXPositionAttribute)
-    }
-
-    func setPosition(_ window: WindowID, _ point: CGPoint) {
-        guard let element = cachedElement(for: window, operation: "set position") else { return }
-        var mutablePoint = point
-        guard let value = AXValueCreate(.cgPoint, &mutablePoint) else {
-            log.error("AX could not create position value for window \(window.token)")
-            return
-        }
-        let result = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
-        logAXFailure(result, operation: "set position", window: window)
-    }
-
-    func park(_ window: WindowID) {
-        guard let element = cachedElement(for: window, operation: "park") else { return }
-        // Keep the window's Y so its vertical extent is unchanged, and push X toward the
-        // tallest extreme display so macOS re-homes it onto a display at least as tall as
-        // itself — never clamping the height (Bringr-93j.81).
-        let currentY = axPoint(element, kAXPositionAttribute)?.y ?? 0
-        let parkX = WindowParkGeometry.parkedX(screenFrames: NSScreen.screens.map(\.frame))
-        setPosition(window, CGPoint(x: parkX, y: currentY))
-    }
-
-    func size(of window: WindowID) -> CGSize? {
-        guard let element = elementCache[window] else { return nil }
-        // Width/height are space-agnostic, so no flip is needed (unlike `frame(of:)`).
-        return axSize(element, kAXSizeAttribute)
-    }
-
-    func setSize(_ window: WindowID, _ size: CGSize) {
-        guard let element = cachedElement(for: window, operation: "set size") else { return }
-        var mutableSize = size
-        guard let value = AXValueCreate(.cgSize, &mutableSize) else {
-            log.error("AX could not create size value for window \(window.token)")
-            return
-        }
-        let result = AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
-        logAXFailure(result, operation: "set size", window: window)
-    }
-
     private func axPoint(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
         guard let value = copyAXValue(element, attribute) else { return nil }
         var point = CGPoint.zero

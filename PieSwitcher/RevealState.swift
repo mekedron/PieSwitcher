@@ -1,4 +1,3 @@
-import CoreGraphics
 import Foundation
 
 /// A persisted record of every app/window a reveal session moved out of the way,
@@ -21,16 +20,6 @@ struct RevealSnapshot: Codable, Equatable, Sendable {
         let pid: pid_t
         let token: Int
         let wasMinimized: Bool
-        /// Pre-summon top-left of a window parked off-screen by the hide-others
-        /// reveal, so a crash mid-reveal can be undone by moving it back on the next
-        /// launch (Bringr-93j.24). `nil` when the window was minimized before the
-        /// summon (it was never parked) or for an older snapshot without the field.
-        var originalPosition: CGPoint?
-        /// Pre-summon size of that parked window, so a crash mid-reveal restores its
-        /// exact frame next launch — macOS shrinks a window's height off-screen, so
-        /// position alone leaves it shorter (Bringr-93j.28). `nil` when minimized
-        /// before the summon, or for an older snapshot without the field.
-        var originalSize: CGSize?
     }
 
     /// The app that was frontmost before the summon, to re-activate on restore.

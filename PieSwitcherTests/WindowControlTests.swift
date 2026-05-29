@@ -71,81 +71,29 @@ final class WindowControlTests: XCTestCase {
         XCTAssertFalse(fake.isHidden(AppID(pid: 2)))
     }
 
-    // MARK: - AC3 + AC5: hide other windows and restore (Bringr-93j.24: park, not minimize)
-
-    func testHideOtherWindowsParksSiblingsOffScreenReTargetsAndRestores() {
-        let appA = AppID(pid: 1)
-        let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11, 12])], frontmost: appA)
-        let controller = WindowController(system: fake)
-        let (w10, w11, w12) = (WindowID(app: appA, token: 10),
-                               WindowID(app: appA, token: 11),
-                               WindowID(app: appA, token: 12))
-
-        controller.hideOtherWindows(besides: w11)
-
-        // Siblings parked off-screen, NOT minimized (Bringr-93j.24); target stays + fronts.
-        XCTAssertEqual(fake.position(of: w10), WindowController.offScreenPoint)
-        XCTAssertEqual(fake.position(of: w12), WindowController.offScreenPoint)
-        XCTAssertFalse(fake.isMinimized(w10))
-        XCTAssertEqual(fake.position(of: w11), CGPoint(x: 11, y: 11))
-        XCTAssertEqual(fake.windows(of: appA).first, w11)
-
-        // Re-target reuses the one baseline: the new target un-parks, the old one parks.
-        controller.hideOtherWindows(besides: w10)
-        XCTAssertEqual(fake.position(of: w10), CGPoint(x: 10, y: 10))
-        XCTAssertEqual(fake.position(of: w11), WindowController.offScreenPoint)
-
-        controller.restore()
-
-        // Everything back at its captured origin, original z-order restored.
-        XCTAssertEqual(fake.position(of: w10), CGPoint(x: 10, y: 10))
-        XCTAssertEqual(fake.position(of: w11), CGPoint(x: 11, y: 11))
-        XCTAssertEqual(fake.position(of: w12), CGPoint(x: 12, y: 12))
-        XCTAssertEqual(fake.windows(of: appA), [w10, w11, w12])
-    }
-
-    func testHideOtherWindowsRevealsTargetThenRestoresItsPriorMinimizedState() {
-        let appA = AppID(pid: 1)
-        let fake = FakeWindowSystem(
-            apps: [makeApp(1, windowTokens: [10, 11])],
-            frontmost: appA
-        )
-        // Target starts minimized; isolating it should reveal it.
-        fake.setMinimized(WindowID(app: appA, token: 11), true)
-        let controller = WindowController(system: fake)
-        let target = WindowID(app: appA, token: 11)
-
-        controller.hideOtherWindows(besides: target)
-
-        XCTAssertFalse(fake.isMinimized(target), "the target is surfaced")
-        XCTAssertEqual(fake.position(of: WindowID(app: appA, token: 10)), WindowController.offScreenPoint,
-                       "the sibling is parked off-screen, not minimized")
-        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
-
-        controller.restore()
-
-        XCTAssertTrue(fake.isMinimized(target), "the target returns to its prior minimized state")
-        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
-    }
-
     // MARK: - restoreWindows: targeted un-isolate that keeps app hiding intact (US-011)
 
-    func testRestoreWindowsRevealsOneAppsWindowsButKeepsOtherAppsHidden() {
+    func testRestoreWindowsUnminimizesOneAppsWindowsButKeepsOtherAppsHidden() {
+        // A window-level reveal that captures a window baseline (e.g. a previously
+        // minimized window the user hovered, which the reveal surfaced) — leaving the
+        // sub-wheel must restore that baseline while keeping the other apps hidden.
         let appA = AppID(pid: 1)
         let fake = FakeWindowSystem(
             apps: [makeApp(1, windowTokens: [10, 11, 12]), makeApp(2)],
             frontmost: appA
         )
+        fake.setMinimized(WindowID(app: appA, token: 10), true)
+        fake.setMinimized(WindowID(app: appA, token: 12), true)
         let controller = WindowController(system: fake)
-        controller.hideOtherApps(besides: appA)                              // app 2 hidden
-        controller.hideOtherWindows(besides: WindowID(app: appA, token: 11)) // 10, 12 minimized
+        controller.hideOtherApps(besides: appA)                            // app 2 hidden
+        controller.revealWindow(WindowID(app: appA, token: 10))            // surfaces 10, captures baseline
 
         controller.restoreWindows(of: appA)
 
-        // The app's windows are all back...
-        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 10)))
+        // The previously minimized window returns to its baseline...
+        XCTAssertTrue(fake.isMinimized(WindowID(app: appA, token: 10)))
         XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 11)))
-        XCTAssertFalse(fake.isMinimized(WindowID(app: appA, token: 12)))
+        XCTAssertTrue(fake.isMinimized(WindowID(app: appA, token: 12)))
         // ...but app 2 stays hidden and the session is still open for a later restore.
         XCTAssertTrue(fake.isHidden(AppID(pid: 2)))
         XCTAssertTrue(controller.hasActiveSession)
@@ -211,18 +159,15 @@ final class WindowControlTests: XCTestCase {
             frontmost: appA
         )
         let controller = WindowController(system: fake)
-        // A reveal session in flight: app 2 hidden, window 10 parked off-screen to isolate 11.
+        // A reveal session in flight: app 2 hidden, window 11 raised to preview it.
         controller.hideOtherApps(besides: appA)
-        controller.hideOtherWindows(besides: target)
+        controller.revealWindow(target)
         XCTAssertTrue(fake.isHidden(AppID(pid: 2)))
-        XCTAssertEqual(fake.position(of: WindowID(app: appA, token: 10)), WindowController.offScreenPoint)
 
         controller.commit(target)
 
-        // AC2: every app/window moved out of the way is restored, session ended.
+        // AC2: every app moved out of the way is restored, session ended.
         XCTAssertFalse(fake.isHidden(AppID(pid: 2)))
-        XCTAssertNotEqual(fake.position(of: WindowID(app: appA, token: 10)), WindowController.offScreenPoint,
-                          "the parked sibling is brought back on commit")
         XCTAssertFalse(controller.hasActiveSession)
         // AC1: the target is raised, focused, and its app active — over the restore.
         XCTAssertEqual(fake.frontmost, appA)
@@ -238,7 +183,7 @@ final class WindowControlTests: XCTestCase {
         // (and thus restore) would leave it minimized.
         fake.setMinimized(target, true)
         let controller = WindowController(system: fake)
-        controller.hideOtherWindows(besides: WindowID(app: appA, token: 10))
+        controller.revealWindow(WindowID(app: appA, token: 10))
 
         controller.commit(target)
 
@@ -277,9 +222,9 @@ final class WindowControlTests: XCTestCase {
             frontmost: priorFrontmost
         )
         let controller = WindowController(system: fake)
-        // Reveal a window of a backgrounded app: hide the prior frontmost, isolate 11.
+        // Reveal a window of a backgrounded app: hide the prior frontmost, raise 11.
         controller.hideOtherApps(besides: target)
-        controller.hideOtherWindows(besides: targetWindow)
+        controller.revealWindow(targetWindow)
         fake.clearLog() // ignore setup; assert only on what commit does
 
         controller.commit(targetWindow)
@@ -305,7 +250,7 @@ final class WindowControlTests: XCTestCase {
             frontmost: appA
         )
         let controller = WindowController(system: fake)
-        controller.hideOtherWindows(besides: target)
+        controller.revealWindow(target)
         fake.clearLog()
 
         controller.commit(target)
@@ -339,11 +284,8 @@ final class WindowControlTests: XCTestCase {
         windowTokens: [Int] = []
     ) -> FakeWindowSystem.AppState {
         let appID = AppID(pid: pid)
-        // Give each window a distinct token-derived origin so the park/restore of
-        // window positions (Bringr-93j.24) can be asserted precisely.
         let windows = windowTokens.map {
-            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false,
-                                         position: CGPoint(x: CGFloat($0), y: CGFloat($0)))
+            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false)
         }
         return FakeWindowSystem.AppState(id: appID, hidden: hidden, windows: windows)
     }

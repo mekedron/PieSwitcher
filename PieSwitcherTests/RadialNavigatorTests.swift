@@ -333,12 +333,12 @@ final class RadialNavigatorTests: XCTestCase {
         FakeWindowSystem.WindowState(id: WindowID(app: AppID(pid: pid), token: token), minimized: false)
     }
 
-    /// Every window here belongs to Chrome (pid 10); a window is on-screen unless it was
-    /// parked at the off-screen sentinel (which no reveal now does at the window level).
+    /// Every window here belongs to Chrome (pid 10). With no reveal parking windows
+    /// at the window level (Bringr-93j.83/.84), the only way a window goes off-screen
+    /// during a reveal is to be minimized — assert it isn't.
     private func assertOnScreen(_ token: Int, _ fake: FakeWindowSystem, line: UInt = #line) {
-        XCTAssertNotEqual(fake.position(of: WindowID(app: AppID(pid: 10), token: token)),
-                          WindowController.offScreenPoint,
-                          "window \(token) should be on-screen", line: line)
+        XCTAssertFalse(fake.isMinimized(WindowID(app: AppID(pid: 10), token: token)),
+                       "window \(token) should be on-screen (not minimized)", line: line)
     }
 
     private func raw(number: Int, pid: pid_t, name: String, title: String = "") -> RawWindow {

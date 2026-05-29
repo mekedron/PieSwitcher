@@ -94,14 +94,14 @@ final class RadialNavigatorKeyboardTests: XCTestCase {
         let fixture = makeFixture()
         fixture.navigator.open(appNodes: fixture.appNodes)
         _ = fixture.navigator.keyboardMove(.right)               // Chrome
-        _ = fixture.navigator.keyboardMove(.up)                  // a Chrome window (Docs parked)
+        _ = fixture.navigator.keyboardMove(.up)                  // a Chrome window (Inbox raised)
 
         let outcome = fixture.navigator.keyboardEscape()
 
         XCTAssertEqual(outcome, .handled, "Escape from a window steps back, it does not close")
         XCTAssertEqual(fixture.navigator.hovered, .slice(level: 0, index: 0))
         XCTAssertNil(fixture.navigator.expandedWindowIndex)
-        assertOnScreen(12, fixture.fake) // the previewed window's sibling is restored
+        assertOnScreen(12, fixture.fake) // the previewed window's sibling stays on-screen
     }
 
     func testEscapeFromAppLevelRequestsClose() {
@@ -319,9 +319,8 @@ final class RadialNavigatorKeyboardTests: XCTestCase {
     }
 
     private func assertOnScreen(_ token: Int, _ fake: FakeWindowSystem, line: UInt = #line) {
-        XCTAssertNotEqual(fake.position(of: WindowID(app: AppID(pid: 10), token: token)),
-                          WindowController.offScreenPoint,
-                          "window \(token) should be on-screen", line: line)
+        XCTAssertFalse(fake.isMinimized(WindowID(app: AppID(pid: 10), token: token)),
+                       "window \(token) should be on-screen (not minimized)", line: line)
     }
 
     private func win(_ pid: pid_t, _ token: Int) -> FakeWindowSystem.WindowState {

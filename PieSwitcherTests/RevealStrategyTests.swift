@@ -135,25 +135,17 @@ final class RevealStrategyTests: XCTestCase {
 
     func testHideOthersRevealWindowRaisesTargetAndLeavesSiblingsInPlace() {
         // Hide-others isolates other *apps* (via revealApp), but a window hover must NOT
-        // park/hide/minimize the app's siblings — it only raises the hovered window for
-        // preview. That sidesteps the off-screen park's per-hover height clamp entirely
-        // (Bringr-93j.81/.28/.32) and the minimize slowness (Bringr-93j.24).
+        // hide/minimize the app's siblings — it only raises the hovered window for
+        // preview, like raise-to-front (Bringr-93j.83).
         let appA = AppID(pid: 1)
         let (target, sibling) = (WindowID(app: appA, token: 11), WindowID(app: appA, token: 10))
-        let fake = sizedApp(1, [
-            10: CGRect(x: 100, y: 100, width: 1600, height: 2000),
-            11: CGRect(x: 200, y: 200, width: 800, height: 600)
-        ])
+        let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11])], frontmost: appA)
         let controller = WindowController(system: fake) // default hide-others
 
         controller.revealWindow(target)
 
         XCTAssertEqual(fake.windows(of: appA).first, target, "the hovered window is raised to the front")
-        XCTAssertEqual(fake.position(of: sibling), CGPoint(x: 100, y: 100),
-                       "the sibling stays in place — it is not parked off-screen")
-        XCTAssertEqual(fake.size(of: sibling), CGSize(width: 1600, height: 2000),
-                       "nor resized, so the off-screen height clamp can never happen")
-        XCTAssertFalse(fake.isMinimized(sibling), "nor minimized")
+        XCTAssertFalse(fake.isMinimized(sibling), "the sibling is not minimized")
 
         controller.restore()
         XCTAssertEqual(fake.windows(of: appA), [sibling, target], "restore returns the original order")
@@ -162,19 +154,14 @@ final class RevealStrategyTests: XCTestCase {
     func testHideOthersRevealWindowReTargetRaisesNewTargetLeavingSiblings() {
         let appA = AppID(pid: 1)
         let (w10, w11) = (WindowID(app: appA, token: 10), WindowID(app: appA, token: 11))
-        let fake = sizedApp(1, [
-            10: CGRect(x: 100, y: 100, width: 1600, height: 2000),
-            11: CGRect(x: 200, y: 200, width: 800, height: 600)
-        ])
+        let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11])], frontmost: appA)
         let controller = WindowController(system: fake) // default hide-others
 
         controller.revealWindow(w11)
         controller.revealWindow(w10) // re-target: raise the new hover; siblings stay put
 
         XCTAssertEqual(fake.windows(of: appA).first, w10, "re-targeting raises the newly hovered window")
-        XCTAssertEqual(fake.position(of: w11), CGPoint(x: 200, y: 200),
-                       "the previously previewed window stays in place — nothing was ever parked")
-        XCTAssertEqual(fake.size(of: w11), CGSize(width: 800, height: 600))
+        XCTAssertFalse(fake.isMinimized(w11), "the previously previewed window stays on screen")
     }
 
     // MARK: - AC2/AC3: dim-others at both levels
@@ -273,18 +260,6 @@ final class RevealStrategyTests: XCTestCase {
             FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false)
         }
         return FakeWindowSystem.AppState(id: appID, hidden: false, windows: windows)
-    }
-
-    /// A one-app fake whose windows carry explicit frames, so the hide-others reveal's
-    /// park/restore of window *size* can be asserted (Bringr-93j.28). Keyed by token.
-    private func sizedApp(_ pid: pid_t, _ frames: [Int: CGRect]) -> FakeWindowSystem {
-        let appID = AppID(pid: pid)
-        let windows = frames.sorted { $0.key < $1.key }.map { token, frame in
-            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: token),
-                                         minimized: false, position: frame.origin, size: frame.size)
-        }
-        let app = FakeWindowSystem.AppState(id: appID, hidden: false, windows: windows)
-        return FakeWindowSystem(apps: [app], frontmost: appID)
     }
 
     /// An isolated `UserDefaults` suite so persistence tests never touch the real domain.

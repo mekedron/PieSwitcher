@@ -11,8 +11,6 @@ final class FakeWindowSystem: WindowControlling {
         case activate(AppID)
         case reopen(AppID)
         case setMinimized(WindowID, Bool)
-        case setPosition(WindowID, CGPoint)
-        case setSize(WindowID, CGSize)
         case raise(WindowID)
         case focusWindow(WindowID)
         case raiseAcrossSpaces(WindowID)
@@ -21,14 +19,10 @@ final class FakeWindowSystem: WindowControlling {
     final class WindowState {
         let id: WindowID
         var minimized: Bool
-        var position: CGPoint
-        var size: CGSize
 
-        init(id: WindowID, minimized: Bool, position: CGPoint = .zero, size: CGSize = .zero) {
+        init(id: WindowID, minimized: Bool) {
             self.id = id
             self.minimized = minimized
-            self.position = position
-            self.size = size
         }
     }
 
@@ -148,32 +142,6 @@ final class FakeWindowSystem: WindowControlling {
 
     func frame(of window: WindowID) -> CGRect? {
         frames[window]
-    }
-
-    func position(of window: WindowID) -> CGPoint? {
-        windowState(window)?.position
-    }
-
-    func setPosition(_ window: WindowID, _ point: CGPoint) {
-        operationLog.append(.setPosition(window, point))
-        windowState(window)?.position = point
-    }
-
-    /// The in-memory model has no real displays to re-home a window onto, so park is just a
-    /// move to the nominal sentinel `WindowController.offScreenPoint` (logged as `.setPosition`,
-    /// like the move it replaced). The live system's screen-aware, height-clamp-avoiding park
-    /// (Bringr-93j.81) is exercised by `WindowParkGeometry` tests instead.
-    func park(_ window: WindowID) {
-        setPosition(window, WindowController.offScreenPoint)
-    }
-
-    func size(of window: WindowID) -> CGSize? {
-        windowState(window)?.size
-    }
-
-    func setSize(_ window: WindowID, _ size: CGSize) {
-        operationLog.append(.setSize(window, size))
-        windowState(window)?.size = size
     }
 }
 

@@ -51,7 +51,6 @@
 		1A000000000000000000006F /* Dimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000070 /* Dimming.swift */; };
 		1A0000000000000000000071 /* RevealStrategyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000072 /* RevealStrategyTests.swift */; };
 		1A0000000000000000000074 /* RadialNavigatorFisheyeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000073 /* RadialNavigatorFisheyeTests.swift */; };
-		1A0000000000000000000076 /* WindowParkPointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000075 /* WindowParkPointTests.swift */; };
 		1A0000000000000000000078 /* RadialNavigatorRetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000077 /* RadialNavigatorRetryTests.swift */; };
 		1A000000000000000000007A /* SortOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000079 /* SortOrder.swift */; };
 		1A000000000000000000007C /* CuratedApps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000007B /* CuratedApps.swift */; };
@@ -165,7 +164,6 @@
 		1A0000000000000000000070 /* Dimming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dimming.swift; sourceTree = "<group>"; };
 		1A0000000000000000000072 /* RevealStrategyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevealStrategyTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000073 /* RadialNavigatorFisheyeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorFisheyeTests.swift; sourceTree = "<group>"; };
-		1A0000000000000000000075 /* WindowParkPointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowParkPointTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000077 /* RadialNavigatorRetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorRetryTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000079 /* SortOrder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortOrder.swift; sourceTree = "<group>"; };
 		1A000000000000000000007B /* CuratedApps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedApps.swift; sourceTree = "<group>"; };
@@ -338,7 +336,6 @@
 				1A000000000000000000004D /* RadialNavigatorTests.swift */,
 				1A0000000000000000000057 /* RadialNavigatorCommitTests.swift */,
 				1A0000000000000000000073 /* RadialNavigatorFisheyeTests.swift */,
-				1A0000000000000000000075 /* WindowParkPointTests.swift */,
 				1A0000000000000000000077 /* RadialNavigatorRetryTests.swift */,
 				1A0000000000000000000065 /* RadialMenuControllerHoverTests.swift */,
 				1A0000000000000000000051 /* WindowMemoryTests.swift */,
@@ -546,7 +543,6 @@
 				1A000000000000000000004E /* RadialNavigatorTests.swift in Sources */,
 				1A0000000000000000000058 /* RadialNavigatorCommitTests.swift in Sources */,
 				1A0000000000000000000074 /* RadialNavigatorFisheyeTests.swift in Sources */,
-				1A0000000000000000000076 /* WindowParkPointTests.swift in Sources */,
 				1A0000000000000000000078 /* RadialNavigatorRetryTests.swift in Sources */,
 				1A0000000000000000000066 /* RadialMenuControllerHoverTests.swift in Sources */,
 				1A0000000000000000000052 /* WindowMemoryTests.swift in Sources */,

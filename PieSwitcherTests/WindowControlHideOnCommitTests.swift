@@ -131,8 +131,7 @@ final class WindowControlHideOnCommitTests: XCTestCase {
     private func makeApp(_ pid: pid_t, windowTokens: [Int] = []) -> FakeWindowSystem.AppState {
         let appID = AppID(pid: pid)
         let windows = windowTokens.map {
-            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false,
-                                         position: CGPoint(x: CGFloat($0), y: CGFloat($0)))
+            FakeWindowSystem.WindowState(id: WindowID(app: appID, token: $0), minimized: false)
         }
         return FakeWindowSystem.AppState(id: appID, hidden: false, windows: windows)
     }
