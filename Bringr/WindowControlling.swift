@@ -37,6 +37,12 @@ protocol WindowControlling {
     func raise(_ window: WindowID)
     /// Make `window` main and focused (its app should already be active).
     func focusWindow(_ window: WindowID)
+    /// Raise and focus a window that lives on another Space, switching to that Space
+    /// (Bringr-93j.54). The Accessibility primitives can't: `kAXWindowsAttribute` doesn't
+    /// enumerate other Spaces, so there's no cached AX element to act on. Used only as the
+    /// commit-time fallback for a window absent from its app's AX window list, so the proven
+    /// AX path for same-Space windows is untouched.
+    func raiseAcrossSpaces(_ window: WindowID)
     /// The window's frame in AppKit-global coordinates (bottom-left origin, y-up),
     /// or `nil` if it can't be resolved — used to cut the target out of the dim
     /// overlay (US-013 dim-others).

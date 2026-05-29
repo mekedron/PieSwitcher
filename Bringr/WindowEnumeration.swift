@@ -57,12 +57,21 @@ struct RawWindow: Equatable, Sendable {
     /// never appear in the wheel, matched by bundle id or name in `CGWindowSource`. Defaults
     /// false (nothing excluded), so the empty-list path and existing fixtures need not set it.
     let isIgnored: Bool
+    /// Whether the window server reports this window as living on a managed Space (Bringr-93j.54).
+    /// This is the cross-Space "is this a real, focusable window" signal: `isAXBacked` can't
+    /// keep genuine other-Space windows because `kAXWindowsAttribute` never enumerates other
+    /// Spaces, so such a window is AX-absent yet Space-assigned, while a phantom helper surface
+    /// is neither. Defaults false, so the narrow query and existing fixtures (which keep real
+    /// off-screen windows via `isAXBacked`) need not set it; the live source stamps it only on
+    /// the broadened path's off-screen records.
+    let isManagedWindow: Bool
 
     init(
         windowNumber: Int, ownerPID: pid_t, ownerName: String, title: String,
         layer: Int, alpha: Double, bounds: CGRect,
         isOnscreen: Bool = true, isMinimized: Bool = false, isHidden: Bool = false,
-        isAXBacked: Bool = true, isDockApp: Bool = true, isIgnored: Bool = false
+        isAXBacked: Bool = true, isDockApp: Bool = true, isIgnored: Bool = false,
+        isManagedWindow: Bool = false
     ) {
         self.windowNumber = windowNumber
         self.ownerPID = ownerPID
@@ -77,18 +86,22 @@ struct RawWindow: Equatable, Sendable {
         self.isAXBacked = isAXBacked
         self.isDockApp = isDockApp
         self.isIgnored = isIgnored
+        self.isManagedWindow = isManagedWindow
     }
 
-    /// A copy carrying the per-window minimized/hidden/AX-backed classification the live
-    /// source resolves after the raw list is parsed (Bringr-93j.50 / Bringr-93j.52). The
-    /// Dock-app and ignored stamps are preserved from `self` (set when the record was first
-    /// built).
-    func classified(isMinimized: Bool, isHidden: Bool, isAXBacked: Bool) -> RawWindow {
+    /// A copy carrying the per-window minimized/hidden/AX-backed/managed classification the
+    /// live source resolves after the raw list is parsed (Bringr-93j.50 / Bringr-93j.52 /
+    /// Bringr-93j.54). The Dock-app and ignored stamps are preserved from `self` (set when the
+    /// record was first built).
+    func classified(
+        isMinimized: Bool, isHidden: Bool, isAXBacked: Bool, isManagedWindow: Bool
+    ) -> RawWindow {
         RawWindow(
             windowNumber: windowNumber, ownerPID: ownerPID, ownerName: ownerName, title: title,
             layer: layer, alpha: alpha, bounds: bounds,
             isOnscreen: isOnscreen, isMinimized: isMinimized, isHidden: isHidden,
-            isAXBacked: isAXBacked, isDockApp: isDockApp, isIgnored: isIgnored
+            isAXBacked: isAXBacked, isDockApp: isDockApp, isIgnored: isIgnored,
+            isManagedWindow: isManagedWindow
         )
     }
 }
@@ -260,20 +273,23 @@ final class WindowEnumerator {
     /// (Bringr-93j.59). A window whose owning app isn't an ordinary Dock app is likewise dropped
     /// — the switcher shows only Dock apps, on the narrow path too, so "all screens" alone stops
     /// surfacing background / agent / menu-bar apps (Bringr-93j.51). Otherwise an on-screen
-    /// window is always kept (the default set). An off-screen record with no AX window is a
-    /// phantom helper surface Bringr can't focus, so it is dropped regardless of flags
-    /// (Bringr-93j.52). The rest are classified by precedence — a hidden app's windows count as
-    /// hidden even if also minimized, since `includeHidden` is meant to bring a whole hidden app
-    /// back — then kept only if the matching flag is on; anything left (off-Space) rides on
-    /// `allSpaces`. With every flag off the source returned only on-screen windows (Dock-app /
-    /// AX-backed / not-ignored by default), so this keeps them all unchanged.
+    /// window is always kept (the default set). An off-screen record that is neither AX-backed
+    /// nor on a managed Space is a phantom helper surface Bringr can't focus, so it is dropped
+    /// regardless of flags: AX backing covers same-Space / minimized / hidden windows
+    /// (Bringr-93j.52), and managed-Space membership covers genuine other-Space windows that AX
+    /// never enumerates (Bringr-93j.54) — a phantom is neither. The rest are classified by
+    /// precedence — a hidden app's windows count as hidden even if also minimized, since
+    /// `includeHidden` is meant to bring a whole hidden app back — then kept only if the matching
+    /// flag is on; anything left (off-Space) rides on `allSpaces`. With every flag off the source
+    /// returned only on-screen windows (Dock-app / not-ignored by default), so this keeps them all
+    /// unchanged.
     private func shouldCollect(
         _ window: RawWindow, allSpaces: Bool, includeMinimized: Bool, includeHidden: Bool
     ) -> Bool {
         if window.isIgnored { return false }
         if !window.isDockApp { return false }
         if window.isOnscreen { return true }
-        if !window.isAXBacked { return false }
+        if !window.isAXBacked && !window.isManagedWindow { return false }
         if window.isHidden { return includeHidden }
         if window.isMinimized { return includeMinimized }
         return allSpaces

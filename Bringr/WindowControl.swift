@@ -89,9 +89,14 @@ final class WindowController {
     /// so a stale handle can't no-op the un-minimize/raise/focus.
     func commit(_ window: WindowID) {
         restore(reactivatingFrontmost: false)
-        _ = system.windows(of: window.app)
+        let live = system.windows(of: window.app)
         system.setMinimized(window, false)
         raiseAndFocus(window)
+        // A window on another Space isn't in its app's AX window list (kAXWindowsAttribute
+        // never enumerates other Spaces), so the AX raise/focus above no-op'd; fall back to the
+        // window-server raise that targets it by CG number and switches Spaces (Bringr-93j.54).
+        // Same-Space windows are in `live`, so their proven AX path is untouched.
+        if !live.contains(window) { system.raiseAcrossSpaces(window) }
         // "Leave only my selection" hides the OTHER apps; the chosen window's siblings stay
         // on screen and only it is activated — never minimizing within the app (Bringr-93j.49).
         if hideOnCommit { hideEveryAppExcept(window.app) }

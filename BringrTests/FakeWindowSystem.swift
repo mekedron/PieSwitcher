@@ -14,6 +14,7 @@ final class FakeWindowSystem: WindowControlling {
         case setSize(WindowID, CGSize)
         case raise(WindowID)
         case focusWindow(WindowID)
+        case raiseAcrossSpaces(WindowID)
     }
 
     final class WindowState {
@@ -125,6 +126,15 @@ final class FakeWindowSystem: WindowControlling {
     func focusWindow(_ window: WindowID) {
         operationLog.append(.focusWindow(window))
         focusedWindow = window
+    }
+
+    func raiseAcrossSpaces(_ window: WindowID) {
+        operationLog.append(.raiseAcrossSpaces(window))
+        focusedWindow = window
+        guard let app = appState(window.app),
+              let index = app.windows.firstIndex(where: { $0.id == window }) else { return }
+        let state = app.windows.remove(at: index)
+        app.windows.insert(state, at: 0)
     }
 
     func frame(of window: WindowID) -> CGRect? {

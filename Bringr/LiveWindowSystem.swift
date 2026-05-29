@@ -101,6 +101,13 @@ final class LiveWindowSystem: WindowControlling {
         setBool(element, kAXFocusedAttribute, true, window: window)
     }
 
+    func raiseAcrossSpaces(_ window: WindowID) {
+        // No AX element exists for an other-Space window (kAXWindowsAttribute omits them), so
+        // defer to the window-server front-process recipe, which raises by CG number and
+        // switches Spaces (Bringr-93j.54).
+        CrossSpaceFocus.raise(windowNumber: window.token, pid: window.app.pid)
+    }
+
     func frame(of window: WindowID) -> CGRect? {
         guard let element = elementCache[window],
               let position = axPoint(element, kAXPositionAttribute),

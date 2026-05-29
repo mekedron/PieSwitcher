@@ -56,11 +56,13 @@ final class CGWindowSource: WindowEnumerationSource {
         )
     }
 
-    /// Stamp each broadened record with its minimized/hidden/AX-backed state so the keep-rule
-    /// can split off-Space from minimized from hidden and drop phantoms (Bringr-93j.52): each
-    /// app's AX windows yield the minimized set and the set of controllable window numbers — a
-    /// broadened record whose number is absent from the latter is a phantom. Hidden via `isHidden`.
-    /// The Dock-app stamp is set earlier by `rawWindow(from:...)` and carried through unchanged.
+    /// Stamp each broadened record with its minimized/hidden/AX-backed/managed-Space state so
+    /// the keep-rule can split off-Space from minimized from hidden and drop phantoms
+    /// (Bringr-93j.52 / Bringr-93j.54): each app's AX windows yield the minimized set and the set
+    /// of AX-controllable window numbers, and `CGWindowSpaces` yields the set living on a managed
+    /// Space. A broadened off-screen record absent from *both* is a phantom; one present in the
+    /// managed set but not the AX set is a genuine other-Space window AX can't see. Hidden via
+    /// `isHidden`. The Dock-app stamp is set earlier by `rawWindow(from:...)` and carried through.
     ///
     /// Only apps that actually surfaced an OFF-screen record are AX-probed (Bringr-93j.53): an
     /// on-screen record is kept by `WindowEnumerator.shouldCollect`'s onscreen short-circuit
@@ -68,13 +70,17 @@ final class CGWindowSource: WindowEnumerationSource {
     /// all on-screen is pure wasted IPC — and that IPC (one `copyWindows` per app, one
     /// `isMinimized` per window) is what made the broadened path lag. The per-window minimized
     /// read is likewise limited to off-screen window numbers, since on-screen windows are never
-    /// minimized. On-screen records are returned untouched (their defaults — not minimized, not
-    /// hidden, AX-backed — already match what the old full probe computed for them).
+    /// minimized. The managed-Space probe is limited to off-screen Dock-app records — non-Dock
+    /// records are dropped before the managed check matters. On-screen records are returned
+    /// untouched (their defaults already match what the old probe computed for them).
     private func classify(_ raws: [RawWindow]) -> [RawWindow] {
         let offscreen = raws.filter { !$0.isOnscreen }
         guard !offscreen.isEmpty else { return raws }
         let offscreenPIDs = Set(offscreen.map(\.ownerPID))
         let offscreenNumbers = Set(offscreen.map(\.windowNumber))
+        let managedNumbers = CGWindowSpaces.managedWindowNumbers(
+            among: offscreen.filter(\.isDockApp).map(\.windowNumber)
+        )
 
         var minimizedNumbers: Set<Int> = []
         var hiddenPIDs: Set<pid_t> = []
@@ -94,7 +100,8 @@ final class CGWindowSource: WindowEnumerationSource {
             return raw.classified(
                 isMinimized: minimizedNumbers.contains(raw.windowNumber),
                 isHidden: hiddenPIDs.contains(raw.ownerPID),
-                isAXBacked: axNumbers.contains(raw.windowNumber)
+                isAXBacked: axNumbers.contains(raw.windowNumber),
+                isManagedWindow: managedNumbers.contains(raw.windowNumber)
             )
         }
     }
