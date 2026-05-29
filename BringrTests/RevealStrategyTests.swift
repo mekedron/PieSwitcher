@@ -106,6 +106,31 @@ final class RevealStrategyTests: XCTestCase {
         ], "restore returns the original front-to-back order")
     }
 
+    func testRaiseToFrontCommitReturnsPreviewedWindowsToTheirOriginalOrder() {
+        // Raise-to-front leaves each hovered window raised (nothing parked/hidden), so
+        // browsing the sub-wheel drifts the live order. Committing a *different* window
+        // must drop the windows hovered along the way back to their pre-summon order
+        // behind the choice, not leave them stacked in hover order (Bringr-93j.47).
+        let appA = AppID(pid: 1)
+        let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11, 12])], frontmost: appA)
+        let controller = WindowController(system: fake)
+        controller.setStrategy(.raiseToFront)
+        let (w10, w11, w12) = (WindowID(app: appA, token: 10),
+                               WindowID(app: appA, token: 11),
+                               WindowID(app: appA, token: 12))
+
+        controller.revealWindow(w11) // preview w11 → [w11, w10, w12]
+        controller.revealWindow(w12) // preview w12 → [w12, w11, w10]
+        XCTAssertEqual(fake.windows(of: appA), [w12, w11, w10], "hovering raised each previewed window")
+
+        controller.commit(w11)
+
+        // Chosen window on top; w10 sits ahead of w12 again — their pre-summon order —
+        // rather than w12 staying raised from the preview.
+        XCTAssertEqual(fake.windows(of: appA), [w11, w10, w12])
+        XCTAssertEqual(fake.focusedWindow, w11)
+    }
+
     // MARK: - hide-others restores the exact window frame (Bringr-93j.28)
 
     func testHideOthersRestoresAParkedWindowToItsOriginalSize() {
