@@ -59,9 +59,6 @@ final class RadialMenuController: ObservableObject {
     /// so a Preferences strategy change applies on the next summon without a relaunch
     /// (US-013 AC4).
     private let strategyProvider: () -> RevealStrategy
-    /// Reads the persisted second-level cursor-lock setting at summon time, mirroring
-    /// `modeProvider`, so a Preferences change applies on the next summon (Bringr-93j.29).
-    private let cursorLockProvider: () -> Bool
     /// Reads the persisted "leave only my selection on screen" setting at summon time,
     /// mirroring `modeProvider`, so a Preferences change applies on the next summon
     /// without a relaunch (Bringr-93j.27).
@@ -73,10 +70,6 @@ final class RadialMenuController: ObservableObject {
     /// haptics fire for the summon (setting on + no external mouse) and taps as hover moves
     /// to a new slice. Resolved per summon like the other read-fresh settings.
     private let haptics: HapticController
-    /// The last global cursor position seen inside the cursor-lock region while it is
-    /// engaged — the point a rejected (out-of-region) move is snapped back to. Refreshed
-    /// on every allowed move, so it is always a valid in-region anchor (Bringr-93j.29).
-    private var lastLockedCursor: CGPoint = .zero
     /// Installs the while-open NSEvent monitors. `.live` in production; a test injects
     /// a recorder to assert hover is wired with both a global and a local monitor.
     private let monitorInstaller: EventMonitorInstaller
@@ -103,7 +96,6 @@ final class RadialMenuController: ObservableObject {
         clickToActivateProvider: @escaping () -> Bool = { ClickToActivate.isEnabled() },
         appearanceProvider: @escaping () -> RadialAppearance = { RadialAppearance.current() },
         strategyProvider: @escaping () -> RevealStrategy = { RevealStrategy.current() },
-        cursorLockProvider: @escaping () -> Bool = { CursorLock.isEnabled() },
         hideOnCommitProvider: @escaping () -> Bool = { HideOnCommit.isEnabled() },
         collectionProvider: @escaping () -> CollectionPreferences = { CollectionPreferences.current() },
         monitorInstaller: EventMonitorInstaller = .live,
@@ -114,7 +106,6 @@ final class RadialMenuController: ObservableObject {
         self.clickToActivateProvider = clickToActivateProvider
         self.appearanceProvider = appearanceProvider
         self.strategyProvider = strategyProvider
-        self.cursorLockProvider = cursorLockProvider
         self.hideOnCommitProvider = hideOnCommitProvider
         self.collectionProvider = collectionProvider
         self.monitorInstaller = monitorInstaller
@@ -221,8 +212,6 @@ final class RadialMenuController: ObservableObject {
         // Apply the persisted reveal strategy for this summon too (US-013 AC4), so a
         // Preferences change takes effect on the next open without a relaunch.
         navigator.setRevealStrategy(strategyProvider())
-        // Apply the persisted second-level cursor-lock setting for this summon (Bringr-93j.29).
-        navigator.setCursorLockEnabled(cursorLockProvider())
         // Apply the persisted "leave only my selection on screen" setting for this summon
         // so a commit can clear everything else away (Bringr-93j.27).
         navigator.setHideOnCommitEnabled(hideOnCommitProvider())
@@ -359,20 +348,11 @@ final class RadialMenuController: ObservableObject {
 
     private func updateHover(forGlobalCursor cursor: CGPoint, isRetry: Bool = false) {
         let layoutOffset = offset(forGlobalCursor: cursor)
-        // Second-level cursor lock (Bringr-93j.29): while engaged, a move that leaves the
-        // open app's sub-wheel and its parent arc is rejected — snap the pointer back to
-        // the last in-region spot and drop the move, so it can't slide onto another app or
-        // out of the wheel. Allowed moves fall through and refresh the snap-back anchor.
-        if navigator.cursorLockEngaged, !navigator.offsetWithinCursorLockRegion(layoutOffset) {
-            warpCursor(toGlobalPoint: lastLockedCursor)
-            return
-        }
         let previousHover = navigator.hovered
         highlightSource = .mouse
         navigator.updateHover(navigator.region(forOffset: layoutOffset))
         haptics.hoverChanged(from: previousHover, to: navigator.hovered)
         syncFromNavigator()
-        if navigator.cursorLockEngaged { lastLockedCursor = cursor }
         scheduleSubWheelRetry(isRetry: isRetry)
     }
 

@@ -73,14 +73,6 @@ final class RadialNavigator {
     var pendingConfirmation: HoverRegion?
     /// Numeric no-window-choice app to commit on release/confirm (Bringr-93j.73); nil once a window is picked.
     var pendingAppCommit: Int?
-    /// Whether the optional second-level cursor lock (Bringr-93j.29) is currently
-    /// confining the pointer to the open app's windows sub-wheel and its parent app
-    /// arc. Engaged when the cursor enters the windows ring (level 1); released when
-    /// it returns to the apps ring. Always false when the setting is disabled.
-    private(set) var cursorLockEngaged = false
-    /// Whether the cursor-lock setting is on for this summon. Pushed in before `open`
-    /// from the persisted setting, so a Preferences change applies on the next open.
-    private var cursorLockEnabled = false
     /// Whether to skip the windows sub-wheel for a zero/one-window app this summon
     /// (Bringr-93j.75). Pushed in before `open` from the persisted appearance, so a
     /// Preferences change applies on the next open.
@@ -137,18 +129,8 @@ final class RadialNavigator {
         windowControl.setHideOnCommit(enabled)
     }
 
-    /// Enable or disable the optional second-level cursor lock for the next summon
-    /// (Bringr-93j.29). Read fresh from the persisted setting just before `open`
-    /// (mirroring `setRevealStrategy`), so a Preferences change applies on the next
-    /// summon without a relaunch. Disabling also clears any active engagement so the
-    /// pointer is freed immediately rather than only on the next open.
-    func setCursorLockEnabled(_ enabled: Bool) {
-        cursorLockEnabled = enabled
-        if !enabled { cursorLockEngaged = false }
-    }
-
     /// Enable or disable skipping the windows sub-wheel for zero/one-window apps for the
-    /// next summon (Bringr-93j.75), pushed in per summon like `setCursorLockEnabled`.
+    /// next summon (Bringr-93j.75), pushed in per summon like the other read-fresh settings.
     func setSkipSingleWindowLevel(_ enabled: Bool) {
         skipSingleWindowLevel = enabled
     }
@@ -165,7 +147,6 @@ final class RadialNavigator {
         focusedWindowIndex = nil
         hovered = .none
         prehighlighted = .none
-        cursorLockEngaged = false
     }
 
     /// End the interaction: restore every hidden app/window to its pre-summon state
@@ -183,7 +164,6 @@ final class RadialNavigator {
         hovered = .none
         prehighlighted = .none
         pendingConfirmation = nil; pendingAppCommit = nil
-        cursorLockEngaged = false
     }
 
     // MARK: - Hover
@@ -199,15 +179,9 @@ final class RadialNavigator {
         pendingConfirmation = nil; pendingAppCommit = nil // a focus move clears a pending confirm/app-commit
         switch region {
         case .slice(level: 0, let index):
-            // Back on the apps ring: the cursor reached the parent app arc, the gate
-            // out of the lock (the only level-0 slice reachable while confined), so
-            // release it (Bringr-93j.29).
-            cursorLockEngaged = false
             restoreWindowIsolation()
             expandApp(at: index)
         case .slice(level: 1, let index):
-            // Entering the windows sub-wheel engages the lock when the setting is on.
-            if cursorLockEnabled { cursorLockEngaged = true }
             isolateWindow(at: index)
             focusWindowSlice(at: index)
         case .slice:
@@ -392,6 +366,5 @@ final class RadialNavigator {
         expandedWindowIndex = nil
         focusedWindowIndex = nil
         prehighlighted = .none
-        cursorLockEngaged = false
     }
 }

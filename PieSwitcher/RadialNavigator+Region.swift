@@ -4,8 +4,8 @@ import Foundation
 /// Read-only queries over the navigator's already-built rings — hit-testing, region
 /// lookups, the derived concentric geometry, and which app is expanded — split out so
 /// `RadialNavigator.swift` stays within the file-length budget. Because they only read
-/// the live rings (and the base geometry), the hover, cursor-lock, and skip decisions
-/// they feed stay pure and unit-testable.
+/// the live rings (and the base geometry), the hover and skip decisions they feed stay
+/// pure and unit-testable.
 extension RadialNavigator {
     /// Whether the windows sub-wheel is open and populated: a level-1 ring carrying at
     /// least one window node. False when an app expansion's live scan momentarily
@@ -44,24 +44,6 @@ extension RadialNavigator {
             }
         }
         return withinARingBand ? hovered : .none
-    }
-
-    /// Whether `offset` lies inside the cursor-lock region while the second-level lock
-    /// is engaged (Bringr-93j.29): any window-ring (level 1) slice — including its
-    /// angular slack, since `region` keeps reporting the open sub-wheel over an
-    /// uncovered outer gap — or the parent app arc on the apps ring (level 0). Every
-    /// other app arc, the dead centre, and anywhere outside the rings fall outside, so
-    /// the controller snaps the pointer back there. Pure geometry over the live rings,
-    /// so the confinement boundary is deterministic and unit-tested.
-    func offsetWithinCursorLockRegion(_ offset: CGPoint) -> Bool {
-        switch region(forOffset: offset) {
-        case .slice(level: 1, _):
-            return true
-        case .slice(level: 0, let index):
-            return index == expandedAppIndex
-        case .slice, .none:
-            return false
-        }
     }
 
     // MARK: - Concentric geometry

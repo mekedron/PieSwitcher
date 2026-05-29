@@ -34,7 +34,7 @@ enum HapticIntensity: String, CaseIterable, Sendable {
 /// The trackpad-haptic-on-hover setting (Bringr-93j.44): an optional tactile tap as the
 /// selection moves through the pie, plus its strength. Off by default — opt-in polish, so
 /// `bool(forKey:)` (which returns false for an absent key) already yields the intended
-/// default with no presence check, like `CursorLock`/`HideOnCommit`. Read fresh at each
+/// default with no presence check, like `HideOnCommit`. Read fresh at each
 /// summon so a Preferences change applies on the next open without a relaunch.
 enum TrackpadHaptics {
     /// `UserDefaults` key for the on/off toggle. Single source of truth shared by the

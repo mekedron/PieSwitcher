@@ -6,8 +6,8 @@ import Foundation
 /// Optional keyboard navigation for the pie menu (Bringr-93j.71). Off unless turned on; when
 /// on, the wheel can be driven by arrow keys and/or number keys, with an optional "press
 /// Return to confirm" step for the number mode. A caseless namespace for the persistence
-/// helpers, mirroring `CursorLock`/`MouseChordActivation`; read fresh at each summon so a
-/// Preferences change applies on the next open without a relaunch.
+/// helpers, mirroring `MouseChordActivation`; read fresh at each summon so a Preferences
+/// change applies on the next open without a relaunch.
 ///
 /// Arrow and number navigation are independent sub-toggles, so either, both, or neither can be
 /// on at once — they share one focus model, so combining them needs no extra wiring.

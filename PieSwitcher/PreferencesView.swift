@@ -179,14 +179,13 @@ struct PreferencesView: View {
     }
 }
 
-/// The interaction-mode picker (US-009) and the optional second-level cursor-lock toggle
-/// (Bringr-93j.29), grouped in their own view so the Preferences body stays within its
-/// length budget. Both keys are read fresh at each summon by `RadialMenuController`, so a
-/// change here applies on the next open without a relaunch.
+/// The interaction-mode picker (US-009) and the click-to-activate toggle (Bringr-93j.76),
+/// grouped in their own view so the Preferences body stays within its length budget. Both
+/// keys are read fresh at each summon by `RadialMenuController`, so a change here applies
+/// on the next open without a relaunch.
 private struct InteractionSettings: View {
     @AppStorage(InteractionMode.defaultsKey) private var modeRaw = InteractionMode.default.rawValue
     @AppStorage(ClickToActivate.defaultsKey) private var clickToActivate = ClickToActivate.default
-    @AppStorage(CursorLock.defaultsKey) private var cursorLockEnabled = CursorLock.default
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -210,17 +209,6 @@ private struct InteractionSettings: View {
                 Text("Also let a click on an app or window pick it and close the wheel. Handy "
                      + "while holding the keyboard shortcut: click to choose without releasing. "
                      + "You can still release the trigger to choose the hovered item.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Lock the cursor inside an app's windows", isOn: $cursorLockEnabled)
-
-                Text("When you open an app's windows, keep the pointer on that app and its "
-                     + "windows so it can't slip onto another app. Move back onto the app to "
-                     + "release it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

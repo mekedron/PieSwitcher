@@ -294,7 +294,7 @@ final class RadialNavigatorKeyboardTests: XCTestCase {
             raw(number: 21, pid: 20, name: "Ghostty", title: "Terminal")
         ])
         let enumerator = WindowEnumerator(
-            source: source, appOrder: { .recentlyUsed }, windowOrder: { .recentlyUsed }
+            source: source, appOrder: { .name }, windowOrder: { .fixed }
         )
         let appNodes = WindowSwitcherMenu(enumerator: enumerator).makeRoot().resolvedChildren()
         let fake = FakeWindowSystem(

@@ -2,9 +2,9 @@ import AppKit
 
 /// Read-only cursor helpers for the controller, split out so `RadialMenuController.swift`
 /// stays within the file-length budget (mirroring `RadialNavigator+Region.swift`). They only
-/// translate a region/point or warp the pointer; the sole shared state they touch is the
-/// (internal) overlay `window`, read for its frame in `offset(forGlobalCursor:)`. `@MainActor`
-/// propagates from the type to these members.
+/// translate a region/point; the sole shared state they touch is the (internal) overlay
+/// `window`, read for its frame in `offset(forGlobalCursor:)`. `@MainActor` propagates from
+/// the type to these members.
 extension RadialMenuController {
     /// Offset from the ring centre for a global (AppKit y-up) cursor, flipped into the
     /// layout's y-down space.
@@ -29,16 +29,5 @@ extension RadialMenuController {
         case .slice(_, let index): return .slice(index)
         case .none: return .none
         }
-    }
-
-    /// Snap the hardware pointer to a global (AppKit y-up) point — the cursor-lock boundary
-    /// side effect (Bringr-93j.29). CoreGraphics warps in the top-left-origin, y-down display
-    /// space, so the point is flipped about the primary display height; the mouse/cursor
-    /// re-association clears the brief post-warp move-suppression window so the pointer stays
-    /// responsive while the user pushes against the boundary.
-    func warpCursor(toGlobalPoint point: CGPoint) {
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-        CGWarpMouseCursorPosition(CGPoint(x: point.x, y: primaryHeight - point.y))
-        CGAssociateMouseAndMouseCursorPosition(1)
     }
 }

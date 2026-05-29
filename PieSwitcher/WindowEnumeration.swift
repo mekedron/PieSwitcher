@@ -330,23 +330,15 @@ final class WindowEnumerator {
         }
     }
 
-    /// Apply the persisted app/window sort orders (Bringr-93j.34) to the freshly
-    /// grouped, front-to-back enumeration. `.recentlyUsed` keeps that live z-order (the
-    /// ⌘-Tab-matching default); the alternatives impose a stable arrangement from values
-    /// macOS already reports — the app name, the creation-ordered window number — so
-    /// positions stop reshuffling without any recency tracking of our own.
+    /// Apply the persisted app/window sort orders (Bringr-93j.34) to the freshly grouped
+    /// enumeration. Both orders impose a stable arrangement from values macOS already reports
+    /// — the app name, the Dock's left-to-right order, the creation-ordered window number —
+    /// so positions never reshuffle without any recency tracking of our own (Bringr-93j.90).
     private func sorted(_ apps: [AppWindows]) -> [AppWindows] {
         let windowsSorted = apps.map { app in
             AppWindows(id: app.id, name: app.name, windows: sortWindows(app.windows))
         }
         switch appOrder() {
-        case .recentlyUsed:
-            // The live front-to-back order — the closest match to ⌘-Tab the public APIs expose
-            // without tracking activations ourselves (Bringr-93j.34/Bringr-93j.85). Preview can
-            // perturb the z-order during a session, but commit leaves that state intentionally
-            // (Bringr-93j.88) and cancel restores it, so the next summon's z-order reflects what
-            // the user actually used.
-            return windowsSorted
         case .name:
             return windowsSorted.sorted { lhs, rhs in
                 switch lhs.name.localizedCaseInsensitiveCompare(rhs.name) {
@@ -368,14 +360,9 @@ final class WindowEnumerator {
 
     /// Order one app's windows by the persisted window sort order. `.fixed` sorts by
     /// window number, which macOS assigns in creation order, so the oldest window keeps
-    /// the first spot summon to summon. `.recentlyUsed` keeps the live front-to-back order,
-    /// so the most recently raised window leads.
+    /// the first spot summon to summon.
     private func sortWindows(_ windows: [WindowInfo]) -> [WindowInfo] {
         switch windowOrder() {
-        case .recentlyUsed:
-            // Front-to-back live z-order — the app's most recently raised window leads. Same
-            // rationale as the app `.recentlyUsed` order above (Bringr-93j.85).
-            return windows
         case .fixed:
             return windows.sorted { $0.id.token < $1.id.token }
         }

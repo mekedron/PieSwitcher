@@ -191,7 +191,7 @@ final class MyAppsMenuTests: XCTestCase {
     // MARK: - Fixtures
 
     private func makeEnumerator(_ source: StubEnumerationSource) -> WindowEnumerator {
-        WindowEnumerator(source: source, appOrder: { .recentlyUsed }, windowOrder: { .recentlyUsed })
+        WindowEnumerator(source: source, appOrder: { .name }, windowOrder: { .fixed })
     }
 
     private func stub(_ windows: [RawWindow], selfPID: pid_t = 1) -> StubEnumerationSource {

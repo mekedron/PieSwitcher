@@ -157,9 +157,11 @@ final class RadialNavigatorCommitTests: XCTestCase {
 
     func testPreHighlightFollowsTheRememberedTitleWhenWindowsReorder() {
         // Remembered "Inbox" at index 0; if it now sits at index 1 the pre-highlight
-        // follows the title, not the stale position.
+        // follows the title, not the stale position. Window number 8 < 11 sorts Docs
+        // ahead of Inbox under the fixed (window-number-ascending) window sort, so
+        // Inbox lands at index 1.
         let fixture = makeFixture(windows: [
-            raw(number: 12, pid: 10, name: "Chrome", title: "Docs"),
+            raw(number: 8, pid: 10, name: "Chrome", title: "Docs"),
             raw(number: 11, pid: 10, name: "Chrome", title: "Inbox"),
             raw(number: 21, pid: 20, name: "Ghostty", title: "Terminal")
         ])
@@ -257,13 +259,12 @@ final class RadialNavigatorCommitTests: XCTestCase {
         ]
         let source = StubEnumerationSource(selfPID: 1, windows: raws)
         // Pin the sort order so these tests stay hermetic — the default `WindowEnumerator`
-        // closures read `.standard`, where a developer's persisted Preferences (e.g. a
-        // "Fixed position" window order) would otherwise reorder the windows out from under
-        // the front-to-back assumptions below.
+        // closures read `.standard`, where a developer's persisted Preferences would
+        // otherwise reorder the windows out from under the assumptions below.
         let enumerator = WindowEnumerator(
             source: source,
-            appOrder: { .recentlyUsed },
-            windowOrder: { .recentlyUsed }
+            appOrder: { .name },
+            windowOrder: { .fixed }
         )
         let appNodes = WindowSwitcherMenu(enumerator: enumerator).makeRoot().resolvedChildren()
         let fake = FakeWindowSystem(

@@ -158,7 +158,7 @@ final class MyAppsMenuIgnoreTests: XCTestCase {
             CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome")
         ]
         let menu = MyAppsMenu(
-            enumerator: WindowEnumerator(source: source, appOrder: { .recentlyUsed }),
+            enumerator: WindowEnumerator(source: source, appOrder: { .name }),
             curatedApps: { curated },
             showOtherRunningApps: { false },
             keepCuratedOrder: { true },
@@ -174,7 +174,7 @@ final class MyAppsMenuIgnoreTests: XCTestCase {
         let source = StubEnumerationSource(selfPID: 1, windows: [])
         let curated = [CuratedApp(bundleIdentifier: "com.dell.dm", name: "Dell Display Manager")]
         let menu = MyAppsMenu(
-            enumerator: WindowEnumerator(source: source, appOrder: { .recentlyUsed }),
+            enumerator: WindowEnumerator(source: source, appOrder: { .name }),
             curatedApps: { curated },
             showOtherRunningApps: { false },
             keepCuratedOrder: { true },

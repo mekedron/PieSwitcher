@@ -33,33 +33,6 @@ final class MyAppsMenuSortingTests: XCTestCase {
         XCTAssertEqual(menu.makeRoot().resolvedChildren().map(\.title), ["Chrome", "Mail", "Telegram"])
     }
 
-    // MARK: - Off + recently used: running entries follow live z-order, others trail
-
-    func testNotKeepingOrderSortsRunningCuratedAppsByLiveOrder() {
-        // Live front-to-back order is Ghostty then Chrome (the order the source reports).
-        let source = stub([
-            raw(number: 21, pid: 20, name: "Ghostty"),
-            raw(number: 11, pid: 10, name: "Chrome")
-        ])
-        // Manual order is Chrome, Mail (not running), Ghostty.
-        let curated = [
-            CuratedApp(bundleIdentifier: "com.google.Chrome", name: "Chrome"),
-            CuratedApp(bundleIdentifier: "com.apple.Mail", name: "Mail"),
-            CuratedApp(bundleIdentifier: "com.mitchellh.ghostty", name: "Ghostty")
-        ]
-        let menu = MyAppsMenu(
-            enumerator: makeEnumerator(source, appOrder: .recentlyUsed),
-            curatedApps: { curated },
-            showOtherRunningApps: { false },
-            keepCuratedOrder: { false },
-            appSortOrder: { .recentlyUsed },
-            runningPID: { id in id == "com.google.Chrome" ? 10 : (id == "com.mitchellh.ghostty" ? 20 : nil) }
-        )
-
-        XCTAssertEqual(menu.makeRoot().resolvedChildren().map(\.title), ["Ghostty", "Chrome", "Mail"],
-                       "running entries take their live z-order; the not-running Mail trails")
-    }
-
     // MARK: - Off + Dock position: curated entries sort by their slot in the Dock
 
     func testNotKeepingOrderSortsCuratedAppsByDockPosition() {
@@ -67,7 +40,7 @@ final class MyAppsMenuSortingTests: XCTestCase {
         // the manual order (Telegram, Chrome, Mail) becomes the Dock order (Chrome, Mail,
         // Telegram) regardless of running state.
         let enumerator = WindowEnumerator(
-            source: stub([]), appOrder: { .dockPosition }, windowOrder: { .recentlyUsed },
+            source: stub([]), appOrder: { .dockPosition }, windowOrder: { .fixed },
             dockOrder: { [] }, keepFinderLast: { false }, appBundleID: { _ in nil }
         )
         let curated = [
@@ -137,9 +110,9 @@ final class MyAppsMenuSortingTests: XCTestCase {
     // MARK: - Fixtures
 
     private func makeEnumerator(
-        _ source: StubEnumerationSource, appOrder: AppSortOrder = .recentlyUsed
+        _ source: StubEnumerationSource, appOrder: AppSortOrder = .dockPosition
     ) -> WindowEnumerator {
-        WindowEnumerator(source: source, appOrder: { appOrder }, windowOrder: { .recentlyUsed })
+        WindowEnumerator(source: source, appOrder: { appOrder }, windowOrder: { .fixed })
     }
 
     private func stub(_ windows: [RawWindow], selfPID: pid_t = 1) -> StubEnumerationSource {

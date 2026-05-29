@@ -64,8 +64,8 @@ struct ModifierCombination: OptionSet, Hashable, Sendable {
 /// mouse's summon trigger; the keyboard's held modifier combination
 /// (`ModifierActivation.keyboard`) is a separate, independent trigger, so either, both, or
 /// neither can be on at once (Bringr-93j.67, Bringr-93j.69).
-/// A caseless namespace for the read helper, mirroring `HideOnCommit`/`CursorLock`; read
-/// fresh by `MouseChordMonitor` on every event so a Preferences change applies with no relaunch.
+/// A caseless namespace for the read helper, mirroring `HideOnCommit`; read fresh by
+/// `MouseChordMonitor` on every event so a Preferences change applies with no relaunch.
 enum MouseChordActivation {
     /// `UserDefaults` key backing the toggle. Single source of truth shared by the
     /// Preferences `@AppStorage` and `isEnabled(from:)` so the two cannot drift.

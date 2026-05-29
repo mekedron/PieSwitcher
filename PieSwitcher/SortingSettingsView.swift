@@ -1,14 +1,16 @@
 import SwiftUI
 
-/// The "Sorting" Preferences group: the apps and windows sort-order pickers and the
-/// "don't sort my pinned apps" toggle (Bringr-93j.34), plus — only when the apps order is
-/// "By Dock position" — the "Keep Finder last" toggle (Bringr-93j.55). Its own file (and
-/// own `@AppStorage` for the keys) so the `PreferencesView` body stays within its length
+/// The "Sorting" Preferences group: the apps sort-order picker and the "don't sort my
+/// pinned apps" toggle (Bringr-93j.34), plus — only when the apps order is "By Dock
+/// position" — the "Keep Finder last" toggle (Bringr-93j.55). Its own file (and own
+/// `@AppStorage` for the keys) so the `PreferencesView` body stays within its length
 /// budget, mirroring `CollectionSettings`. The same keys are read fresh at each summon by
 /// `WindowEnumerator` / `MyAppsMenu`, so a change applies on the next open without a relaunch.
+///
+/// The windows sub-wheel has only one available sort (Fixed position, Bringr-93j.90), so it
+/// is not shown here — there is nothing to choose between.
 struct SortingSettings: View {
     @AppStorage(AppSortOrder.defaultsKey) private var appSortOrderRaw = AppSortOrder.default.rawValue
-    @AppStorage(WindowSortOrder.defaultsKey) private var windowSortOrderRaw = WindowSortOrder.default.rawValue
     @AppStorage(CuratedApps.keepCuratedOrderDefaultsKey)
     private var keepCuratedOrder = CuratedApps.keepCuratedOrderDefault
     @AppStorage(DockOrder.keepFinderLastKey) private var keepFinderLast = DockOrder.keepFinderLastDefault
@@ -16,7 +18,6 @@ struct SortingSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             appsGroup
-            windowsGroup
             VStack(alignment: .leading, spacing: 8) {
                 Toggle("Don't sort my pinned apps", isOn: $keepCuratedOrder)
 
@@ -57,22 +58,6 @@ struct SortingSettings: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 18)
             }
-        }
-    }
-
-    private var windowsGroup: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("Windows:", selection: $windowSortOrderRaw) {
-                ForEach(WindowSortOrder.allCases, id: \.rawValue) { order in
-                    Text(order.displayName).tag(order.rawValue)
-                }
-            }
-            .pickerStyle(.radioGroup)
-
-            Text((WindowSortOrder(rawValue: windowSortOrderRaw) ?? .default).detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

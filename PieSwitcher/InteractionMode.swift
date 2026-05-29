@@ -50,8 +50,8 @@ enum InteractionMode: String, CaseIterable, Sendable {
 /// `clickToStay` a click already commits, so the setting only changes `holdToSelect`.
 ///
 /// Off by default — an opt-in setting, so unless the user turns it on selection works exactly
-/// as before. A caseless namespace for the read helper, mirroring `HideOnCommit`/`CursorLock`;
-/// read fresh at each summon so a Preferences change applies on the next open without a relaunch.
+/// as before. A caseless namespace for the read helper, mirroring `HideOnCommit`; read fresh at
+/// each summon so a Preferences change applies on the next open without a relaunch.
 enum ClickToActivate {
     /// `UserDefaults` key backing the toggle. Single source of truth shared by the
     /// Preferences `@AppStorage` and `isEnabled(from:)` so the two cannot drift.
@@ -59,7 +59,7 @@ enum ClickToActivate {
 
     /// Default: OFF. Because the default is false, `bool(forKey:)` — which returns `false` for
     /// an absent key — already yields the intended default, so no explicit unset check is needed
-    /// (mirroring `HideOnCommit`/`CursorLock`).
+    /// (mirroring `HideOnCommit`).
     static let `default` = false
 
     /// Whether click-to-activate is enabled. Read fresh at each summon.

@@ -9,9 +9,9 @@ import Foundation
 /// - picking an app keeps all the app's windows and activates its front one.
 ///
 /// Off by default — an opt-in setting, so unless the user turns it on a commit behaves
-/// exactly as before and nothing extra is hidden. A caseless namespace for the read
-/// helper, mirroring `CursorLock`; read fresh at each summon so a Preferences change
-/// applies on the next open without a relaunch.
+/// exactly as before and nothing extra is hidden. A caseless namespace for the read helper;
+/// read fresh at each summon so a Preferences change applies on the next open without a
+/// relaunch.
 enum HideOnCommit {
     /// `UserDefaults` key backing the toggle. Single source of truth shared by the
     /// Preferences `@AppStorage` and `isEnabled(from:)` so the two cannot drift.

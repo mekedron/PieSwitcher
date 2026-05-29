@@ -104,7 +104,7 @@ final class WindowEnumeratorDockSortTests: XCTestCase {
             10: "com.google.Chrome", 20: "com.mitchellh.ghostty", 30: "com.apple.Mail"
         ]
         let apps = WindowEnumerator(
-            source: source, appOrder: { .dockPosition }, windowOrder: { .recentlyUsed },
+            source: source, appOrder: { .dockPosition }, windowOrder: { .fixed },
             dockOrder: { [DockOrder.finderBundleID, "com.apple.Mail", "com.google.Chrome"] },
             keepFinderLast: { false }, appBundleID: { bundleByPID[$0] }
         ).enumerate()
@@ -122,7 +122,7 @@ final class WindowEnumeratorDockSortTests: XCTestCase {
             40: DockOrder.finderBundleID, 10: "com.google.Chrome", 20: "com.mitchellh.ghostty"
         ]
         let apps = WindowEnumerator(
-            source: source, appOrder: { .dockPosition }, windowOrder: { .recentlyUsed },
+            source: source, appOrder: { .dockPosition }, windowOrder: { .fixed },
             dockOrder: { [DockOrder.finderBundleID, "com.google.Chrome"] },
             keepFinderLast: { true }, appBundleID: { bundleByPID[$0] }
         ).enumerate()

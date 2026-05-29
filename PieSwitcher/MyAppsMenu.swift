@@ -181,13 +181,10 @@ struct MyAppsMenu: MenuDefinition {
 
     /// Reorder the curated entries by the active Apps sort order, for when the user turned
     /// the "do not sort my custom list" checkbox off (Bringr-93j.43). `.name` sorts every
-    /// entry alphabetically — the only key a not-running app has. `.recentlyUsed` follows the
-    /// front-to-back order the screen-scoped enumeration already imposes: each running entry
-    /// takes its position in `live`, and entries with no window on this screen (not running,
-    /// or running on another display — no `live` position) fall to the end. `.dockPosition`
-    /// sorts every entry (running or not) by its bundle id's slot in the Dock order, which
-    /// each `CuratedApp` carries directly (Bringr-93j.55). All branches break ties by the
-    /// entry's original index, so the sort is stable and equal keys keep the manual order.
+    /// entry alphabetically — the only key a not-running app has. `.dockPosition` sorts every
+    /// entry (running or not) by its bundle id's slot in the Dock order, which each
+    /// `CuratedApp` carries directly (Bringr-93j.55). Both branches break ties by the entry's
+    /// original index, so the sort is stable and equal keys keep the manual order.
     private static func ordered(
         _ curated: [CuratedApp], live: [AppWindows], runningPID: (String) -> pid_t?,
         by order: AppSortOrder, dock: (order: [String], finderLast: Bool)
@@ -205,17 +202,6 @@ struct MyAppsMenu: MenuDefinition {
                 case .orderedDescending: return false
                 case .orderedSame: return lhs.offset < rhs.offset
                 }
-            }.map(\.element)
-        case .recentlyUsed:
-            let position = Dictionary(uniqueKeysWithValues: live.enumerated().map { ($1.id.pid, $0) })
-            func rank(_ app: CuratedApp) -> Int {
-                guard let pid = runningPID(app.bundleIdentifier) else { return Int.max }
-                return position[pid] ?? Int.max
-            }
-            return curated.enumerated().sorted { lhs, rhs in
-                let lhsRank = rank(lhs.element)
-                let rhsRank = rank(rhs.element)
-                return lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
             }.map(\.element)
         }
     }
