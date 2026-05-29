@@ -71,42 +71,93 @@ final class WindowController {
         system.focusWindow(window)
     }
 
-    /// Commit `window` as the user's choice (US-012): restore everything moved aside
-    /// (AC2), then surface, raise, and focus `window` (AC1). `restore` skips re-activating
-    /// the prior frontmost (would race the target); re-enumerating refreshes the AX cache
-    /// so a stale handle can't no-op the un-minimize/raise/focus.
+    /// Commit `window` as the user's choice (US-012): raise+focus the chosen window
+    /// (AC1), then restore everything moved aside (AC2). Bringr-93j.86 reordered raise
+    /// before restore so other apps unhiding can no longer flash visible for a frame
+    /// before the chosen window reaches the top — the user-reported blink. AX cache
+    /// stays valid because the chosen app was visible throughout the reveal.
     func commit(_ window: WindowID) {
-        restore(reactivatingFrontmost: false)
+        // OLD implementation (preserved per Bringr-93j.86 for easy rollback if this
+        // reorder breaks the activation/switch flow). Old rationale: `restore` first
+        // refreshed the AX cache via the unhide+re-enumeration. The visible cost was
+        // unhiding every other app a frame before the chosen one came to the top.
+        //   restore(reactivatingFrontmost: false)
+        //   let live = system.windows(of: window.app)
+        //   system.setMinimized(window, false)
+        //   raiseAndFocus(window)
+        //   if !live.contains(window) { system.raiseAcrossSpaces(window) }
+        //   if hideOnCommit { hideEveryAppExcept(window.app) }
+
+        // Restore chosen app's window baseline first so siblings return to original
+        // z-order (Bringr-93j.47), or the previously-front sibling stays at the bottom.
+        if let baseline = session?.windowBaseline[window.app] {
+            restoreWindowBaseline(baseline)
+            session?.windowBaseline[window.app] = nil
+        }
         let live = system.windows(of: window.app)
         system.setMinimized(window, false)
         raiseAndFocus(window)
-        // A window on another Space isn't in its app's AX window list (kAXWindowsAttribute
-        // never enumerates other Spaces), so the AX raise/focus above no-op'd; fall back to the
-        // window-server raise that targets it by CG number and switches Spaces (Bringr-93j.54).
-        // Same-Space windows are in `live`, so their proven AX path is untouched.
+        // Cross-Space fallback (Bringr-93j.54): kAXWindowsAttribute doesn't enumerate
+        // other Spaces, so the AX raise/focus above no-op'd; raise by CG number instead.
         if !live.contains(window) { system.raiseAcrossSpaces(window) }
-        // "Leave only my selection" hides the OTHER apps; the chosen window's siblings stay
-        // on screen and only it is activated — never minimizing within the app (Bringr-93j.49).
-        if hideOnCommit { hideEveryAppExcept(window.app) }
+        // With hide-on-commit on, other apps are re-hidden immediately — skip the
+        // unhide-then-re-hide flicker (Bringr-93j.86). Otherwise restore unhides them
+        // behind the chosen window (which is now on top), so the user sees no flash.
+        if hideOnCommit {
+            endSessionWithoutRestoringAppVisibility()
+            hideEveryAppExcept(window.app)
+        } else {
+            restore(reactivatingFrontmost: false)
+        }
     }
 
-    /// Commit `app` as the user's choice from the first-level apps ring. This is
-    /// intentionally weaker than choosing a specific window: restore the reveal,
-    /// then activate the app's current front window if one is available.
+    /// Commit `app` from the first-level apps ring: raise its front window (or reopen
+    /// if windowless, Bringr-93j.61), then restore. Reordered per Bringr-93j.86 — see
+    /// `commit(_ window:)` for the rationale.
     func commit(_ app: AppID) {
-        restore(reactivatingFrontmost: false)
+        // OLD implementation (preserved per Bringr-93j.86 for easy rollback):
+        //   restore(reactivatingFrontmost: false)
+        //   if let frontWindow = system.windows(of: app).first {
+        //       system.setMinimized(frontWindow, false)
+        //       raiseAndFocus(frontWindow)
+        //   } else {
+        //       system.reopen(app)
+        //   }
+        //   if hideOnCommit { hideEveryAppExcept(app) }
+
+        if let baseline = session?.windowBaseline[app] {
+            restoreWindowBaseline(baseline)
+            session?.windowBaseline[app] = nil
+        }
         if let frontWindow = system.windows(of: app).first {
             system.setMinimized(frontWindow, false)
             raiseAndFocus(frontWindow)
         } else {
-            // No window to focus (the app is running window-less, e.g. closed to the menu
-            // bar): reopen it like a Dock click so it gets a fresh window, rather than just
-            // activating an empty app (Bringr-93j.61).
             system.reopen(app)
         }
-        // "Leave only my selection" hides the OTHER apps but never touches this app's own
-        // windows — every window of the chosen app stays on screen (Bringr-93j.49).
-        if hideOnCommit { hideEveryAppExcept(app) }
+        if hideOnCommit {
+            endSessionWithoutRestoringAppVisibility()
+            hideEveryAppExcept(app)
+        } else {
+            restore(reactivatingFrontmost: false)
+        }
+    }
+
+    /// End the session without unhiding any apps — used by `commit` with `hideOnCommit`
+    /// on, so the apps the reveal hid are not unhid and re-hidden in the same breath
+    /// (the visible flicker Bringr-93j.86 fixed). Like `restore()` minus the app-
+    /// visibility loop and the frontmost re-activation.
+    private func endSessionWithoutRestoringAppVisibility() {
+        dimmer?.clear()
+        if let session {
+            // Defensive: only the target app's window baseline is populated in normal
+            // flows, and commit already cleared it. Replay any leftover baselines.
+            for (_, windows) in session.windowBaseline {
+                restoreWindowBaseline(windows)
+            }
+        }
+        store?.clear()
+        session = nil
     }
 
     /// The app's current front (active) window — the first in z-order — or `nil` if it has none.

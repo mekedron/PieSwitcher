@@ -75,10 +75,17 @@ final class RadialNavigatorCommitTests: XCTestCase {
         XCTAssertTrue(fixture.navigator.rings.isEmpty)
         XCTAssertFalse(fixture.fake.activationLog.contains(AppID(pid: 10)))
         XCTAssertTrue(fixture.fake.activationLog.allSatisfy { $0 == AppID(pid: 20) })
+        // Bringr-93j.86 (blink fix): target activation now comes BEFORE unhiding the
+        // other apps. Restoring first was the cause of the visible flash on every commit
+        // — every hidden app appeared for a frame before the chosen one was raised. With
+        // the new order the chosen window is already on top when others reappear behind
+        // it. Correctness (the chosen app still wins) is covered by the frontmost +
+        // activationLog assertions above; this guards the new order so a regression that
+        // re-introduces the blink also flips this assertion.
         XCTAssertLessThan(
-            operations.firstIndex(of: .setHidden(AppID(pid: 10), false)) ?? -1,
             operations.firstIndex(of: .activate(AppID(pid: 20))) ?? -1,
-            "app-slice commit must restore hidden apps before the selected app wins"
+            operations.firstIndex(of: .setHidden(AppID(pid: 10), false)) ?? -1,
+            "post-Bringr-93j.86: target activation must precede unhiding the hidden apps"
         )
     }
 
