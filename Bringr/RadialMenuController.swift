@@ -29,15 +29,20 @@ final class RadialMenuController: ObservableObject {
     /// opacity and label visibility in `RadialMenuView`. Re-read from the persisted
     /// settings at each summon so a Preferences change takes effect next open (AC2).
     @Published private(set) var appearance: RadialAppearance = .default
+    /// Whether the live highlight was last moved by keyboard vs mouse, for the focus tint
+    /// (Bringr-93j.71). Set by the mouse hover path and the +Keyboard extension.
+    @Published var highlightSource: HighlightSource = .mouse
 
     /// Overlay side length for the current base size, fit to every concentric ring
     /// at full depth.
     var overallDiameter: CGFloat { navigator.overallDiameter }
+    /// Keyboard-navigation settings resolved at summon time, read by the +Keyboard extension (Bringr-93j.71).
+    var keyboardConfig: KeyboardNavigationConfig = .disabled
 
     private let registry: MenuRegistry
-    private let navigator: RadialNavigator
+    let navigator: RadialNavigator
     private let window: RadialMenuWindow
-    private var machine = InteractionStateMachine()
+    var machine = InteractionStateMachine()
     /// Reads the persisted interaction mode at summon time so a Preferences change
     /// takes effect on the next summon without a relaunch (AC3 of US-009).
     private let modeProvider: () -> InteractionMode
@@ -123,7 +128,7 @@ final class RadialMenuController: ObservableObject {
 
     // MARK: - Trigger entry points
 
-    /// A hold-capable trigger (mouse chord, trackpad press) fired. Opens in the
+    /// A hold-capable trigger (mouse chord, keyboard shortcut) fired. Opens in the
     /// persisted mode, or dismisses if already open (toggle parity).
     func triggerPressed(for trigger: MenuTrigger, at cursor: CGPoint) {
         press(trigger: trigger, mode: modeProvider(), at: cursor)
@@ -209,6 +214,10 @@ final class RadialMenuController: ObservableObject {
         // Resolve the trackpad-haptic state once for this summon (Bringr-93j.44), like the
         // other read-fresh settings; the per-hover check then reads only this cheap state.
         haptics.resolveForSummon()
+        // Resolve the optional keyboard-navigation settings for this summon (Bringr-93j.71), like
+        // the other read-fresh settings; the live tap then consults `acceptsKeyboardNav`.
+        keyboardConfig = KeyboardNavigationConfig.current()
+        highlightSource = .mouse
         navigator.open(appNodes: root.resolvedChildren())
         syncFromNavigator()
         let side = navigator.overallDiameter
@@ -246,14 +255,14 @@ final class RadialMenuController: ObservableObject {
     /// Tear down the on-screen overlay and stop tracking the cursor, without
     /// touching window state — used after a commit, where the navigator has already
     /// restored and focused.
-    private func hideOverlay() {
+    func hideOverlay() {
         stopMenuMonitors()
         syncFromNavigator()
         window.orderOut(nil)
         isVisible = false
     }
 
-    private func syncFromNavigator() {
+    func syncFromNavigator() {
         rings = navigator.rings
         hovered = navigator.hovered
         prehighlighted = navigator.prehighlighted
@@ -344,6 +353,7 @@ final class RadialMenuController: ObservableObject {
             return
         }
         let previousHover = navigator.hovered
+        highlightSource = .mouse
         navigator.updateHover(navigator.region(forOffset: layoutOffset))
         haptics.hoverChanged(from: previousHover, to: navigator.hovered)
         syncFromNavigator()

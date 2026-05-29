@@ -97,6 +97,13 @@
 		1A00000000000000000000AE /* WindowEnumeratorSpacesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */; };
 		1A00000000000000000000B2 /* SortingSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B1 /* SortingSettingsView.swift */; };
 		1A00000000000000000000B4 /* DockOrderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000B3 /* DockOrderTests.swift */; };
+		1A00000000000000000000D1 /* KeyboardNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000D2 /* KeyboardNavigation.swift */; };
+		1A00000000000000000000D3 /* RadialNavigator+Keyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000D4 /* RadialNavigator+Keyboard.swift */; };
+		1A00000000000000000000D5 /* RadialMenuController+Keyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000D6 /* RadialMenuController+Keyboard.swift */; };
+		1A00000000000000000000D7 /* KeyboardNavMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000D8 /* KeyboardNavMonitor.swift */; };
+		1A00000000000000000000D9 /* KeyboardNavigationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000DA /* KeyboardNavigationSettingsView.swift */; };
+		1A00000000000000000000DB /* KeyboardNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000DC /* KeyboardNavigationTests.swift */; };
+		1A00000000000000000000DD /* RadialNavigatorKeyboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,6 +209,13 @@
 		1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeratorSpacesTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B1 /* SortingSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortingSettingsView.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B3 /* DockOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockOrderTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000D2 /* KeyboardNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardNavigation.swift; sourceTree = "<group>"; };
+		1A00000000000000000000D4 /* RadialNavigator+Keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RadialNavigator+Keyboard.swift"; sourceTree = "<group>"; };
+		1A00000000000000000000D6 /* RadialMenuController+Keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RadialMenuController+Keyboard.swift"; sourceTree = "<group>"; };
+		1A00000000000000000000D8 /* KeyboardNavMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardNavMonitor.swift; sourceTree = "<group>"; };
+		1A00000000000000000000DA /* KeyboardNavigationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardNavigationSettingsView.swift; sourceTree = "<group>"; };
+		1A00000000000000000000DC /* KeyboardNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardNavigationTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorKeyboardTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -293,6 +307,11 @@
 				1A00000000000000000000A7 /* CollectionScope.swift */,
 				1A00000000000000000000AB /* CollectionSettingsView.swift */,
 				1A00000000000000000000B1 /* SortingSettingsView.swift */,
+				1A00000000000000000000D2 /* KeyboardNavigation.swift */,
+				1A00000000000000000000D4 /* RadialNavigator+Keyboard.swift */,
+				1A00000000000000000000D6 /* RadialMenuController+Keyboard.swift */,
+				1A00000000000000000000D8 /* KeyboardNavMonitor.swift */,
+				1A00000000000000000000DA /* KeyboardNavigationSettingsView.swift */,
 			);
 			path = Bringr;
 			sourceTree = "<group>";
@@ -340,6 +359,8 @@
 				1A00000000000000000000CE /* WindowEnumeratorOnscreenValidationTests.swift */,
 				1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */,
 				1A00000000000000000000B3 /* DockOrderTests.swift */,
+				1A00000000000000000000DC /* KeyboardNavigationTests.swift */,
+				1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */,
 			);
 			path = BringrTests;
 			sourceTree = "<group>";
@@ -492,6 +513,11 @@
 				1A00000000000000000000A8 /* CollectionScope.swift in Sources */,
 				1A00000000000000000000AC /* CollectionSettingsView.swift in Sources */,
 				1A00000000000000000000B2 /* SortingSettingsView.swift in Sources */,
+				1A00000000000000000000D1 /* KeyboardNavigation.swift in Sources */,
+				1A00000000000000000000D3 /* RadialNavigator+Keyboard.swift in Sources */,
+				1A00000000000000000000D5 /* RadialMenuController+Keyboard.swift in Sources */,
+				1A00000000000000000000D7 /* KeyboardNavMonitor.swift in Sources */,
+				1A00000000000000000000D9 /* KeyboardNavigationSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -539,6 +565,8 @@
 				1A00000000000000000000CD /* WindowEnumeratorOnscreenValidationTests.swift in Sources */,
 				1A00000000000000000000AE /* WindowEnumeratorSpacesTests.swift in Sources */,
 				1A00000000000000000000B4 /* DockOrderTests.swift in Sources */,
+				1A00000000000000000000DB /* KeyboardNavigationTests.swift in Sources */,
+				1A00000000000000000000DD /* RadialNavigatorKeyboardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

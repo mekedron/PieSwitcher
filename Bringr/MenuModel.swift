@@ -106,8 +106,8 @@ struct MenuNode: Identifiable {
 enum MenuTrigger: Hashable, Sendable {
     /// Simultaneous left+right mouse press (US-007).
     case mouseChord
-    /// A held modifier-key combination — the mouse's modifier-key option and the
-    /// trackpad's only trigger (Bringr-93j.35), replacing the three-finger press.
+    /// A held modifier-key combination — the keyboard shortcut (Bringr-93j.35),
+    /// replacing the three-finger press.
     case modifierHold
 }
 

@@ -23,9 +23,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionAlertWindow: PermissionAlertWindow?
     /// Global left+right mouse-chord activation (US-007). `nil` under XCTest.
     private var activationMonitor: MouseChordMonitor?
-    /// Global modifier-key hold activation (Bringr-93j.35) — the trackpad's trigger and
-    /// the mouse's modifier-key option, replacing the three-finger press. `nil` under XCTest.
+    /// Global modifier-key hold activation (Bringr-93j.35) — the keyboard shortcut (formerly
+    /// split into the trackpad's trigger and the mouse's modifier option, unified in
+    /// Bringr-93j.69), replacing the three-finger press. `nil` under XCTest.
     private var modifierMonitor: ModifierHoldMonitor?
+    /// Global keyDown tap for optional keyboard navigation of the wheel (Bringr-93j.71). `nil`
+    /// under XCTest. Always installed but only consumes keys while the menu is open with the
+    /// feature on.
+    private var keyboardNavMonitor: KeyboardNavMonitor?
     private var trustCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -38,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         prewarmRadialMenu()
         startActivationMonitor()
         startModifierMonitor()
+        startKeyboardNavMonitor()
 
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {
@@ -92,13 +98,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // user grants it — no relaunch (US-002).
                 self.activationMonitor?.start()
                 self.modifierMonitor?.start()
+                self.keyboardNavMonitor?.start()
             }
     }
 
-    /// Install the global modifier-key hold monitor (Bringr-93j.35) — the trackpad's
-    /// trigger and the mouse's modifier-key option. Like the mouse-chord tap it needs
-    /// Accessibility permission, so it may fail on first launch of an untrusted build and
-    /// is retried the moment trust is granted; it never consumes a modifier key.
+    /// Install the global modifier-key hold monitor (Bringr-93j.35) — the keyboard shortcut.
+    /// Like the mouse-chord tap it needs Accessibility permission, so it may fail on first
+    /// launch of an untrusted build and is retried the moment trust is granted; it never
+    /// consumes a modifier key.
     private func startModifierMonitor() {
         let monitor = ModifierHoldMonitor(
             onPress: { [weak self] in
@@ -110,6 +117,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         modifierMonitor = monitor
+        monitor.start()
+    }
+
+    /// Install the global keyboard-navigation tap (Bringr-93j.71). Like the other taps it needs
+    /// Accessibility permission and is retried when trust is granted; it only consumes keys while
+    /// the menu is open with keyboard navigation enabled, passing everything else through.
+    private func startKeyboardNavMonitor() {
+        let monitor = KeyboardNavMonitor(
+            isActive: { [weak self] in self?.radialMenu?.acceptsKeyboardNav ?? false },
+            onKey: { [weak self] key in self?.radialMenu?.handleKeyboardNavKey(key) ?? false }
+        )
+        keyboardNavMonitor = monitor
         monitor.start()
     }
 

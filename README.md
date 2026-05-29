@@ -47,10 +47,11 @@ window the next time it launches.
 
 Bringr offers two global triggers, both configurable in Preferences:
 
-- **Mouse** — *Left + right click together* (the default), or *hold a modifier
-  combination*. Normal single clicks pass through untouched.
-- **Trackpad** — *hold a modifier combination* (defaults to **Fn**). No click or
-  tap needed; just hold the keys.
+- **Mouse** — *Left + right click together* (the default). Normal single clicks
+  pass through untouched.
+- **Keyboard** — *hold a modifier combination* (defaults to **Fn**). No click or
+  tap needed; just hold the keys. On a laptop without an external mouse, this is
+  the only way to summon the wheel.
 
 You can also open the wheel from the menu-bar icon via **Open Window Switcher**.
 
@@ -69,8 +70,8 @@ and takes effect on the **next summon** — no relaunch needed.
 | Section | What it controls |
 | --- | --- |
 | **Permissions** | Accessibility status, with **Open System Settings** and **Re-check** actions. |
-| **Mouse** | Activation method: *left + right click* or *hold modifier keys* (with a Fn / Control / Option / Shift / Command picker). |
-| **Trackpad** | The modifier combination to hold (default **Fn**). |
+| **Mouse** | *Left + right click together* to summon. |
+| **Keyboard** | The modifier combination to hold (default **Fn**), with a Fn / Control / Option / Shift / Command picker and a hold delay. The only way to summon on a laptop without an external mouse. |
 | **Startup** | Launch Bringr at login. |
 | **Interaction** | *Hold to select* (default) vs *Click to stay open*. |
 | **Reveal** | How other apps/windows get out of the way (see [below](#reveal)). |

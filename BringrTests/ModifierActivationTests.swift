@@ -2,10 +2,10 @@ import CoreGraphics
 import XCTest
 @testable import Bringr
 
-/// Covers the configurable modifier-key activation (Bringr-93j.35): the `CGEventFlags`
-/// reduction, the persisted mouse-method and modifier-combination readers, the armed-set
-/// computation, and the pure `ModifierHoldDetector` edge logic — all in isolation from
-/// the live event tap.
+/// Covers the configurable keyboard-shortcut activation (Bringr-93j.35, Bringr-93j.69): the
+/// `CGEventFlags` reduction, the persisted modifier-combination reader, the armed-set
+/// computation, and the pure `ModifierHoldDetector` edge logic — all in isolation from the
+/// live event tap.
 final class ModifierActivationTests: XCTestCase {
 
     // MARK: - CGEventFlags → ModifierCombination
@@ -33,64 +33,53 @@ final class ModifierActivationTests: XCTestCase {
         XCTAssertTrue(ModifierCombination(cgFlags: []).isEmpty)
     }
 
-    // MARK: - Persisted combinations (defaults & the "cleared vs unset" distinction)
+    // MARK: - Persisted combination (defaults & the "cleared vs unset" distinction)
 
-    func testTrackpadDefaultsToFnWhenUnset() {
-        XCTAssertEqual(ModifierActivation.trackpad(from: makeDefaults()), .function)
-    }
-
-    func testMouseModifiersDefaultToEmptyWhenUnset() {
-        XCTAssertTrue(ModifierActivation.mouse(from: makeDefaults()).isEmpty)
+    func testKeyboardDefaultsToFnWhenUnset() {
+        XCTAssertEqual(ModifierActivation.keyboard(from: makeDefaults()), .function)
     }
 
     func testStoredCombinationRoundTrips() {
         let defaults = makeDefaults()
         let combo: ModifierCombination = [.control, .option]
-        defaults.set(combo.rawValue, forKey: ModifierActivation.trackpadDefaultsKey)
-        XCTAssertEqual(ModifierActivation.trackpad(from: defaults), combo)
+        defaults.set(combo.rawValue, forKey: ModifierActivation.keyboardDefaultsKey)
+        XCTAssertEqual(ModifierActivation.keyboard(from: defaults), combo)
     }
 
-    func testClearedTrackpadStaysEmptyAndIsNotTheDefault() {
+    func testClearedKeyboardStaysEmptyAndIsNotTheDefault() {
         // Storing 0 means "the user unchecked every key" — disabled — and must NOT fall
         // back to the Fn default the way an absent key does.
         let defaults = makeDefaults()
-        defaults.set(0, forKey: ModifierActivation.trackpadDefaultsKey)
-        XCTAssertTrue(ModifierActivation.trackpad(from: defaults).isEmpty)
+        defaults.set(0, forKey: ModifierActivation.keyboardDefaultsKey)
+        XCTAssertTrue(ModifierActivation.keyboard(from: defaults).isEmpty)
     }
 
     func testStrayBitsAreMaskedAway() {
         let defaults = makeDefaults()
-        defaults.set(ModifierCombination.function.rawValue | (1 << 20), forKey: ModifierActivation.mouseDefaultsKey)
-        XCTAssertEqual(ModifierActivation.mouse(from: defaults), .function)
+        defaults.set(ModifierCombination.function.rawValue | (1 << 20), forKey: ModifierActivation.keyboardDefaultsKey)
+        XCTAssertEqual(ModifierActivation.keyboard(from: defaults), .function)
     }
 
     // MARK: - Armed combinations
 
-    func testArmedByDefaultIsTrackpadFnOnly() {
-        // Fresh install: trackpad Fn is armed; the mouse uses left+right click, so its
-        // (empty) modifier set is not armed.
+    func testArmedByDefaultIsKeyboardFnOnly() {
+        // Fresh install: the keyboard shortcut defaults to Fn, so Fn is the one armed combo;
+        // the mouse uses left+right click, which is not a modifier combination.
         XCTAssertEqual(ModifierActivation.armedCombinations(from: makeDefaults()), [.function])
     }
 
-    func testMouseModifiersArmedWheneverNonEmpty() {
-        // The mouse modifier hold is now independent of the left+right click trigger
-        // (Bringr-93j.67): selecting any key arms it, with no "method" gate to flip.
+    func testChosenKeyboardComboIsArmed() {
+        // Bringr-93j.69: one unified keyboard combination, so the armed set is exactly it.
         let defaults = makeDefaults()
-        defaults.set(ModifierCombination.command.rawValue, forKey: ModifierActivation.mouseDefaultsKey)
-        XCTAssertEqual(Set(ModifierActivation.armedCombinations(from: defaults)), [.function, .command])
+        defaults.set(ModifierCombination([.command, .option]).rawValue, forKey: ModifierActivation.keyboardDefaultsKey)
+        XCTAssertEqual(ModifierActivation.armedCombinations(from: defaults), [[.command, .option]])
     }
 
-    func testClearedTrackpadDropsOutOfArmedSet() {
+    func testClearedKeyboardDisarmsEverything() {
+        // Unchecking every key (stored 0) disables the keyboard path entirely, so nothing is
+        // armed — the mouse's left+right click is then the only remaining trigger.
         let defaults = makeDefaults()
-        defaults.set(0, forKey: ModifierActivation.trackpadDefaultsKey)
-        defaults.set(ModifierCombination.option.rawValue, forKey: ModifierActivation.mouseDefaultsKey)
-        XCTAssertEqual(ModifierActivation.armedCombinations(from: defaults), [.option])
-    }
-
-    func testEmptyMouseSetIsNotArmed() {
-        let defaults = makeDefaults()
-        defaults.set(0, forKey: ModifierActivation.trackpadDefaultsKey)
-        // Mouse modifiers never set → empty → nothing armed at all.
+        defaults.set(0, forKey: ModifierActivation.keyboardDefaultsKey)
         XCTAssertTrue(ModifierActivation.armedCombinations(from: defaults).isEmpty)
     }
 

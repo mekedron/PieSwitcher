@@ -65,7 +65,8 @@ struct RadialMenuView: View {
                     ring: ring,
                     hovered: controller.hovered,
                     prehighlighted: controller.prehighlighted,
-                    appearance: controller.appearance
+                    appearance: controller.appearance,
+                    highlightSource: controller.highlightSource
                 )
             }
         }
@@ -153,6 +154,10 @@ struct RadialRingEmphasis: View {
     let hovered: HoverRegion
     let prehighlighted: HoverRegion
     let appearance: RadialAppearance
+    /// Whether the hovered slice was reached by keyboard (Bringr-93j.71): keyboard focus reuses
+    /// the same emphasis but swaps the white "lit" cue for an accent-coloured one, so it reads
+    /// clearly as keyboard focus rather than mouse hover.
+    let highlightSource: HighlightSource
 
     var body: some View {
         ZStack {
@@ -160,21 +165,22 @@ struct RadialRingEmphasis: View {
                 let region = HoverRegion.slice(level: ring.level, index: index)
                 let isHovered = hovered == region
                 let isPrehighlighted = !isHovered && prehighlighted == region
+                let isKeyboardFocus = isHovered && highlightSource == .keyboard
                 let wedge = RadialWedge(layout: ring.layout, index: index)
 
-                wedge.fill(Color.white.opacity(
+                wedge.fill((isKeyboardFocus ? Color.accentColor : Color.white).opacity(
                     appearance.fillOpacity(hovered: isHovered, prehighlighted: isPrehighlighted)
                 ))
                 wedge.stroke(
-                    rimColor(hovered: isHovered, prehighlighted: isPrehighlighted),
+                    rimColor(hovered: isHovered, prehighlighted: isPrehighlighted, keyboardFocus: isKeyboardFocus),
                     lineWidth: rimWidth(hovered: isHovered, prehighlighted: isPrehighlighted)
                 )
             }
         }
     }
 
-    private func rimColor(hovered: Bool, prehighlighted: Bool) -> Color {
-        if hovered { return Color.primary.opacity(0.85) }
+    private func rimColor(hovered: Bool, prehighlighted: Bool, keyboardFocus: Bool) -> Color {
+        if hovered { return keyboardFocus ? Color.accentColor : Color.primary.opacity(0.85) }
         if prehighlighted { return Color.primary.opacity(0.5) }
         return Color.primary.opacity(0.14)
     }

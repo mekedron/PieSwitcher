@@ -10,25 +10,25 @@ struct PreferencesView: View {
     /// fresh at each summon, so a change here applies on the next open without a relaunch.
     @AppStorage(CuratedApps.showOtherRunningAppsDefaultsKey)
     private var showsOtherRunningApps = CuratedApps.showOtherRunningAppsDefault
-    /// How the mouse and trackpad summon the menu (Bringr-93j.35, Bringr-93j.67). The same
-    /// keys are read fresh by the activation monitors, so a change here takes effect with no
-    /// relaunch. The mouse's two triggers — left+right click and a held modifier combination —
-    /// are independent toggles, so either, both, or neither can be on at once.
+    /// How the mouse and keyboard summon the menu (Bringr-93j.35, Bringr-93j.67, Bringr-93j.69).
+    /// The same keys are read fresh by the activation monitors, so a change here takes effect
+    /// with no relaunch. The mouse's left+right click and the keyboard's held modifier
+    /// combination are independent triggers, so either, both, or neither can be on at once.
     @AppStorage(MouseChordActivation.defaultsKey)
     private var mouseChordEnabled = MouseChordActivation.default
-    @AppStorage(ModifierActivation.mouseDefaultsKey)
-    private var mouseModifiersRaw = ModifierActivation.mouseDefault.rawValue
-    @AppStorage(ModifierActivation.trackpadDefaultsKey)
-    private var trackpadModifiersRaw = ModifierActivation.trackpadDefault.rawValue
+    @AppStorage(ModifierActivation.keyboardDefaultsKey)
+    private var keyboardModifiersRaw = ModifierActivation.keyboardDefault.rawValue
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 section("Permissions", isFirst: true) { permissionSection }
                 section("Mouse") { mouseSection }
-                section("Trackpad") { trackpadSection }
+                section("Keyboard") { keyboardSection }
                 section("Startup") { startupSection }
                 section("Interaction") { interactionSection }
+                section("Keyboard Navigation") { KeyboardNavigationSettings() }
+                section("Haptics") { TrackpadHapticsSettings() }
                 section("Reveal") { revealSection }
                 section("Sorting") { SortingSettings() }
                 section("Collection") { collectionSection }
@@ -80,56 +80,42 @@ struct PreferencesView: View {
     }
 
     private var mouseSection: some View {
-        let combo = ModifierCombination(rawValue: mouseModifiersRaw).intersection(.all)
-        return VStack(alignment: .leading, spacing: 12) {
-            // Two independent triggers (Bringr-93j.67): the click combo and the modifier
-            // hold can each be on or off, so the wheel summons on whichever is active.
+        VStack(alignment: .leading, spacing: 8) {
             Toggle("Left and right click together", isOn: $mouseChordEnabled)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Hold modifier keys")
-                ModifierKeysPicker(rawValue: $mouseModifiersRaw)
-                ModifierHoldDelayPicker()
-            }
-
-            Text(mouseHelp(chordEnabled: mouseChordEnabled, modifiers: combo))
+            Text(mouseChordEnabled
+                 ? "Press the left and right mouse buttons together to summon the wheel. "
+                   + "Normal single clicks pass through untouched."
+                 : "Turn this on to summon the wheel by pressing the left and right mouse "
+                   + "buttons together. The keyboard shortcut still works on its own.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    /// Describes whichever of the mouse's two independent triggers are on (Bringr-93j.67),
-    /// so the caption always reflects the live combination — click only, modifiers only,
-    /// both, or (the one dead end worth calling out) neither.
-    private func mouseHelp(chordEnabled: Bool, modifiers: ModifierCombination) -> String {
-        switch (chordEnabled, modifiers.isEmpty) {
-        case (true, true):
-            return "Press the left and right mouse buttons together to summon the wheel."
-        case (false, false):
-            return "Hold \(modifiers.names) to summon the wheel, then release to choose."
-        case (true, false):
-            return "Press the left and right buttons together, or hold \(modifiers.names), to summon the wheel."
-        case (false, true):
-            return "No mouse trigger is on. Turn on the click combo, or pick modifier keys to hold."
-        }
-    }
-
-    private var trackpadSection: some View {
-        let combo = ModifierCombination(rawValue: trackpadModifiersRaw).intersection(.all)
-        return VStack(alignment: .leading, spacing: 10) {
-            ModifierKeysPicker(rawValue: $trackpadModifiersRaw)
-
+    private var keyboardSection: some View {
+        let combo = ModifierCombination(rawValue: keyboardModifiersRaw).intersection(.all)
+        return VStack(alignment: .leading, spacing: 12) {
+            // The keyboard shortcut: one held modifier combination, independent of the mouse's
+            // click combo. Bringr-93j.69 merged the former mouse + trackpad modifier pickers
+            // into this one, since the modifier hold is a global key event either way.
+            Text("Hold modifier keys")
+            ModifierKeysPicker(rawValue: $keyboardModifiersRaw)
             ModifierHoldDelayPicker()
 
             Text(combo.isEmpty
-                 ? "Pick one or more modifier keys to hold. Until then, the trackpad can't summon the wheel."
+                 ? "Pick one or more modifier keys to hold. Until then, the keyboard can't summon the wheel."
                  : "Hold \(combo.names) to summon the wheel — no click or tap needed — then release to choose.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            TrackpadHapticsSettings()
+            Text("On a laptop without an external mouse, the keyboard shortcut is the only "
+                 + "way to summon the wheel.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -304,10 +290,10 @@ private struct ModifierKeysPicker: View {
     }
 }
 
-/// A slider plus a numeric field for the modifier hold delay (Bringr-93j.58). Rendered in
-/// both the Mouse and Trackpad sections; both bind the one key, so editing either keeps
-/// them in sync. `ModifierHoldMonitor` reads the same key fresh on each hold, so a change
-/// applies on the next summon without a relaunch.
+/// A slider plus a numeric field for the modifier hold delay (Bringr-93j.58). Lives in the
+/// Keyboard section (Bringr-93j.69 folded the former duplicate out of the old Mouse and
+/// Trackpad sections into this one). `ModifierHoldMonitor` reads the same key fresh on each
+/// hold, so a change applies on the next summon without a relaunch.
 private struct ModifierHoldDelayPicker: View {
     @AppStorage(ActivationHoldDelay.defaultsKey)
     private var delayMilliseconds = ActivationHoldDelay.defaultMilliseconds
@@ -329,8 +315,7 @@ private struct ModifierHoldDelayPicker: View {
             }
 
             Text("Hold the keys at least this long before the wheel opens, so a quick tap "
-                 + "(like Fn to switch the input language) won't summon it. Shared by Mouse "
-                 + "and Trackpad.")
+                 + "(like Fn to switch the input language) won't summon it.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

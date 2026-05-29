@@ -4,7 +4,7 @@ import Foundation
 
 /// Whether the radial menu stays open after the summon trigger is released.
 /// Persisted (AC3) and chosen in Preferences; governs the hold-capable triggers
-/// (mouse chord, trackpad press). The menu-bar fallback always behaves as
+/// (mouse chord, keyboard shortcut). The menu-bar fallback always behaves as
 /// `clickToStay` because a menu click has no "hold" to track.
 enum InteractionMode: String, CaseIterable, Sendable {
     /// The menu stays open only while the trigger is held: gliding to a slice and
@@ -54,7 +54,7 @@ enum SliceTarget: Equatable, Sendable {
 /// Inputs the interaction state machine reacts to. The live controller translates
 /// triggers, releases, clicks, and Esc into these; the machine stays pure.
 enum InteractionInput: Equatable, Sendable {
-    /// The summon trigger fired (mouse chord, trackpad press, or menu-bar item).
+    /// The summon trigger fired (mouse chord, keyboard shortcut, or menu-bar item).
     case triggerPressed
     /// The summon trigger was released, with what the cursor was over at release.
     case triggerReleased(over: SliceTarget)
@@ -121,6 +121,14 @@ struct InteractionStateMachine {
             isOpen = false
             return .cancel
         }
+    }
+
+    /// Force the machine to the closed state after a keyboard-driven commit (Bringr-93j.71),
+    /// which performs the selection directly on the navigator rather than through the mode-gated
+    /// release/click path. Mirrors the `isOpen = false` every commit/cancel already does, so the
+    /// next trigger opens cleanly.
+    mutating func markClosed() {
+        isOpen = false
     }
 
     private mutating func handleTriggerPressed() -> InteractionOutcome {

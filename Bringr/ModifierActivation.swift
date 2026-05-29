@@ -60,9 +60,10 @@ struct ModifierCombination: OptionSet, Hashable, Sendable {
 
 // MARK: - Mouse left+right-click trigger
 
-/// Whether the simultaneous left+right mouse click summons the menu (US-007). This is one
-/// of the mouse's two independent triggers — the other being a held modifier combination
-/// (`ModifierActivation.mouse`) — so either, both, or neither can be on at once (Bringr-93j.67).
+/// Whether the simultaneous left+right mouse click summons the menu (US-007). This is the
+/// mouse's summon trigger; the keyboard's held modifier combination
+/// (`ModifierActivation.keyboard`) is a separate, independent trigger, so either, both, or
+/// neither can be on at once (Bringr-93j.67, Bringr-93j.69).
 /// A caseless namespace for the read helper, mirroring `HideOnCommit`/`CursorLock`; read
 /// fresh by `MouseChordMonitor` on every event so a Preferences change applies with no relaunch.
 enum MouseChordActivation {
@@ -85,31 +86,32 @@ enum MouseChordActivation {
 
 // MARK: - Persisted modifier combinations
 
-/// The persisted modifier-key activation for the mouse and the trackpad, plus the set
-/// of combinations currently "armed". Read fresh like the other settings, so a change
+/// The persisted keyboard-shortcut activation — one held modifier combination — plus the
+/// set of combinations currently "armed". Read fresh like the other settings, so a change
 /// applies immediately without a relaunch.
+///
+/// Bringr-93j.69 unified the former separate mouse-modifier and trackpad-modifier settings
+/// into this single keyboard shortcut: the modifier hold is a global key event that never
+/// distinguished mouse from trackpad, so two persisted combinations were redundant. The mouse
+/// keeps its own, independent left+right-click trigger (see `MouseChordActivation`).
 enum ModifierActivation {
-    /// `UserDefaults` keys backing the two persisted combinations.
-    static let trackpadDefaultsKey = "activation.trackpad.modifiers"
-    static let mouseDefaultsKey = "activation.mouse.modifiers"
+    /// `UserDefaults` key backing the persisted combination. The pre-Bringr-93j.69 keys
+    /// (`activation.mouse.modifiers`, `activation.trackpad.modifiers`) are abandoned, not
+    /// migrated — matching the project's no-compat-shim convention.
+    static let keyboardDefaultsKey = "activation.keyboard.modifiers"
 
-    /// The trackpad defaults to Fn: holding Fn summons the menu with no trackpad gesture.
-    static let trackpadDefault: ModifierCombination = .function
-    /// The mouse defaults to no modifiers — out of the box it summons with left+right
-    /// click (`MouseChordActivation.default`), so no modifier path needs to be armed.
-    static let mouseDefault: ModifierCombination = []
+    /// Defaults to Fn: out of the box, holding Fn summons the menu with no mouse or trackpad
+    /// gesture. This was the prior trackpad default and is the only summon method on a laptop
+    /// without an external mouse.
+    static let keyboardDefault: ModifierCombination = .function
 
-    static func trackpad(from defaults: UserDefaults = .standard) -> ModifierCombination {
-        read(trackpadDefaultsKey, default: trackpadDefault, from: defaults)
+    static func keyboard(from defaults: UserDefaults = .standard) -> ModifierCombination {
+        read(keyboardDefaultsKey, default: keyboardDefault, from: defaults)
     }
 
-    static func mouse(from defaults: UserDefaults = .standard) -> ModifierCombination {
-        read(mouseDefaultsKey, default: mouseDefault, from: defaults)
-    }
-
-    /// A stored `0` means "explicitly cleared" (the user unchecked every key, disabling
-    /// that path) — distinct from "never set", which yields the default. So an absent key
-    /// gets the default while a cleared one stays empty. Stray bits are masked away.
+    /// A stored `0` means "explicitly cleared" (the user unchecked every key, disabling the
+    /// keyboard shortcut) — distinct from "never set", which yields the default. So an absent
+    /// key gets the default while a cleared one stays empty. Stray bits are masked away.
     private static func read(
         _ key: String,
         default fallback: ModifierCombination,
@@ -119,18 +121,15 @@ enum ModifierActivation {
         return ModifierCombination(rawValue: raw).intersection(.all)
     }
 
-    /// Every modifier combination that should summon the menu right now: the trackpad's
-    /// and the mouse's. Each is included only when non-empty, so unchecking every key
-    /// disables that path rather than arming "no modifiers". Both are independent of the
-    /// mouse's left+right-click trigger (see `MouseChordActivation`), which is not a
-    /// modifier combination and so is not represented here.
+    /// Every modifier combination that should summon the menu right now: the single keyboard
+    /// shortcut, included only when non-empty so unchecking every key disables the keyboard
+    /// path rather than arming "no modifiers". Independent of the mouse's left+right-click
+    /// trigger (see `MouseChordActivation`), which is not a modifier combination and so is
+    /// not represented here. Returned as an array because the detector matches against a set
+    /// of armed combinations (a shape that also leaves room for future per-menu shortcuts).
     static func armedCombinations(from defaults: UserDefaults = .standard) -> [ModifierCombination] {
-        var armed: [ModifierCombination] = []
-        let trackpad = trackpad(from: defaults)
-        if !trackpad.isEmpty { armed.append(trackpad) }
-        let mouse = mouse(from: defaults)
-        if !mouse.isEmpty { armed.append(mouse) }
-        return armed
+        let keyboard = keyboard(from: defaults)
+        return keyboard.isEmpty ? [] : [keyboard]
     }
 }
 
@@ -180,8 +179,8 @@ struct ModifierHoldDetector {
 
 /// Watches global modifier-key changes through a `CGEventTap` and fires `onPress` /
 /// `onRelease` when the held modifiers start / stop matching an armed combination
-/// (Bringr-93j.35). This is the trackpad's only activation and the mouse's modifier-key
-/// option; it replaces the unreliable three-finger trackpad press.
+/// (Bringr-93j.35). This is the keyboard shortcut — the only summon method on a laptop
+/// without an external mouse; it replaces the unreliable three-finger trackpad press.
 ///
 /// The tap **never consumes** an event — modifier keys must keep working everywhere — it
 /// only observes and always passes the event through. It needs Accessibility permission
