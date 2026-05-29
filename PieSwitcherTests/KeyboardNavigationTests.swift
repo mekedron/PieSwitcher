@@ -119,6 +119,16 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertEqual(KeyboardNavKey(keyCode: 126), .arrow(.up))
     }
 
+    /// Holding Fn (the default summon shortcut) turns the arrow cluster into Home/End/Page Up/
+    /// Page Down, so in hold-to-select the arrows arrive as those codes — they must still map to
+    /// the matching arrow or arrow navigation is dead while Fn is held (Bringr-93j.80).
+    func testFnShiftedArrowClusterMapsToArrows() {
+        XCTAssertEqual(KeyboardNavKey(keyCode: 115), .arrow(.left), "Fn+← arrives as Home")
+        XCTAssertEqual(KeyboardNavKey(keyCode: 119), .arrow(.right), "Fn+→ arrives as End")
+        XCTAssertEqual(KeyboardNavKey(keyCode: 116), .arrow(.up), "Fn+↑ arrives as Page Up")
+        XCTAssertEqual(KeyboardNavKey(keyCode: 121), .arrow(.down), "Fn+↓ arrives as Page Down")
+    }
+
     func testConfirmAndEscapeKeyCodes() {
         XCTAssertEqual(KeyboardNavKey(keyCode: 36), .confirm) // Return
         XCTAssertEqual(KeyboardNavKey(keyCode: 76), .confirm) // keypad Enter

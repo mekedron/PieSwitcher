@@ -135,12 +135,20 @@ enum KeyboardNavKey: Equatable, Sendable {
     /// `.unsupported` rather than dropping it (Bringr-93j.73), so the close-on-unsupported policy
     /// can act on it. Both the number row and the keypad map to digits, and Return, keypad Enter,
     /// and Space all confirm (Bringr-93j.72 added Space), so the keyboard layout doesn't matter.
+    ///
+    /// The arrow cluster's Fn-shifted codes map to the same arrows (Bringr-93j.80): on a Mac,
+    /// holding Fn turns ← → ↑ ↓ into Home/End/Page Up/Page Down, and the default summon shortcut
+    /// IS Fn — so in hold-to-select the trigger is still down when the arrows are pressed and they
+    /// arrive as Home (123→115), End (124→119), Page Up (126→116), Page Down (125→121), never as
+    /// the bare arrow codes. Treating each as its arrow makes arrow navigation work while Fn is
+    /// held; on a full keyboard the dedicated Home/End/Page keys then navigate too, which is
+    /// harmless inside the wheel where they have no other meaning.
     init(keyCode: Int64) {
         switch keyCode {
-        case 123: self = .arrow(.left)
-        case 124: self = .arrow(.right)
-        case 125: self = .arrow(.down)
-        case 126: self = .arrow(.up)
+        case 123, 115: self = .arrow(.left)   // ←, or Fn+← → Home
+        case 124, 119: self = .arrow(.right)  // →, or Fn+→ → End
+        case 125, 121: self = .arrow(.down)   // ↓, or Fn+↓ → Page Down
+        case 126, 116: self = .arrow(.up)     // ↑, or Fn+↑ → Page Up
         case 36, 76, 49: self = .confirm
         case 53: self = .escape
         default:
