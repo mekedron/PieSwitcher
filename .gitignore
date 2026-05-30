@@ -51,3 +51,6 @@ fastlane/test_output
 
 # ralph-tui local session state (not synced to remote)
 .ralph-tui/
+
+# Sparkle Ed25519 private key (paste into GitHub secret SPARKLE_PRIVATE_KEY; never commit)
+sparkle_private_key

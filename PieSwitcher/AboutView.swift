@@ -29,6 +29,10 @@ struct AboutView: View {
             Link("github.com/mekedron/PieSwitcher", destination: repoURL)
                 .font(.callout)
 
+            Button("Check for Updates…") {
+                SparkleUpdater.shared?.checkForUpdates()
+            }
+
             Text(copyrightString)
                 .font(.caption2)
                 .foregroundStyle(.tertiary)

@@ -6,7 +6,11 @@ struct PieSwitcherApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent(permissions: appDelegate.permissions, radialMenu: appDelegate.radialMenu)
+            MenuContent(
+                permissions: appDelegate.permissions,
+                radialMenu: appDelegate.radialMenu,
+                updater: appDelegate.updater
+            )
         } label: {
             Image(systemName: "circle.hexagongrid")
         }
@@ -33,6 +37,7 @@ struct PieSwitcherApp: App {
 private struct MenuContent: View {
     @ObservedObject var permissions: PermissionsManager
     let radialMenu: RadialMenuController?
+    let updater: SparkleUpdater
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -56,6 +61,10 @@ private struct MenuContent: View {
             openPreferences()
         }
         .keyboardShortcut(",")
+
+        Button("Check for Updates…") {
+            updater.checkForUpdates()
+        }
 
         Button("About PieSwitcher") {
             NSApp.activate(ignoringOtherApps: true)

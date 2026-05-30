@@ -99,6 +99,8 @@
 		1A00000000000000000000DD /* RadialNavigatorKeyboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */; };
 		1A00000000000000000000DF /* RadialNavigatorKeyboardFollowupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E0 /* RadialNavigatorKeyboardFollowupTests.swift */; };
 		1A00000000000000000000E3 /* RadialLayoutLabelWidthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E4 /* RadialLayoutLabelWidthTests.swift */; };
+		1A00000000000000000000F1 /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000F0 /* SparkleUpdater.swift */; };
+		1A00000000000000000000F3 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00000000000000000000F2 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -206,6 +208,7 @@
 		1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorKeyboardTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000E0 /* RadialNavigatorKeyboardFollowupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorKeyboardFollowupTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000E4 /* RadialLayoutLabelWidthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialLayoutLabelWidthTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000F0 /* SparkleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdater.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -213,6 +216,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A00000000000000000000F3 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,6 +303,7 @@
 				1A00000000000000000000D6 /* RadialMenuController+Keyboard.swift */,
 				1A00000000000000000000D8 /* KeyboardNavMonitor.swift */,
 				1A00000000000000000000DA /* KeyboardNavigationSettingsView.swift */,
+				1A00000000000000000000F0 /* SparkleUpdater.swift */,
 			);
 			path = PieSwitcher;
 			sourceTree = "<group>";
@@ -366,6 +371,9 @@
 			dependencies = (
 			);
 			name = PieSwitcher;
+			packageProductDependencies = (
+				1A00000000000000000000F2 /* Sparkle */,
+			);
 			productName = PieSwitcher;
 			productReference = 1A0000000000000000000006 /* PieSwitcher.app */;
 			productType = "com.apple.product-type.application";
@@ -416,6 +424,9 @@
 				Base,
 			);
 			mainGroup = 1A0000000000000000000002;
+			packageReferences = (
+				1A00000000000000000000F4 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = 1A0000000000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -500,6 +511,7 @@
 				1A00000000000000000000D5 /* RadialMenuController+Keyboard.swift in Sources */,
 				1A00000000000000000000D7 /* KeyboardNavMonitor.swift in Sources */,
 				1A00000000000000000000D9 /* KeyboardNavigationSettingsView.swift in Sources */,
+				1A00000000000000000000F1 /* SparkleUpdater.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -698,6 +710,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (c) 2026 Nikita R. All rights reserved.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_FILE = PieSwitcher/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -727,6 +740,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (c) 2026 Nikita R. All rights reserved.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_FILE = PieSwitcher/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -812,6 +826,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1A00000000000000000000F4 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1A00000000000000000000F2 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A00000000000000000000F4 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1A0000000000000000000001 /* Project object */;
 }

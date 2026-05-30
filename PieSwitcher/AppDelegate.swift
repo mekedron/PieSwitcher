@@ -16,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// window is up (Bringr-93j.45). Driven by the Preferences window's
     /// appear/disappear in `PieSwitcherApp`.
     let dockIcon = DockIconManager()
+    /// Sparkle auto-updater (Bringr-jz4). No-ops until `start()` is called and only
+    /// actually starts polling when `SUFeedURL` is set in Info.plist, so debug builds
+    /// without an appcast wired up stay quiet.
+    let updater = SparkleUpdater()
     /// The pre-warmed radial menu, summoned by the menu-bar item (and, later, the
     /// global activation triggers in US-007/US-008). `nil` under XCTest, where the
     /// launch bootstrap is skipped.
@@ -44,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startActivationMonitor()
         startModifierMonitor()
         startKeyboardNavMonitor()
+        updater.start()
 
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {
