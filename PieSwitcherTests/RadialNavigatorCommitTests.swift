@@ -278,7 +278,12 @@ final class RadialNavigatorCommitTests: XCTestCase {
             frontmost: AppID(pid: 10)
         )
         let store = makeEphemeralStore()
-        let navigator = RadialNavigator(windowControl: WindowController(system: fake), store: store)
+        let controller = WindowController(system: fake)
+        // Pin `.hideOthers` so the commit tests' "reveal hid apps, commit kept them
+        // hidden" assertions (Bringr-93j.88) keep working regardless of the default-
+        // strategy pick. The default flipped to `.raiseToFront` in Bringr-93j.93.
+        controller.setStrategy(.hideOthers)
+        let navigator = RadialNavigator(windowControl: controller, store: store)
         return Fixture(navigator: navigator, fake: fake, store: store, appNodes: appNodes)
     }
 

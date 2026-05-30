@@ -10,15 +10,43 @@ final class CollectionScopeTests: XCTestCase {
 
     // MARK: - Persistence: defaults and round-trip
 
-    func testEveryFlagDefaultsToFalseWhenUnset() {
+    func testEveryFlagDefaultsToItsBakedDefault() {
+        // Bringr-93j.93: screens/minimized/hidden ship ON so the wheel collects the broadest
+        // set out of the box; Spaces flags stay OFF (current Space only is the safe,
+        // non-phantom-prone behaviour).
         let prefs = CollectionPreferences.current(from: ephemeralDefaults())
 
-        // All off → collection stays on the summon screen/Space (the Bringr-93j.30 behaviour),
-        // with minimized/hidden windows left out (Bringr-93j.50).
-        XCTAssertFalse(prefs.appsAllScreens)
+        XCTAssertTrue(prefs.appsAllScreens)
         XCTAssertFalse(prefs.appsAllSpaces)
-        XCTAssertFalse(prefs.windowsAllScreens)
+        XCTAssertTrue(prefs.windowsAllScreens)
         XCTAssertFalse(prefs.windowsAllSpaces)
+        XCTAssertTrue(prefs.includeMinimized)
+        XCTAssertTrue(prefs.includeHidden)
+    }
+
+    func testEachFlagDefaultConstantMatches() {
+        // The per-flag constants are the single source of truth for the Preferences
+        // `@AppStorage` bindings and the read fallback — keep them visibly correct.
+        XCTAssertTrue(CollectionPreferences.appsAllScreensDefault)
+        XCTAssertFalse(CollectionPreferences.appsAllSpacesDefault)
+        XCTAssertTrue(CollectionPreferences.windowsAllScreensDefault)
+        XCTAssertFalse(CollectionPreferences.windowsAllSpacesDefault)
+        XCTAssertTrue(CollectionPreferences.includeMinimizedDefault)
+        XCTAssertTrue(CollectionPreferences.includeHiddenDefault)
+    }
+
+    func testStoredFalseOverridesOnDefault() {
+        // Explicit false must round-trip — `bool(forKey:)` returning false for an absent key
+        // can't mask a real, persisted false (the unset-vs-stored distinction).
+        let defaults = ephemeralDefaults()
+        defaults.set(false, forKey: CollectionPreferences.appsAllScreensDefaultsKey)
+        defaults.set(false, forKey: CollectionPreferences.windowsAllScreensDefaultsKey)
+        defaults.set(false, forKey: CollectionPreferences.includeMinimizedDefaultsKey)
+        defaults.set(false, forKey: CollectionPreferences.includeHiddenDefaultsKey)
+
+        let prefs = CollectionPreferences.current(from: defaults)
+        XCTAssertFalse(prefs.appsAllScreens)
+        XCTAssertFalse(prefs.windowsAllScreens)
         XCTAssertFalse(prefs.includeMinimized)
         XCTAssertFalse(prefs.includeHidden)
     }
@@ -34,9 +62,12 @@ final class CollectionScopeTests: XCTestCase {
     }
 
     func testEachFlagRoundTripsIndependently() {
+        // Set every key explicitly so the four ON-default flags don't mask a setter mismatch.
         let defaults = ephemeralDefaults()
+        defaults.set(false, forKey: CollectionPreferences.appsAllScreensDefaultsKey)
         defaults.set(true, forKey: CollectionPreferences.appsAllSpacesDefaultsKey)
         defaults.set(true, forKey: CollectionPreferences.windowsAllScreensDefaultsKey)
+        defaults.set(false, forKey: CollectionPreferences.windowsAllSpacesDefaultsKey)
 
         let prefs = CollectionPreferences.current(from: defaults)
         XCTAssertFalse(prefs.appsAllScreens)

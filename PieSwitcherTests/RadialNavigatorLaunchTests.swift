@@ -46,8 +46,13 @@ final class RadialNavigatorLaunchTests: XCTestCase {
             ],
             frontmost: AppID(pid: 10)
         )
+        let controller = WindowController(system: fake)
+        // Pin `.hideOthers` so the "reveal hid the other app" assertion below still
+        // holds — the default flipped to `.raiseToFront` in Bringr-93j.93, which hides
+        // nothing on hover.
+        controller.setStrategy(.hideOthers)
         let navigator = RadialNavigator(
-            windowControl: WindowController(system: fake),
+            windowControl: controller,
             store: makeEphemeralStore(),
             appLauncher: launcher
         )

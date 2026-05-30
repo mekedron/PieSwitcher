@@ -19,9 +19,11 @@ enum InteractionMode: String, CaseIterable, Sendable {
     /// The default mouse mode — hold-to-select is the most fluid match for a held
     /// chord: press, glide to a slice, release to pick, never leaving the wheel.
     static let defaultForMouse: InteractionMode = .holdToSelect
-    /// The default keyboard mode — "Press" (a.k.a. `clickToStay`) fits the keyboard
-    /// shortcut better: tap the modifier to summon, then click the slice to commit.
-    static let defaultForKeyboard: InteractionMode = .clickToStay
+    /// The default keyboard mode — hold-to-select, matching the mouse. The same fluid
+    /// flow (hold, glide, release) works for the keyboard shortcut once a hold delay
+    /// is in place: `ActivationHoldDelay` ensures a quick modifier tap doesn't summon,
+    /// while a deliberate hold reads as a hold and releasing over a slice commits.
+    static let defaultForKeyboard: InteractionMode = .holdToSelect
 
     /// `UserDefaults` key backing the persisted mouse choice. The pre-Bringr-93j.91
     /// shared key (`interactionMode`) is abandoned, not migrated — matching the

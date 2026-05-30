@@ -17,10 +17,12 @@ enum RevealStrategy: String, CaseIterable, Sendable {
     /// on screen — the strongest isolation ("everything else disappears").
     case hideOthers
 
-    /// Hide-others is the default: it matches the described v1 experience — only the
-    /// target stays visible ("everything else disappears") — which gives the clearest
-    /// visual confirmation while drilling through the wheel.
-    static let `default`: RevealStrategy = .hideOthers
+    /// Raise-to-front is the default (Bringr-93j.93): the lowest-disruption choice — the
+    /// hovered target comes forward while every other app/window stays where it is, so
+    /// drilling through the wheel never strands anything hidden. The user can switch to
+    /// `.hideOthers` for stronger isolation if they prefer the "everything else disappears"
+    /// experience.
+    static let `default`: RevealStrategy = .raiseToFront
 
     /// `UserDefaults` key backing the persisted choice. Single source of truth shared
     /// by the Preferences `@AppStorage` and `current(from:)` so they cannot drift.

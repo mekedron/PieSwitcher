@@ -238,6 +238,12 @@ private struct KeyboardInteractionMode: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Text("Note: \"Press\" still has to last at least the Hold delay above before the wheel "
+                 + "opens, so that value also sets how long you must hold the keys to trigger a press.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

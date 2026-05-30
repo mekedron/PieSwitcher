@@ -14,17 +14,22 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertFalse(KeyboardNavigation.isEnabled(from: makeDefaults()))
     }
 
-    func testSubTogglesDefaultOnExceptConfirmation() {
+    func testSubTogglesDefaultPerSourceWhenUnset() {
+        // Bringr-93j.93: arrows ship OFF (numbers carry the keyboard-driven flow); numbers ON;
+        // confirm OFF (numbers commit instantly).
         let defaults = makeDefaults()
-        XCTAssertTrue(KeyboardNavigation.arrowsEnabled(from: defaults))
+        XCTAssertFalse(KeyboardNavigation.arrowsDefault)
+        XCTAssertFalse(KeyboardNavigation.arrowsEnabled(from: defaults))
         XCTAssertTrue(KeyboardNavigation.numbersEnabled(from: defaults))
         XCTAssertFalse(KeyboardNavigation.requiresConfirmation(from: defaults))
     }
 
-    func testCloseOnUnsupportedDefaultsOnAndCommitAppDefaultsOff() {
+    func testCloseOnUnsupportedDefaultsOffAndCommitAppDefaultsOff() {
+        // Bringr-93j.93: both off — an unrecognised key passes through (doesn't close the wheel),
+        // and a window pick is required for multi-window apps.
         let defaults = makeDefaults()
-        XCTAssertTrue(KeyboardNavigation.closeOnUnsupportedDefault)
-        XCTAssertTrue(KeyboardNavigation.closesOnUnsupportedKey(from: defaults), "an absent key keeps it on")
+        XCTAssertFalse(KeyboardNavigation.closeOnUnsupportedDefault)
+        XCTAssertFalse(KeyboardNavigation.closesOnUnsupportedKey(from: defaults), "an absent key keeps it off")
         XCTAssertFalse(KeyboardNavigation.commitAppWithoutWindowChoiceDefault)
         XCTAssertFalse(KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults))
     }
@@ -86,16 +91,19 @@ final class KeyboardNavigationTests: XCTestCase {
     func testConfigArrowsAndNumbersCanBothBeOn() {
         let defaults = makeDefaults()
         defaults.set(true, forKey: KeyboardNavigation.enabledKey)
+        // Arrows ship OFF (Bringr-93j.93), so opt in explicitly to assert independence.
+        defaults.set(true, forKey: KeyboardNavigation.arrowsKey)
         let config = KeyboardNavigationConfig.current(from: defaults)
         XCTAssertTrue(config.arrowsEnabled)
         XCTAssertTrue(config.numbersEnabled, "arrow and number navigation are independent toggles")
     }
 
-    func testConfigCloseDefaultsOnAndCommitDefaultsOffWhenNavigationOn() {
+    func testConfigCloseDefaultsOffAndCommitDefaultsOffWhenNavigationOn() {
+        // Bringr-93j.93: both opt-in; the top-level enable doesn't flip these on.
         let defaults = makeDefaults()
         defaults.set(true, forKey: KeyboardNavigation.enabledKey)
         let config = KeyboardNavigationConfig.current(from: defaults)
-        XCTAssertTrue(config.closesOnUnsupportedKey, "close-on-unsupported is on by default once nav is on")
+        XCTAssertFalse(config.closesOnUnsupportedKey, "close-on-unsupported is opt-in")
         XCTAssertFalse(config.commitsAppWithoutWindowChoice, "the no-window-choice commit is opt-in")
     }
 

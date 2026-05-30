@@ -10,7 +10,7 @@ struct RadialGeometry: Equatable, Sendable {
     /// Outer radius of the ring. A cursor farther out than this hits no slice.
     let outerRadius: CGFloat
 
-    static let `default` = RadialGeometry(innerRadius: 55, outerRadius: 160)
+    static let `default` = RadialGeometry(innerRadius: 110 * 55 / 160, outerRadius: 110)
 
     /// Mid-ring radius, where a slice's icon/label sits.
     var midRadius: CGFloat { (innerRadius + outerRadius) / 2 }

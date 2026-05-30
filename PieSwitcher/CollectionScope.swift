@@ -56,10 +56,9 @@ struct CollectionScope: Equatable, Sendable {
 ///
 /// Mirrors `RadialAppearance` — a pure value type bundling several `UserDefaults`-backed
 /// flags behind one `current(from:)`, read fresh at each summon so a Preferences change
-/// applies on the next open without a relaunch. Every flag defaults to `false` (stay on
-/// the current screen/Space), preserving the screen-scoped behaviour Bringr-93j.30
-/// introduced; `bool(forKey:)` already yields that default for an absent key, so no
-/// unset guard is needed.
+/// applies on the next open without a relaunch. The four ON-by-default flags
+/// (Bringr-93j.93) each check `object(forKey:) != nil` explicitly so an absent key reads
+/// as ON, not as the implicit `false` `bool(forKey:)` would otherwise return.
 struct CollectionPreferences: Equatable, Sendable {
     /// The first-level apps ring: span every display? every Space?
     let appsAllScreens: Bool
@@ -69,7 +68,7 @@ struct CollectionPreferences: Equatable, Sendable {
     let windowsAllSpaces: Bool
     /// Global across both levels (Bringr-93j.50), unlike the per-level screen/Space flags
     /// above: whether collection also gathers minimized windows and windows of hidden apps.
-    /// Both default `false` (left out, as before). Resolved into both `appsScope` and
+    /// Both default `true` (Bringr-93j.93). Resolved into both `appsScope` and
     /// `windowsScope`, so the apps ring and windows sub-wheel honour them alike.
     let includeMinimized: Bool
     let includeHidden: Bool
@@ -82,6 +81,16 @@ struct CollectionPreferences: Equatable, Sendable {
     static let windowsAllSpacesDefaultsKey = "collection.windows.allSpaces"
     static let includeMinimizedDefaultsKey = "collection.includeMinimized"
     static let includeHiddenDefaultsKey = "collection.includeHidden"
+
+    /// Per-flag defaults (Bringr-93j.93). The screen / minimized / hidden trio ships ON so
+    /// the wheel collects the broadest set out of the box; the Spaces flags ship OFF to
+    /// keep collection on the current Space, the safe (non-phantom-prone) behaviour.
+    static let appsAllScreensDefault = true
+    static let appsAllSpacesDefault = false
+    static let windowsAllScreensDefault = true
+    static let windowsAllSpacesDefault = false
+    static let includeMinimizedDefault = true
+    static let includeHiddenDefault = true
 
     init(
         appsAllScreens: Bool,
@@ -123,16 +132,25 @@ struct CollectionPreferences: Equatable, Sendable {
         )
     }
 
-    /// The persisted preferences, each flag read fresh and defaulting to `false`
-    /// (stay on the summon screen/Space; leave minimized/hidden windows out).
+    /// The persisted preferences, each flag read fresh and falling back to its per-flag
+    /// default (Bringr-93j.93). The four ON-default flags need the explicit unset check
+    /// because `bool(forKey:)` returns `false` for an absent key.
     static func current(from defaults: UserDefaults = .standard) -> CollectionPreferences {
         CollectionPreferences(
-            appsAllScreens: defaults.bool(forKey: appsAllScreensDefaultsKey),
-            appsAllSpaces: defaults.bool(forKey: appsAllSpacesDefaultsKey),
-            windowsAllScreens: defaults.bool(forKey: windowsAllScreensDefaultsKey),
-            windowsAllSpaces: defaults.bool(forKey: windowsAllSpacesDefaultsKey),
-            includeMinimized: defaults.bool(forKey: includeMinimizedDefaultsKey),
-            includeHidden: defaults.bool(forKey: includeHiddenDefaultsKey)
+            appsAllScreens: read(appsAllScreensDefaultsKey, default: appsAllScreensDefault, from: defaults),
+            appsAllSpaces: read(appsAllSpacesDefaultsKey, default: appsAllSpacesDefault, from: defaults),
+            windowsAllScreens: read(windowsAllScreensDefaultsKey, default: windowsAllScreensDefault, from: defaults),
+            windowsAllSpaces: read(windowsAllSpacesDefaultsKey, default: windowsAllSpacesDefault, from: defaults),
+            includeMinimized: read(includeMinimizedDefaultsKey, default: includeMinimizedDefault, from: defaults),
+            includeHidden: read(includeHiddenDefaultsKey, default: includeHiddenDefault, from: defaults)
         )
+    }
+
+    /// Read a `Bool` key, falling back to the supplied default when the key is unset.
+    /// `bool(forKey:)` alone returns `false` for an absent key, which silently flips any
+    /// ON default; the presence check guards that, mirroring `MouseChordActivation`.
+    private static func read(_ key: String, default fallback: Bool, from defaults: UserDefaults) -> Bool {
+        guard defaults.object(forKey: key) != nil else { return fallback }
+        return defaults.bool(forKey: key)
     }
 }

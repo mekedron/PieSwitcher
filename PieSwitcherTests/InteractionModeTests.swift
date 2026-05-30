@@ -143,8 +143,10 @@ final class InteractionModeTests: XCTestCase {
 
     func testDefaultsAreSplitPerSource() {
         XCTAssertEqual(InteractionMode.defaultForMouse, .holdToSelect)
-        XCTAssertEqual(InteractionMode.defaultForKeyboard, .clickToStay,
-                       "the keyboard defaults to 'Press' (click-to-stay) so a held shortcut isn't required")
+        // Bringr-93j.93: the keyboard now also defaults to hold-to-select — same fluid flow
+        // as the mouse (hold, glide, release) — backed by the hold delay so a quick modifier
+        // tap (e.g. Fn to switch input language) doesn't summon.
+        XCTAssertEqual(InteractionMode.defaultForKeyboard, .holdToSelect)
     }
 
     func testDefaultsKeysAreStableAndDistinct() {
@@ -160,9 +162,10 @@ final class InteractionModeTests: XCTestCase {
     }
 
     func testCurrentReadsPersistedKeyboardMode() {
+        // Set the non-default value so the read isn't masked by the per-source default.
         let defaults = makeDefaults()
-        defaults.set(InteractionMode.holdToSelect.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
-        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .holdToSelect)
+        defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .clickToStay)
     }
 
     func testCurrentFallsBackToPerSourceDefaultsWhenUnset() {
@@ -180,11 +183,17 @@ final class InteractionModeTests: XCTestCase {
     }
 
     func testMouseAndKeyboardModesAreIndependent() {
+        // Pick each side's non-default so a stray cross-binding can't slip past unnoticed.
         let defaults = makeDefaults()
         defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.mouseDefaultsKey)
-        defaults.set(InteractionMode.holdToSelect.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
+        defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
         XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .clickToStay)
-        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .holdToSelect,
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .clickToStay)
+
+        // Flip just one side and the other holds.
+        defaults.set(InteractionMode.holdToSelect.rawValue, forKey: InteractionMode.mouseDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .holdToSelect)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .clickToStay,
                        "changing one source's mode must not flip the other")
     }
 

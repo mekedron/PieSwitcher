@@ -11,8 +11,8 @@ final class RevealStrategyTests: XCTestCase {
 
     // MARK: - Persistence helpers (AC1, AC4, AC5 default)
 
-    func testDefaultStrategyIsHideOthers() {
-        XCTAssertEqual(RevealStrategy.default, .hideOthers)
+    func testDefaultStrategyIsRaiseToFront() {
+        XCTAssertEqual(RevealStrategy.default, .raiseToFront)
     }
 
     func testDefaultsKeyIsStable() {
@@ -51,17 +51,17 @@ final class RevealStrategyTests: XCTestCase {
         XCTAssertFalse(RevealStrategy.allCases.map(\.detail).contains(where: \.isEmpty))
     }
 
-    // MARK: - hide-others is the controller's default (proves the wiring, AC5)
+    // MARK: - raise-to-front is the controller's default (proves the wiring, AC5)
 
-    func testUnconfiguredControllerHidesOthers() {
+    func testUnconfiguredControllerRaisesToFront() {
         let fake = FakeWindowSystem(apps: [makeApp(1), makeApp(2), makeApp(3)], frontmost: AppID(pid: 1))
-        let controller = WindowController(system: fake) // no setStrategy → default
+        let controller = WindowController(system: fake) // no setStrategy → default (Bringr-93j.93)
 
         controller.revealApp(AppID(pid: 2))
 
-        XCTAssertTrue(fake.isHidden(AppID(pid: 1)))
-        XCTAssertFalse(fake.isHidden(AppID(pid: 2)))
-        XCTAssertTrue(fake.isHidden(AppID(pid: 3)))
+        XCTAssertEqual(fake.frontmost, AppID(pid: 2), "the hovered app is brought to the front")
+        XCTAssertFalse(fake.isHidden(AppID(pid: 1)), "raise-to-front hides nothing")
+        XCTAssertFalse(fake.isHidden(AppID(pid: 3)))
     }
 
     // MARK: - AC2/AC3: raise-to-front at both levels
@@ -139,7 +139,8 @@ final class RevealStrategyTests: XCTestCase {
         let appA = AppID(pid: 1)
         let (target, sibling) = (WindowID(app: appA, token: 11), WindowID(app: appA, token: 10))
         let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11])], frontmost: appA)
-        let controller = WindowController(system: fake) // default hide-others
+        let controller = WindowController(system: fake)
+        controller.setStrategy(.hideOthers)
 
         controller.revealWindow(target)
 
@@ -154,7 +155,8 @@ final class RevealStrategyTests: XCTestCase {
         let appA = AppID(pid: 1)
         let (w10, w11) = (WindowID(app: appA, token: 10), WindowID(app: appA, token: 11))
         let fake = FakeWindowSystem(apps: [makeApp(1, windowTokens: [10, 11])], frontmost: appA)
-        let controller = WindowController(system: fake) // default hide-others
+        let controller = WindowController(system: fake)
+        controller.setStrategy(.hideOthers)
 
         controller.revealWindow(w11)
         controller.revealWindow(w10) // re-target: raise the new hover; siblings stay put

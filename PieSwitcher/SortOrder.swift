@@ -108,8 +108,10 @@ enum DockOrder {
     /// sort order is `.dockPosition`; Preferences shows the checkbox only then.
     static let keepFinderLastKey = "sortOrder.apps.keepFinderLast"
 
-    /// Default for "Keep Finder last": off, so Finder takes its real (first) Dock slot.
-    static let keepFinderLastDefault = false
+    /// Default for "Keep Finder last": on (Bringr-93j.93), so Finder is sent to the end of
+    /// the wheel rather than monopolising the always-first 12-o'clock slot it would otherwise
+    /// hold by virtue of its pinned-first Dock position.
+    static let keepFinderLastDefault = true
 
     /// The persisted "Keep Finder last" flag, falling back to the default when unset.
     static func keepsFinderLast(from defaults: UserDefaults = .standard) -> Bool {

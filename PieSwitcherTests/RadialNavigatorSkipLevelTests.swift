@@ -140,7 +140,11 @@ final class RadialNavigatorSkipLevelTests: XCTestCase {
             ],
             frontmost: AppID(pid: 10)
         )
-        let navigator = RadialNavigator(windowControl: WindowController(system: fake))
+        let controller = WindowController(system: fake)
+        // Pin `.hideOthers` so the skip-level tests' "reveal hid the other app"
+        // assertions hold after the Bringr-93j.93 default flip to `.raiseToFront`.
+        controller.setStrategy(.hideOthers)
+        let navigator = RadialNavigator(windowControl: controller)
         return Fixture(navigator: navigator, fake: fake, appNodes: appNodes)
     }
 

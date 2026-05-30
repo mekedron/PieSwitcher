@@ -30,10 +30,14 @@ enum KeyboardNavigation {
     static let commitAppWithoutWindowChoiceKey = "keyboardNav.commitAppWithoutWindowChoice"
 
     static let enabledDefault = false
-    static let arrowsDefault = true
+    /// Off by default (Bringr-93j.93): number keys carry the keyboard navigation, so arrows
+    /// are opt-in for those who want both.
+    static let arrowsDefault = false
     static let numbersDefault = true
     static let confirmDefault = false
-    static let closeOnUnsupportedDefault = true
+    /// Off by default (Bringr-93j.93): an unrecognised key passes through rather than closing
+    /// the wheel, so a stray press never strands the summon.
+    static let closeOnUnsupportedDefault = false
     static let commitAppWithoutWindowChoiceDefault = false
 
     static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
@@ -41,7 +45,7 @@ enum KeyboardNavigation {
     }
 
     static func arrowsEnabled(from defaults: UserDefaults = .standard) -> Bool {
-        readTrueDefault(arrowsKey, from: defaults)
+        defaults.bool(forKey: arrowsKey)
     }
 
     static func numbersEnabled(from defaults: UserDefaults = .standard) -> Bool {
@@ -53,15 +57,15 @@ enum KeyboardNavigation {
     }
 
     static func closesOnUnsupportedKey(from defaults: UserDefaults = .standard) -> Bool {
-        readTrueDefault(closeOnUnsupportedKey, from: defaults)
+        defaults.bool(forKey: closeOnUnsupportedKey)
     }
 
     static func commitsAppWithoutWindowChoice(from defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: commitAppWithoutWindowChoiceKey)
     }
 
-    /// A true-defaulted toggle: an absent key yields `true`, so the sub-options are on out of
-    /// the box once the master switch is enabled (mirroring `MouseChordActivation`).
+    /// A true-defaulted toggle: an absent key yields `true`, so an unset key still reads as
+    /// the intended ON default (mirroring `MouseChordActivation`).
     private static func readTrueDefault(_ key: String, from defaults: UserDefaults) -> Bool {
         guard defaults.object(forKey: key) != nil else { return true }
         return defaults.bool(forKey: key)

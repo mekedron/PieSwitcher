@@ -16,8 +16,10 @@ enum HapticIntensity: String, CaseIterable, Sendable {
     /// The firmest tick (maps to the level-change feedback pattern).
     case strong
 
-    /// Medium by default — noticeable but unobtrusive.
-    static let `default`: HapticIntensity = .medium
+    /// Strong by default (Bringr-93j.93) — the firmest tick reads most clearly as a slice
+    /// boundary crossing, since the gentler `.light` and `.medium` patterns can fade into
+    /// the background trackpad noise.
+    static let `default`: HapticIntensity = .strong
 
     /// Human-readable name for the Preferences picker.
     var displayName: String {
@@ -32,10 +34,11 @@ enum HapticIntensity: String, CaseIterable, Sendable {
 // MARK: - Persisted setting
 
 /// The trackpad-haptic-on-hover setting (Bringr-93j.44): an optional tactile tap as the
-/// selection moves through the pie, plus its strength. Off by default — opt-in polish, so
-/// `bool(forKey:)` (which returns false for an absent key) already yields the intended
-/// default with no presence check, like `HideOnCommit`. Read fresh at each
-/// summon so a Preferences change applies on the next open without a relaunch.
+/// selection moves through the pie, plus its strength. On by default (Bringr-93j.93), so
+/// the unset case needs an explicit presence check (mirroring `MouseChordActivation`) —
+/// `bool(forKey:)` alone returns `false` for an absent key, which would silently flip the
+/// intended default. Read fresh at each summon so a Preferences change applies on the next
+/// open without a relaunch.
 enum TrackpadHaptics {
     /// `UserDefaults` key for the on/off toggle. Single source of truth shared by the
     /// Preferences `@AppStorage` and `isEnabled(from:)` so the two cannot drift.
@@ -43,12 +46,16 @@ enum TrackpadHaptics {
     /// `UserDefaults` key for the chosen strength.
     static let intensityKey = "trackpad.haptics.intensity"
 
-    /// Default: OFF — a nice-to-have the user opts into.
-    static let enabledDefault = false
+    /// Default: ON (Bringr-93j.93) — the tactile tap pairs naturally with the trackpad-driven
+    /// summon and reads as a slice-to-slice cursor click; the user opts out for a silent ring.
+    static let enabledDefault = true
 
-    /// Whether the hover haptic is enabled. Read fresh at each summon.
+    /// Whether the hover haptic is enabled. Read fresh at each summon. Because the default is
+    /// ON, the unset case is checked explicitly: `bool(forKey:)` alone returns `false` for an
+    /// absent key, which would silently flip the default (mirroring `MouseChordActivation`).
     static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: enabledKey)
+        guard defaults.object(forKey: enabledKey) != nil else { return enabledDefault }
+        return defaults.bool(forKey: enabledKey)
     }
 
     /// The chosen strength, falling back to `.default` when unset or unrecognized.

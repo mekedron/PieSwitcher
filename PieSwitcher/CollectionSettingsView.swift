@@ -15,14 +15,20 @@ import SwiftUI
 /// enumerator's all-Spaces query) is left intact. Their keys stay absent/false, so collection
 /// stays on the current Space.
 struct CollectionSettings: View {
-    @AppStorage(CollectionPreferences.appsAllScreensDefaultsKey) private var appsAllScreens = false
-    // @AppStorage(CollectionPreferences.appsAllSpacesDefaultsKey) private var appsAllSpaces = false
-    @AppStorage(CollectionPreferences.windowsAllScreensDefaultsKey) private var windowsAllScreens = false
-    // @AppStorage(CollectionPreferences.windowsAllSpacesDefaultsKey) private var windowsAllSpaces = false
+    @AppStorage(CollectionPreferences.appsAllScreensDefaultsKey)
+    private var appsAllScreens = CollectionPreferences.appsAllScreensDefault
+    // @AppStorage(CollectionPreferences.appsAllSpacesDefaultsKey)
+    // private var appsAllSpaces = CollectionPreferences.appsAllSpacesDefault
+    @AppStorage(CollectionPreferences.windowsAllScreensDefaultsKey)
+    private var windowsAllScreens = CollectionPreferences.windowsAllScreensDefault
+    // @AppStorage(CollectionPreferences.windowsAllSpacesDefaultsKey)
+    // private var windowsAllSpaces = CollectionPreferences.windowsAllSpacesDefault
     /// Global across both levels (Bringr-93j.50); read fresh at summon via
     /// `CollectionPreferences.current`, so a change applies on the next open without relaunch.
-    @AppStorage(CollectionPreferences.includeMinimizedDefaultsKey) private var includeMinimized = false
-    @AppStorage(CollectionPreferences.includeHiddenDefaultsKey) private var includeHidden = false
+    @AppStorage(CollectionPreferences.includeMinimizedDefaultsKey)
+    private var includeMinimized = CollectionPreferences.includeMinimizedDefault
+    @AppStorage(CollectionPreferences.includeHiddenDefaultsKey)
+    private var includeHidden = CollectionPreferences.includeHiddenDefault
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

@@ -64,14 +64,17 @@ final class DockOrderTests: XCTestCase {
 
     // MARK: - "Keep Finder last" persistence
 
-    func testKeepsFinderLastDefaultsFalseWhenUnset() {
-        XCTAssertFalse(DockOrder.keepsFinderLast(from: ephemeralDefaults()))
+    func testKeepsFinderLastDefaultsTrueWhenUnset() {
+        // Bringr-93j.93: on by default so Finder doesn't monopolise 12 o'clock by virtue of
+        // its pinned-first Dock position.
+        XCTAssertTrue(DockOrder.keepFinderLastDefault)
+        XCTAssertTrue(DockOrder.keepsFinderLast(from: ephemeralDefaults()))
     }
 
     func testKeepsFinderLastReadsPersistedValue() {
         let defaults = ephemeralDefaults()
-        defaults.set(true, forKey: DockOrder.keepFinderLastKey)
-        XCTAssertTrue(DockOrder.keepsFinderLast(from: defaults))
+        defaults.set(false, forKey: DockOrder.keepFinderLastKey)
+        XCTAssertFalse(DockOrder.keepsFinderLast(from: defaults))
     }
 
     // MARK: - Fixtures

@@ -325,7 +325,14 @@ final class RadialNavigatorTests: XCTestCase {
             ],
             frontmost: AppID(pid: 10)
         )
-        let navigator = RadialNavigator(windowControl: WindowController(system: fake))
+        let controller = WindowController(system: fake)
+        // The navigator tests assert apps-level isolation (hidden / visible non-target
+        // apps), which is the `.hideOthers` strategy's job. The default flipped to
+        // `.raiseToFront` in Bringr-93j.93, which doesn't hide anything — explicitly
+        // pin `.hideOthers` so these tests keep validating that strategy's behaviour
+        // independent of the default-pick.
+        controller.setStrategy(.hideOthers)
+        let navigator = RadialNavigator(windowControl: controller)
         return Fixture(navigator: navigator, fake: fake, source: source, appNodes: appNodes)
     }
 

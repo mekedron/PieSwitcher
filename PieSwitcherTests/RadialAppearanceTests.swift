@@ -46,17 +46,18 @@ final class RadialAppearanceTests: XCTestCase {
         XCTAssertTrue(RadialAppearance.current(from: defaults).usesLiquidGlass)
     }
 
-    func testSkipSingleWindowLevelDefaultsOffAndRoundTrips() {
-        // Ships off, so every app opens its windows ring exactly as before.
-        XCTAssertFalse(RadialAppearance.default.skipSingleWindowLevel)
-        XCTAssertFalse(RadialAppearance.current(from: makeDefaults()).skipSingleWindowLevel)
+    func testSkipSingleWindowLevelDefaultsOnAndRoundTrips() {
+        // Bringr-93j.93: ships on, so a single-window (or empty) app commits straight to its
+        // window with no pointless second ring.
+        XCTAssertTrue(RadialAppearance.default.skipSingleWindowLevel)
+        XCTAssertTrue(RadialAppearance.current(from: makeDefaults()).skipSingleWindowLevel)
 
         // Persists both ways, so the toggle sticks.
         let defaults = makeDefaults()
-        defaults.set(true, forKey: RadialAppearance.skipSingleWindowLevelDefaultsKey)
-        XCTAssertTrue(RadialAppearance.current(from: defaults).skipSingleWindowLevel)
         defaults.set(false, forKey: RadialAppearance.skipSingleWindowLevelDefaultsKey)
         XCTAssertFalse(RadialAppearance.current(from: defaults).skipSingleWindowLevel)
+        defaults.set(true, forKey: RadialAppearance.skipSingleWindowLevelDefaultsKey)
+        XCTAssertTrue(RadialAppearance.current(from: defaults).skipSingleWindowLevel)
     }
 
     func testEachFieldFallsBackToItsDefaultIndependently() {

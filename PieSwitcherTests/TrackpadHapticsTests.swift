@@ -13,9 +13,11 @@ final class TrackpadHapticsTests: XCTestCase {
         XCTAssertEqual(TrackpadHaptics.intensityKey, "trackpad.haptics.intensity")
     }
 
-    func testEnabledDefaultsToOff() {
-        XCTAssertFalse(TrackpadHaptics.enabledDefault)
-        XCTAssertFalse(TrackpadHaptics.isEnabled(from: makeDefaults()))
+    func testEnabledDefaultsToOn() {
+        // Bringr-93j.93: the tactile tap is on out of the box so the trackpad-driven summon
+        // reads as a slice-to-slice cursor click; the user opts out for a silent ring.
+        XCTAssertTrue(TrackpadHaptics.enabledDefault)
+        XCTAssertTrue(TrackpadHaptics.isEnabled(from: makeDefaults()))
     }
 
     func testIsEnabledReadsTheStoredValue() {
@@ -26,13 +28,14 @@ final class TrackpadHapticsTests: XCTestCase {
         }
     }
 
-    func testIntensityDefaultsToMediumWhenUnsetOrUnrecognized() {
-        XCTAssertEqual(HapticIntensity.default, .medium)
-        XCTAssertEqual(TrackpadHaptics.intensity(from: makeDefaults()), .medium)
+    func testIntensityDefaultsToStrongWhenUnsetOrUnrecognized() {
+        // Bringr-93j.93: the firmest tick reads most clearly above background trackpad noise.
+        XCTAssertEqual(HapticIntensity.default, .strong)
+        XCTAssertEqual(TrackpadHaptics.intensity(from: makeDefaults()), .strong)
 
         let defaults = makeDefaults()
         defaults.set("bogus", forKey: TrackpadHaptics.intensityKey)
-        XCTAssertEqual(TrackpadHaptics.intensity(from: defaults), .medium)
+        XCTAssertEqual(TrackpadHaptics.intensity(from: defaults), .strong)
     }
 
     func testIntensityReadsTheStoredValue() {

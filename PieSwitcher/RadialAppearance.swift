@@ -55,10 +55,9 @@ struct RadialAppearance: Equatable, Sendable {
     var skipSingleWindowLevel: Bool = defaultSkipSingleWindowLevel
 
     static let defaultOuterRadius: CGFloat = RadialGeometry.default.outerRadius
-    /// Low by default so the genuine Liquid Glass material reads as glass at rest
-    /// rather than as a flat white frost; the user dials it up for a more filled,
-    /// frosted ring (the range now reaches a near-solid slice).
-    static let defaultFillOpacity = 0.1
+    /// Zero by default — pure glass, so the genuine Liquid Glass material shows through
+    /// at rest with no frost on top; the user dials it up for a more filled, frosted ring.
+    static let defaultFillOpacity = 0.0
     static let defaultShowsLabels = true
     /// On by default, so the wheel ships with the Liquid Glass look; the user opts
     /// out to the plain frosted fallback.
@@ -66,15 +65,16 @@ struct RadialAppearance: Equatable, Sendable {
     /// Zero by default, so the wheel ships exactly where US-006 placed it; the user
     /// opts into pushing it further out.
     static let defaultInnerRadiusPadding: CGFloat = 0
-    /// Matches the shipped glass drop shadow, so the default look is unchanged; the user
-    /// dials it down to 0 (no shadow) or up to a fully opaque one.
-    static let defaultGlassShadowOpacity = 0.3
-    /// Matches the shipped label shadow, so the default look is unchanged.
-    static let defaultContentShadowOpacity = 0.55
-    /// Off by default — an opt-in setting, so the wheel ships opening the windows
-    /// sub-wheel for every app exactly as before; the user turns it on to collapse the
-    /// single-window case.
-    static let defaultSkipSingleWindowLevel = false
+    /// Zero by default — no glass drop shadow, so the wheel sits flush on the desktop;
+    /// the user dials it up for a stronger floating-object look.
+    static let defaultGlassShadowOpacity = 0.0
+    /// Zero by default — no shadow behind icons and labels; the user raises it for more
+    /// legibility on busy backgrounds.
+    static let defaultContentShadowOpacity = 0.0
+    /// On by default (Bringr-93j.93) — an app with no windows or just one skips the
+    /// windows sub-wheel, so choosing it goes straight to its window with no pointless
+    /// extra ring. Apps with two or more windows still open the sub-wheel.
+    static let defaultSkipSingleWindowLevel = true
 
     static let `default` = RadialAppearance(
         outerRadius: defaultOuterRadius,
