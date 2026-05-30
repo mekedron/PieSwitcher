@@ -80,8 +80,10 @@ struct KeyboardNavigationConfig: Equatable, Sendable {
     let arrowsEnabled: Bool
     let numbersEnabled: Bool
     let requiresConfirmation: Bool
-    /// Whether a key the wheel doesn't navigate with closes it (Bringr-93j.73), AND-ed with the
-    /// top-level switch so it never fires while the feature is off.
+    /// Whether a key the wheel doesn't navigate with closes it (Bringr-93j.73/.95). Independent
+    /// of the top-level switch: with the switch off every keyboard-nav key (arrows, numbers,
+    /// Enter, Escape, Space) is unsupported too, so they all close when this is on. When the
+    /// switch is on but a sub-toggle is off, the keys that sub-toggle owns are unsupported too.
     let closesOnUnsupportedKey: Bool
     /// Whether a number-jumped multi-window app commits on release/confirm without a window pick
     /// (Bringr-93j.73), AND-ed with the top-level switch.
@@ -99,7 +101,11 @@ struct KeyboardNavigationConfig: Equatable, Sendable {
             arrowsEnabled: on && KeyboardNavigation.arrowsEnabled(from: defaults),
             numbersEnabled: on && KeyboardNavigation.numbersEnabled(from: defaults),
             requiresConfirmation: KeyboardNavigation.requiresConfirmation(from: defaults),
-            closesOnUnsupportedKey: on && KeyboardNavigation.closesOnUnsupportedKey(from: defaults),
+            // Independent of the top-level switch (Bringr-93j.95): when the switch is off, every
+            // keyboard-nav key has no function in the wheel and should close on press the same as
+            // any other unsupported key. The controller then asks whether the specific key has a
+            // function under the current sub-toggles.
+            closesOnUnsupportedKey: KeyboardNavigation.closesOnUnsupportedKey(from: defaults),
             commitsAppWithoutWindowChoice: on && KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults)
         )
     }

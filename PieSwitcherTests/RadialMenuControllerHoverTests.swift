@@ -105,6 +105,90 @@ final class RadialMenuControllerHoverTests: XCTestCase {
         XCTAssertFalse(controller.acceptsKeyboardNav)
     }
 
+    /// Close-on-unused (Bringr-93j.95) is independent of the main switch: with only the policy on,
+    /// the monitor still has to fire so it can close the wheel on every key (all are unused while
+    /// the nav feature is off).
+    func testAcceptsKeyboardNavWhenOnlyCloseOnUnsupportedIsOn() {
+        setCloseOnUnsupportedEnabled()
+        let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
+        controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
+        XCTAssertTrue(
+            controller.acceptsKeyboardNav,
+            "with only close-on-unused on, the monitor must still consume keys to close the wheel"
+        )
+    }
+
+    /// With the main switch off and close-on-unused on, every keyboard-nav key (arrows, numbers,
+    /// Enter, Escape, Space) and every other key is unused — pressing any of them must close the
+    /// wheel (Bringr-93j.95). The handler returns true to signal it consumed the key.
+    func testEveryKeyClosesWheelWhenMainSwitchOffAndCloseOnUnsupportedOn() {
+        setCloseOnUnsupportedEnabled()
+        let keysThatShouldClose: [KeyboardNavKey] = [
+            .arrow(.left), .arrow(.right), .arrow(.up), .arrow(.down),
+            .digit(1), .digit(0), .confirm, .escape, .unsupported
+        ]
+        for key in keysThatShouldClose {
+            let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
+            controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
+            XCTAssertTrue(controller.acceptsKeyboardNav, "\(key): expected the monitor to be active")
+            XCTAssertTrue(
+                controller.handleKeyboardNavKey(key),
+                "\(key): expected the key to close the wheel"
+            )
+            XCTAssertFalse(controller.isVisible, "\(key): the wheel must be hidden after the close")
+        }
+    }
+
+    /// With the main switch on, arrows off, and close-on-unused on (Bringr-93j.95), an arrow key
+    /// is unused → closes; a digit (numbers default on) is supported → handled. Confirms the rule
+    /// is "supported = currently has a function".
+    func testDisabledArrowsCloseWheelWhenCloseOnUnsupportedOn() {
+        setKeyboardNavEnabled()
+        setCloseOnUnsupportedEnabled()
+        // Arrows ship off (Bringr-93j.93), so the default with the master switch on is exactly this.
+        let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
+        controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
+
+        XCTAssertTrue(
+            controller.handleKeyboardNavKey(.arrow(.left)),
+            "an arrow with arrow mode off counts as unused and closes the wheel"
+        )
+        XCTAssertFalse(controller.isVisible)
+    }
+
+    /// Same rule applied to the number keys (Bringr-93j.95): with numbers off but close-on-unused
+    /// on, a digit closes the wheel; without the policy it would pass through silently.
+    func testDisabledNumbersCloseWheelWhenCloseOnUnsupportedOn() {
+        setKeyboardNavEnabled()
+        setCloseOnUnsupportedEnabled()
+        let defaults = UserDefaults.standard
+        defaults.set(false, forKey: KeyboardNavigation.numbersKey)
+        addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.numbersKey) }
+
+        let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
+        controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
+
+        XCTAssertTrue(
+            controller.handleKeyboardNavKey(.digit(1)),
+            "a digit with number mode off counts as unused and closes the wheel"
+        )
+        XCTAssertFalse(controller.isVisible)
+    }
+
+    /// When the policy is off, a key with no function passes through silently — even when its
+    /// category is disabled. Confirms close-on-unused still gates everything (Bringr-93j.95).
+    func testDisabledCategoryStaysOpenWhenCloseOnUnsupportedOff() {
+        setKeyboardNavEnabled() // arrows ship off; close-on-unused defaults off (Bringr-93j.93).
+        let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
+        controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
+
+        XCTAssertFalse(
+            controller.handleKeyboardNavKey(.arrow(.left)),
+            "with the policy off, a disabled-category key passes through and leaves the wheel open"
+        )
+        XCTAssertTrue(controller.isVisible)
+    }
+
     /// Releasing the trigger over a number-jumped multi-window app the user never picked a window in
     /// commits that app rather than reverting, when "don't require a window choice" is on
     /// (Bringr-93j.73). Driven through the controller's release entry point in hold-to-select.
@@ -147,6 +231,14 @@ final class RadialMenuControllerHoverTests: XCTestCase {
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: KeyboardNavigation.enabledKey)
         addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.enabledKey) }
+    }
+
+    /// Set up: enable close-on-unused (Bringr-93j.95) in the standard defaults the controller reads
+    /// at summon, cleaning up after.
+    private func setCloseOnUnsupportedEnabled() {
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: KeyboardNavigation.closeOnUnsupportedKey)
+        addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.closeOnUnsupportedKey) }
     }
 
     // MARK: - Fixtures

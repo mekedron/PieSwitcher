@@ -7,11 +7,13 @@ import AppKit
 /// decision logic and performs the resulting side effect, reusing the same commit/cancel paths
 /// the mouse uses.
 extension RadialMenuController {
-    /// Whether keyboard navigation should handle keys right now: the wheel is on screen and the
-    /// per-summon resolved settings have it enabled. The monitor consults this before consuming
-    /// any key, so when the feature is off keys pass straight through.
+    /// Whether keyboard navigation should handle keys right now: the wheel is on screen and either
+    /// the main keyboard-nav feature or the close-on-unused-key policy is on (Bringr-93j.95). The
+    /// monitor consults this before consuming any key, so when both are off keys pass straight
+    /// through. With only close-on-unused on, the monitor still has to fire so it can close the
+    /// wheel on every key (all of which are "unused" once the nav feature is off).
     var acceptsKeyboardNav: Bool {
-        isVisible && keyboardConfig.isEnabled
+        isVisible && (keyboardConfig.isEnabled || keyboardConfig.closesOnUnsupportedKey)
     }
 
     /// Handle one navigation key. Returns `true` when the key was consumed (so the monitor stops
@@ -40,31 +42,39 @@ extension RadialMenuController {
     }
 
     /// Map a key to the navigator's decision, gating each key on the sub-mode that owns it:
-    /// Escape always works while open; arrows need arrow mode; digits need number mode; Return
-    /// works in either (it commits arrow focus and confirms number focus). An unsupported key
-    /// closes the wheel when that option is on, else passes through. `nil` means "not for keyboard
-    /// nav" — pass it through.
+    /// Escape needs the main switch on (it cancels/steps back via the navigator); arrows need
+    /// arrow mode; digits need number mode; Return/Space work whenever either nav mode is on
+    /// (commits arrow focus or confirms number focus). A key whose category is off is treated as
+    /// unsupported (Bringr-93j.95), so the close-on-unused policy fires on it just like on a key
+    /// the wheel never used. `nil` means "not for keyboard nav" — pass it through.
     private func keyboardOutcome(for key: KeyboardNavKey) -> KeyboardNavOutcome? {
         switch key {
         case .escape:
+            guard keyboardConfig.isEnabled else { return unsupportedOutcome() }
             return navigator.keyboardEscape()
         case .arrow(let arrow):
-            guard keyboardConfig.arrowsEnabled else { return nil }
+            guard keyboardConfig.arrowsEnabled else { return unsupportedOutcome() }
             return navigator.keyboardMove(arrow)
         case .digit(let digit):
-            guard keyboardConfig.numbersEnabled else { return nil }
+            guard keyboardConfig.numbersEnabled else { return unsupportedOutcome() }
             return navigator.keyboardNumber(
                 digit, requireConfirmation: keyboardConfig.requiresConfirmation,
                 autoCommitsApp: keyboardConfig.commitsAppWithoutWindowChoice
             )
         case .confirm:
-            guard keyboardConfig.arrowsEnabled || keyboardConfig.numbersEnabled else { return nil }
+            guard keyboardConfig.arrowsEnabled || keyboardConfig.numbersEnabled else {
+                return unsupportedOutcome()
+            }
             return navigator.keyboardConfirm()
         case .unsupported:
-            // A key the wheel doesn't use: close it (a full cancel/restore via `escapePressed`)
-            // when "close on any other key" is on, otherwise let it pass through (Bringr-93j.73).
-            return keyboardConfig.closesOnUnsupportedKey ? .close : nil
+            return unsupportedOutcome()
         }
+    }
+
+    /// The outcome for a key with no function in the wheel: close on press when the policy is on
+    /// (a full cancel/restore via `escapePressed`), otherwise pass it through (Bringr-93j.73/.95).
+    private func unsupportedOutcome() -> KeyboardNavOutcome? {
+        keyboardConfig.closesOnUnsupportedKey ? .close : nil
     }
 
     /// Commit the app a numeric jump landed on but never picked a window in, when "don't require a

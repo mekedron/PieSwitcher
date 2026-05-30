@@ -26,20 +26,27 @@ struct KeyboardNavigationSettings: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Divider()
+            closeOnUnsupportedControls
+
             if enabled {
                 Divider()
-                closeOnUnsupportedControls
                 arrowsControls
                 numbersControls
             }
         }
     }
 
+    /// Always shown, even with the main switch off (Bringr-93j.95): "supported" is dynamic — a key
+    /// counts only when it actually does something under the current settings. With the switch off
+    /// the whole keyboard-nav cluster (arrows, numbers, Enter, Escape, Space) is unsupported too,
+    /// so this checkbox is the only switch that controls whether any of them close the wheel.
     private var closeOnUnsupportedControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle("Close the wheel on any other key", isOn: $closeOnUnsupported)
-            Text("Pressing a key the wheel doesn't use closes it. Turn this off to ignore those "
-                 + "keys and keep the wheel open.")
+            Toggle("Close the wheel on any unused key", isOn: $closeOnUnsupported)
+            Text("Pressing a key the wheel isn't currently using closes it. A key counts as unused "
+                 + "when its keyboard-nav category is off, so disabling Arrow keys (or Number keys, "
+                 + "or the whole feature above) means those keys also close the wheel.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -107,15 +107,26 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertFalse(config.commitsAppWithoutWindowChoice, "the no-window-choice commit is opt-in")
     }
 
-    func testConfigGatesNewFlagsOnTopLevelSwitch() {
+    func testCommitAppFlagGatesOnTopLevelSwitch() {
         let defaults = makeDefaults()
-        // Even explicitly on, both gate behind the master switch so neither fires while it is off.
+        // Commit-app-without-window-choice is meaningless without the keyboard-driven number flow,
+        // so it gates behind the master switch and stays off while it is off.
         defaults.set(false, forKey: KeyboardNavigation.enabledKey)
-        defaults.set(true, forKey: KeyboardNavigation.closeOnUnsupportedKey)
         defaults.set(true, forKey: KeyboardNavigation.commitAppWithoutWindowChoiceKey)
         let config = KeyboardNavigationConfig.current(from: defaults)
-        XCTAssertFalse(config.closesOnUnsupportedKey)
         XCTAssertFalse(config.commitsAppWithoutWindowChoice)
+    }
+
+    /// Close-on-unsupported (Bringr-93j.95) is intentionally independent of the master switch: with
+    /// the switch off every keyboard-nav key is unused too, so they all close on press when this is
+    /// on. The controller routes the keys; the config just surfaces the raw setting.
+    func testCloseOnUnsupportedIndependentOfTopLevelSwitch() {
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: KeyboardNavigation.enabledKey)
+        defaults.set(true, forKey: KeyboardNavigation.closeOnUnsupportedKey)
+        let config = KeyboardNavigationConfig.current(from: defaults)
+        XCTAssertTrue(config.closesOnUnsupportedKey, "the close-on-unused policy is decoupled")
+        XCTAssertFalse(config.isEnabled, "the master switch itself stays off")
     }
 
     // MARK: - Key-code mapping
