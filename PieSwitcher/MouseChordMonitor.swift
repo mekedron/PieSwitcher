@@ -221,11 +221,16 @@ final class MouseChordMonitor {
         blocking: Bool,
         holdDelay: TimeInterval
     ) -> Unmanaged<CGEvent>? {
-        // In non-blocking mode every event passes through unchanged. The detector still
-        // tracks state so the hold-delay timer / summon side effects fire just as in blocking
-        // mode — but no event is ever held back, which is what eliminates the system-wide lag.
+        // In non-blocking mode every event passes through unchanged, with one exception:
+        // the chord-completing press itself. summon() installs a global dismiss monitor
+        // synchronously before this callback returns, so if the press were dispatched it
+        // would immediately trigger that monitor's `click(over: .none)` and cancel the
+        // wheel a beat after it opened (Bringr-93j.99 — the L+R activation regression
+        // introduced when blocking defaulted to OFF). Consume just that one press; the
+        // pursuit presses still pass through, which is non-blocking's whole promise.
         if !blocking {
             applySideEffects(reaction, holdDelay: holdDelay)
+            if reaction == .summon { return nil }
             return Unmanaged.passUnretained(event)
         }
         return applyBlocking(reaction, event: event, holdDelay: holdDelay)
