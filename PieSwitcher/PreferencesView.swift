@@ -26,7 +26,6 @@ struct PreferencesView: View {
                 section("Mouse") { mouseSection }
                 section("Keyboard") { keyboardSection }
                 section("Startup") { startupSection }
-                section("Interaction") { interactionSection }
                 section("Keyboard Navigation") { KeyboardNavigationSettings() }
                 section("Haptics") { TrackpadHapticsSettings() }
                 section("Reveal mode") { revealSection }
@@ -80,17 +79,23 @@ struct PreferencesView: View {
     }
 
     private var mouseSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle("Left and right click together", isOn: $mouseChordEnabled)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Left and right click together", isOn: $mouseChordEnabled)
 
-            Text(mouseChordEnabled
-                 ? "Press the left and right mouse buttons together to summon the wheel. "
-                   + "Normal single clicks pass through untouched."
-                 : "Turn this on to summon the wheel by pressing the left and right mouse "
-                   + "buttons together. The keyboard shortcut still works on its own.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(mouseChordEnabled
+                     ? "Press the left and right mouse buttons together to summon the wheel. "
+                       + "Normal single clicks pass through untouched."
+                     : "Turn this on to summon the wheel by pressing the left and right mouse "
+                       + "buttons together. The keyboard shortcut still works on its own.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            MouseInteractionMode()
         }
     }
 
@@ -116,11 +121,11 @@ struct PreferencesView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-        }
-    }
 
-    private var interactionSection: some View {
-        InteractionSettings()
+            Divider()
+
+            KeyboardInteractionMode()
+        }
     }
 
     private var revealSection: some View {
@@ -179,49 +184,70 @@ struct PreferencesView: View {
     }
 }
 
-/// The interaction-mode picker (US-009) and the click-to-activate toggle (Bringr-93j.76),
-/// grouped in their own view so the Preferences body stays within its length budget. Both
-/// keys are read fresh at each summon by `RadialMenuController`, so a change here applies
-/// on the next open without a relaunch.
-private struct InteractionSettings: View {
-    @AppStorage(InteractionMode.defaultsKey) private var modeRaw = InteractionMode.default.rawValue
-    @AppStorage(ClickToActivate.defaultsKey) private var clickToActivate = ClickToActivate.default
+/// The mouse's interaction-mode picker (US-009 / Bringr-93j.91). Separate from the
+/// keyboard's picker so each input source carries its own preference; both keys are
+/// read fresh at each summon by `RadialMenuController`, so a change here applies on
+/// the next open without a relaunch.
+private struct MouseInteractionMode: View {
+    @AppStorage(InteractionMode.mouseDefaultsKey)
+    private var modeRaw = InteractionMode.defaultForMouse.rawValue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("When summoned:", selection: $modeRaw) {
-                    ForEach(InteractionMode.allCases, id: \.rawValue) { mode in
-                        Text(mode.displayName).tag(mode.rawValue)
-                    }
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("When summoned:", selection: $modeRaw) {
+                ForEach(InteractionMode.allCases, id: \.rawValue) { mode in
+                    Text(mode.displayName).tag(mode.rawValue)
                 }
-                .pickerStyle(.radioGroup)
-
-                Text(modeHelp)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
+            .pickerStyle(.radioGroup)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Click an item to choose it", isOn: $clickToActivate)
-
-                Text("Also let a click on an app or window pick it and close the wheel. Handy "
-                     + "while holding the keyboard shortcut: click to choose without releasing. "
-                     + "You can still release the trigger to choose the hovered item.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(modeHelp)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var modeHelp: String {
-        switch InteractionMode(rawValue: modeRaw) ?? .default {
+        switch InteractionMode(rawValue: modeRaw) ?? .defaultForMouse {
         case .holdToSelect:
-            return "Release the trigger over a slice to choose it; release on the centre to cancel."
+            return "Hold the chord, glide to a slice, release to choose; release on the centre to cancel."
         case .clickToStay:
             return "The wheel stays open after release. Click a slice to choose it, or the centre to cancel."
+        }
+    }
+}
+
+/// The keyboard's interaction-mode picker (Bringr-93j.91). Same shape as the mouse
+/// picker but reads its own persisted key and renders `clickToStay` as "Press" —
+/// you don't really "click" a keyboard.
+private struct KeyboardInteractionMode: View {
+    @AppStorage(InteractionMode.keyboardDefaultsKey)
+    private var modeRaw = InteractionMode.defaultForKeyboard.rawValue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("When summoned:", selection: $modeRaw) {
+                ForEach(InteractionMode.allCases, id: \.rawValue) { mode in
+                    Text(mode.keyboardDisplayName).tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.radioGroup)
+
+            Text(modeHelp)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var modeHelp: String {
+        switch InteractionMode(rawValue: modeRaw) ?? .defaultForKeyboard {
+        case .holdToSelect:
+            return "Keep holding the modifier keys, move the cursor to a slice, then release to choose."
+        case .clickToStay:
+            return "Tap the modifier keys to open the wheel; it stays open. Click a slice to choose, "
+                 + "or the centre to cancel."
         }
     }
 }

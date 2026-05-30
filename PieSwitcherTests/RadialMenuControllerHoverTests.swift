@@ -125,7 +125,7 @@ final class RadialMenuControllerHoverTests: XCTestCase {
         registry.register(WindowSwitcherMenu(enumerator: WindowEnumerator(source: source)), for: .mouseChord)
         let controller = RadialMenuController(
             registry: registry, windowControl: WindowController(system: fake),
-            modeProvider: { .holdToSelect }, appearanceProvider: { .default },
+            modeProvider: { _ in .holdToSelect }, appearanceProvider: { .default },
             monitorInstaller: MonitorRecorder().installer()
         )
         // Bypass summon — headless display scoping yields 0 apps — by opening a populated tree.
@@ -176,7 +176,7 @@ final class RadialMenuControllerHoverTests: XCTestCase {
         return RadialMenuController(
             registry: registry,
             windowControl: WindowController(system: fake),
-            modeProvider: { mode },
+            modeProvider: { _ in mode },
             appearanceProvider: { .default },
             monitorInstaller: installer
         )

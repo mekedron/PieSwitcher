@@ -3,7 +3,8 @@ import XCTest
 
 /// Exercises the interaction-mode state machine in isolation (AC5): every test
 /// drives `InteractionStateMachine` with synthetic inputs and asserts the outcome,
-/// plus the persistence helpers behind the Preferences setting (AC3).
+/// plus the persistence helpers behind the per-source Preferences settings
+/// (Bringr-93j.91 split the single shared mode into a Mouse mode and a Keyboard mode).
 final class InteractionModeTests: XCTestCase {
     // MARK: - Opening
 
@@ -43,13 +44,6 @@ final class InteractionModeTests: XCTestCase {
         _ = machine.handle(.triggerPressed)
         XCTAssertEqual(machine.handle(.triggerReleased(over: .none)), .cancel)
         XCTAssertFalse(machine.isOpen)
-    }
-
-    func testHoldToSelectIgnoresClicksAndStaysOpen() {
-        var machine = InteractionStateMachine(mode: .holdToSelect)
-        _ = machine.handle(.triggerPressed)
-        XCTAssertEqual(machine.handle(.click(over: .slice(0))), .none, "hold mode commits on release, not on a click")
-        XCTAssertTrue(machine.isOpen)
     }
 
     // MARK: - AC2: click-to-stay
@@ -145,106 +139,99 @@ final class InteractionModeTests: XCTestCase {
         XCTAssertEqual(machine.handle(.click(over: .slice(1))), .select(1))
     }
 
-    // MARK: - AC3: mode persistence helpers
+    // MARK: - Bringr-93j.91: per-source persistence helpers
 
-    func testDefaultModeIsHoldToSelect() {
-        XCTAssertEqual(InteractionMode.default, .holdToSelect)
-        XCTAssertEqual(InteractionStateMachine().mode, .holdToSelect)
+    func testDefaultsAreSplitPerSource() {
+        XCTAssertEqual(InteractionMode.defaultForMouse, .holdToSelect)
+        XCTAssertEqual(InteractionMode.defaultForKeyboard, .clickToStay,
+                       "the keyboard defaults to 'Press' (click-to-stay) so a held shortcut isn't required")
     }
 
-    func testDefaultsKeyIsStable() {
-        XCTAssertEqual(InteractionMode.defaultsKey, "interactionMode")
+    func testDefaultsKeysAreStableAndDistinct() {
+        XCTAssertEqual(InteractionMode.mouseDefaultsKey, "interactionMode.mouse")
+        XCTAssertEqual(InteractionMode.keyboardDefaultsKey, "interactionMode.keyboard")
+        XCTAssertNotEqual(InteractionMode.mouseDefaultsKey, InteractionMode.keyboardDefaultsKey)
     }
 
-    func testCurrentReadsPersistedMode() {
+    func testCurrentReadsPersistedMouseMode() {
         let defaults = makeDefaults()
-        defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.defaultsKey)
-        XCTAssertEqual(InteractionMode.current(from: defaults), .clickToStay)
+        defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.mouseDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .clickToStay)
     }
 
-    func testCurrentFallsBackToDefaultWhenUnset() {
-        XCTAssertEqual(InteractionMode.current(from: makeDefaults()), .default)
-    }
-
-    func testCurrentFallsBackToDefaultWhenUnrecognized() {
+    func testCurrentReadsPersistedKeyboardMode() {
         let defaults = makeDefaults()
-        defaults.set("not-a-mode", forKey: InteractionMode.defaultsKey)
-        XCTAssertEqual(InteractionMode.current(from: defaults), .default)
+        defaults.set(InteractionMode.holdToSelect.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .holdToSelect)
+    }
+
+    func testCurrentFallsBackToPerSourceDefaultsWhenUnset() {
+        let defaults = makeDefaults()
+        XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .defaultForMouse)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .defaultForKeyboard)
+    }
+
+    func testCurrentFallsBackToPerSourceDefaultsWhenUnrecognized() {
+        let defaults = makeDefaults()
+        defaults.set("not-a-mode", forKey: InteractionMode.mouseDefaultsKey)
+        defaults.set("also-not-a-mode", forKey: InteractionMode.keyboardDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .defaultForMouse)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .defaultForKeyboard)
+    }
+
+    func testMouseAndKeyboardModesAreIndependent() {
+        let defaults = makeDefaults()
+        defaults.set(InteractionMode.clickToStay.rawValue, forKey: InteractionMode.mouseDefaultsKey)
+        defaults.set(InteractionMode.holdToSelect.rawValue, forKey: InteractionMode.keyboardDefaultsKey)
+        XCTAssertEqual(InteractionMode.current(for: .mouseChord, from: defaults), .clickToStay)
+        XCTAssertEqual(InteractionMode.current(for: .modifierHold, from: defaults), .holdToSelect,
+                       "changing one source's mode must not flip the other")
     }
 
     func testDisplayNamesAreDistinctAndNonEmpty() {
-        let names = InteractionMode.allCases.map(\.displayName)
-        XCTAssertFalse(names.contains(where: \.isEmpty))
-        XCTAssertEqual(Set(names).count, names.count)
+        let mouseNames = InteractionMode.allCases.map(\.displayName)
+        XCTAssertFalse(mouseNames.contains(where: \.isEmpty))
+        XCTAssertEqual(Set(mouseNames).count, mouseNames.count)
+
+        let keyboardNames = InteractionMode.allCases.map(\.keyboardDisplayName)
+        XCTAssertFalse(keyboardNames.contains(where: \.isEmpty))
+        XCTAssertEqual(Set(keyboardNames).count, keyboardNames.count)
     }
 
-    // MARK: - Bringr-93j.76: click-to-activate lets a click commit in hold-to-select
+    func testKeyboardDisplayNameRenamesClickToStay() {
+        XCTAssertEqual(InteractionMode.holdToSelect.keyboardDisplayName, "Hold to select",
+                       "hold-to-select keeps its name on the keyboard")
+        XCTAssertEqual(InteractionMode.clickToStay.keyboardDisplayName, "Press",
+                       "click-to-stay reads as 'Press' on the keyboard — you don't 'click' a keyboard")
+        XCTAssertNotEqual(InteractionMode.clickToStay.displayName,
+                          InteractionMode.clickToStay.keyboardDisplayName,
+                          "the rename must be keyboard-only — the mouse label still says 'Click to stay open'")
+    }
 
-    func testClickToActivateLetsHoldModeClickSelect() {
+    // MARK: - Bringr-93j.91: click-to-activate is always on
+
+    func testClickInHoldModeSelectsTheSlice() {
         var machine = InteractionStateMachine(mode: .holdToSelect)
-        machine.clickToActivate = true
         _ = machine.handle(.triggerPressed)
         XCTAssertEqual(machine.handle(.click(over: .slice(2))), .select(2),
-                       "with click-to-activate on, a click picks the slice even in hold mode")
+                       "click-to-activate is now always on: a click picks the slice even in hold mode")
         XCTAssertFalse(machine.isOpen)
     }
 
-    func testClickToActivateClickOffSliceCancelsInHoldMode() {
+    func testClickInHoldModeOffSliceCancels() {
         var machine = InteractionStateMachine(mode: .holdToSelect)
-        machine.clickToActivate = true
         _ = machine.handle(.triggerPressed)
-        XCTAssertEqual(machine.handle(.click(over: .none)), .cancel, "a click off any slice cancels")
+        XCTAssertEqual(machine.handle(.click(over: .none)), .cancel,
+                       "a click off any slice cancels in hold mode too")
         XCTAssertFalse(machine.isOpen)
     }
 
-    func testClickToActivateStillCommitsOnReleaseInHoldMode() {
+    func testReleaseStillCommitsInHoldMode() {
         var machine = InteractionStateMachine(mode: .holdToSelect)
-        machine.clickToActivate = true
         _ = machine.handle(.triggerPressed)
         XCTAssertEqual(machine.handle(.triggerReleased(over: .slice(1))), .select(1),
-                       "release-to-select still works alongside click-to-activate")
+                       "release-to-select still works alongside the always-on click-to-activate")
         XCTAssertFalse(machine.isOpen)
-    }
-
-    func testClickToActivateOffKeepsHoldModeIgnoringClicks() {
-        var machine = InteractionStateMachine(mode: .holdToSelect)
-        machine.clickToActivate = false
-        _ = machine.handle(.triggerPressed)
-        XCTAssertEqual(machine.handle(.click(over: .slice(0))), .none, "off: hold mode still ignores clicks")
-        XCTAssertTrue(machine.isOpen)
-    }
-
-    func testClickToStayUnaffectedByClickToActivateFlag() {
-        for flag in [true, false] {
-            var machine = InteractionStateMachine(mode: .clickToStay)
-            machine.clickToActivate = flag
-            _ = machine.handle(.triggerPressed)
-            _ = machine.handle(.triggerReleased(over: .none))
-            XCTAssertEqual(machine.handle(.click(over: .slice(3))), .select(3),
-                           "click-to-stay always commits a click regardless of the flag (\(flag))")
-        }
-    }
-
-    // MARK: - Bringr-93j.76: click-to-activate persistence helpers
-
-    func testClickToActivateDefaultIsOff() {
-        XCTAssertFalse(ClickToActivate.default)
-    }
-
-    func testClickToActivateDefaultsKeyIsStable() {
-        XCTAssertEqual(ClickToActivate.defaultsKey, "clickToActivate")
-    }
-
-    func testClickToActivateFallsBackToOffWhenUnset() {
-        XCTAssertFalse(ClickToActivate.isEnabled(from: makeDefaults()))
-    }
-
-    func testClickToActivateReadsTheStoredValue() {
-        for value in [true, false] {
-            let defaults = makeDefaults()
-            defaults.set(value, forKey: ClickToActivate.defaultsKey)
-            XCTAssertEqual(ClickToActivate.isEnabled(from: defaults), value)
-        }
     }
 
     // MARK: - Helpers

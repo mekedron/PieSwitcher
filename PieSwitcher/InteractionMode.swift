@@ -3,9 +3,11 @@ import Foundation
 // MARK: - Mode
 
 /// Whether the radial menu stays open after the summon trigger is released.
-/// Persisted (AC3) and chosen in Preferences; governs the hold-capable triggers
-/// (mouse chord, keyboard shortcut). The menu-bar fallback always behaves as
-/// `clickToStay` because a menu click has no "hold" to track.
+/// Persisted independently per input source (Bringr-93j.91): the mouse chord and the
+/// keyboard shortcut each carry their own preference, so a single picker no longer
+/// forces both to behave alike. Read fresh per summon via `current(for:from:)`. The
+/// menu-bar fallback always behaves as `clickToStay` because a menu click has no
+/// "hold" to track.
 enum InteractionMode: String, CaseIterable, Sendable {
     /// The menu stays open only while the trigger is held: gliding to a slice and
     /// releasing over it selects it; releasing off any slice cancels.
@@ -14,15 +16,22 @@ enum InteractionMode: String, CaseIterable, Sendable {
     /// selects, a click off any slice (or Esc) cancels.
     case clickToStay
 
-    /// Hold-to-select is the default — the most fluid match for the hold-natured
-    /// mouse chord: press, glide to a slice, release to pick, never leaving the wheel.
-    static let `default`: InteractionMode = .holdToSelect
+    /// The default mouse mode — hold-to-select is the most fluid match for a held
+    /// chord: press, glide to a slice, release to pick, never leaving the wheel.
+    static let defaultForMouse: InteractionMode = .holdToSelect
+    /// The default keyboard mode — "Press" (a.k.a. `clickToStay`) fits the keyboard
+    /// shortcut better: tap the modifier to summon, then click the slice to commit.
+    static let defaultForKeyboard: InteractionMode = .clickToStay
 
-    /// `UserDefaults` key backing the persisted choice. Single source of truth shared
-    /// by the Preferences `@AppStorage` and `current(from:)` so they cannot drift.
-    static let defaultsKey = "interactionMode"
+    /// `UserDefaults` key backing the persisted mouse choice. The pre-Bringr-93j.91
+    /// shared key (`interactionMode`) is abandoned, not migrated — matching the
+    /// project's no-compat-shim convention.
+    static let mouseDefaultsKey = "interactionMode.mouse"
+    /// `UserDefaults` key backing the persisted keyboard choice. Same no-compat-shim
+    /// rationale as the mouse key.
+    static let keyboardDefaultsKey = "interactionMode.keyboard"
 
-    /// Human-readable name for the Preferences picker.
+    /// Human-readable name for the mouse picker.
     var displayName: String {
         switch self {
         case .holdToSelect: return "Hold to select"
@@ -30,41 +39,39 @@ enum InteractionMode: String, CaseIterable, Sendable {
         }
     }
 
-    /// The persisted mode, falling back to `.default` when unset or unrecognized.
-    static func current(from defaults: UserDefaults = .standard) -> InteractionMode {
-        guard let raw = defaults.string(forKey: defaultsKey),
+    /// Human-readable name for the keyboard picker (Bringr-93j.91): "Click to stay
+    /// open" is renamed to "Press" because you don't really "click" a keyboard.
+    var keyboardDisplayName: String {
+        switch self {
+        case .holdToSelect: return "Hold to select"
+        case .clickToStay: return "Press"
+        }
+    }
+
+    /// The persisted mode for the given trigger, falling back to that source's
+    /// default when unset or unrecognized.
+    static func current(
+        for trigger: MenuTrigger,
+        from defaults: UserDefaults = .standard
+    ) -> InteractionMode {
+        switch trigger {
+        case .mouseChord:
+            return read(mouseDefaultsKey, default: defaultForMouse, from: defaults)
+        case .modifierHold:
+            return read(keyboardDefaultsKey, default: defaultForKeyboard, from: defaults)
+        }
+    }
+
+    private static func read(
+        _ key: String,
+        default fallback: InteractionMode,
+        from defaults: UserDefaults
+    ) -> InteractionMode {
+        guard let raw = defaults.string(forKey: key),
               let mode = InteractionMode(rawValue: raw) else {
-            return .default
+            return fallback
         }
         return mode
-    }
-}
-
-// MARK: - Click-to-activate
-
-/// Optional click-to-activate behaviour (Bringr-93j.76). When enabled, clicking an app or
-/// window slice selects it and closes the wheel even in `holdToSelect` mode — so the user can
-/// either release the held trigger to commit the hovered item (as before) or click an item
-/// directly. Most useful with the keyboard-shortcut trigger, where the mouse is free to click
-/// while the modifier is held; with the mouse chord the buttons are busy being held. In
-/// `clickToStay` a click already commits, so the setting only changes `holdToSelect`.
-///
-/// Off by default — an opt-in setting, so unless the user turns it on selection works exactly
-/// as before. A caseless namespace for the read helper, mirroring `HideOnCommit`; read fresh at
-/// each summon so a Preferences change applies on the next open without a relaunch.
-enum ClickToActivate {
-    /// `UserDefaults` key backing the toggle. Single source of truth shared by the
-    /// Preferences `@AppStorage` and `isEnabled(from:)` so the two cannot drift.
-    static let defaultsKey = "clickToActivate"
-
-    /// Default: OFF. Because the default is false, `bool(forKey:)` — which returns `false` for
-    /// an absent key — already yields the intended default, so no explicit unset check is needed
-    /// (mirroring `HideOnCommit`).
-    static let `default` = false
-
-    /// Whether click-to-activate is enabled. Read fresh at each summon.
-    static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: defaultsKey)
     }
 }
 
@@ -114,23 +121,21 @@ enum InteractionOutcome: Equatable, Sendable {
 ///
 /// A pure value type with no AppKit/overlay dependency, so the whole policy is
 /// unit-tested directly (AC5).
+///
+/// Bringr-93j.91 made click-to-activate always-on: a click on a slice commits in
+/// either mode, and a click off any slice cancels. The former opt-in flag is gone;
+/// the keyboard's default mode is now `clickToStay`, so "click to choose" is the
+/// out-of-the-box behaviour there, while hold-to-select still commits on release.
 struct InteractionStateMachine {
     /// The active mode. The controller sets this before a summon so a change takes
     /// effect on the next open rather than mid-session (AC3).
     var mode: InteractionMode
 
-    /// Whether a click commits even in `holdToSelect` (Bringr-93j.76). Off (the default)
-    /// keeps the original behaviour — a click commits only in `clickToStay`. On, a click on a
-    /// slice selects it and a click off any slice cancels, in *either* mode, so the user can
-    /// click an item to activate it instead of releasing the held trigger. Set per-summon by
-    /// the controller, like `mode`, so a Preferences change applies on the next open.
-    var clickToActivate = false
-
     /// Whether the menu is currently open. Read-only to callers; only `handle`
     /// transitions it, so the machine is the single source of truth.
     private(set) var isOpen = false
 
-    init(mode: InteractionMode = .default) {
+    init(mode: InteractionMode = .defaultForMouse) {
         self.mode = mode
     }
 
@@ -146,11 +151,11 @@ struct InteractionStateMachine {
             return commit(for: target)
         case .click(let target):
             guard isOpen else { return .none }
-            // Click-to-stay always commits on a click. Hold-to-select commits on release, not on
-            // a click — unless click-to-activate is on (Bringr-93j.76), which lets a click pick an
-            // item (or cancel off a slice) in either mode, so the user can click instead of
-            // releasing the held trigger.
-            guard mode == .clickToStay || clickToActivate else { return .none }
+            // A click always commits in either mode: click-to-stay was always click-to-commit,
+            // and hold-to-select gained the same behaviour after Bringr-93j.91 made click-to-activate
+            // always-on — so the user can click an item to pick it instead of releasing the trigger,
+            // and a click off any slice cancels. A click *outside* the overlay reaches this path via
+            // the dismiss monitor with `over: .none`, so the cancel arm still applies there.
             return commit(for: target)
         case .escape, .triggerLost:
             // Both force a cancel when open: Esc, and any abrupt loss of the summon

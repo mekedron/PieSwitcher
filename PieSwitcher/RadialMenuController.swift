@@ -46,11 +46,9 @@ final class RadialMenuController: ObservableObject {
     let window: RadialMenuWindow
     var machine = InteractionStateMachine()
     /// Reads the persisted interaction mode at summon time so a Preferences change
-    /// takes effect on the next summon without a relaunch (AC3 of US-009).
-    private let modeProvider: () -> InteractionMode
-    /// Reads the persisted click-to-activate setting at summon time, mirroring `modeProvider`,
-    /// so a Preferences change applies on the next summon without a relaunch (Bringr-93j.76).
-    private let clickToActivateProvider: () -> Bool
+    /// takes effect on the next summon without a relaunch (AC3 of US-009). Takes the
+    /// trigger so the mouse and keyboard can carry independent modes (Bringr-93j.91).
+    private let modeProvider: (MenuTrigger) -> InteractionMode
     /// Reads the persisted appearance at summon time, mirroring `modeProvider`, so a
     /// Preferences appearance change applies on the next summon without a relaunch
     /// (US-014 AC2).
@@ -92,8 +90,7 @@ final class RadialMenuController: ObservableObject {
         registry: MenuRegistry,
         geometry: RadialGeometry = .default,
         windowControl: WindowController? = nil,
-        modeProvider: @escaping () -> InteractionMode = { InteractionMode.current() },
-        clickToActivateProvider: @escaping () -> Bool = { ClickToActivate.isEnabled() },
+        modeProvider: @escaping (MenuTrigger) -> InteractionMode = { InteractionMode.current(for: $0) },
         appearanceProvider: @escaping () -> RadialAppearance = { RadialAppearance.current() },
         strategyProvider: @escaping () -> RevealStrategy = { RevealStrategy.current() },
         hideOnCommitProvider: @escaping () -> Bool = { HideOnCommit.isEnabled() },
@@ -103,7 +100,6 @@ final class RadialMenuController: ObservableObject {
     ) {
         self.registry = registry
         self.modeProvider = modeProvider
-        self.clickToActivateProvider = clickToActivateProvider
         self.appearanceProvider = appearanceProvider
         self.strategyProvider = strategyProvider
         self.hideOnCommitProvider = hideOnCommitProvider
@@ -127,9 +123,10 @@ final class RadialMenuController: ObservableObject {
     // MARK: - Trigger entry points
 
     /// A hold-capable trigger (mouse chord, keyboard shortcut) fired. Opens in the
-    /// persisted mode, or dismisses if already open (toggle parity).
+    /// persisted mode for that trigger (Bringr-93j.91 — mouse and keyboard each
+    /// carry their own mode), or dismisses if already open (toggle parity).
     func triggerPressed(for trigger: MenuTrigger, at cursor: CGPoint) {
-        press(trigger: trigger, mode: modeProvider(), at: cursor)
+        press(trigger: trigger, mode: modeProvider(trigger), at: cursor)
     }
 
     /// The menu-bar fallback: a single click with no "hold", so it always opens in
@@ -146,8 +143,9 @@ final class RadialMenuController: ObservableObject {
         route(machine.handle(.triggerReleased(over: sliceTarget(region))), region: region)
     }
 
-    /// A click inside the overlay. In click-to-stay this selects the slice under the
-    /// cursor, or cancels on a dead-zone/outside click; in hold-to-select it is ignored.
+    /// A click inside the overlay. Selects the slice under the cursor, or cancels on a
+    /// dead-zone click — in either interaction mode, since Bringr-93j.91 made
+    /// click-to-activate always-on so a click always commits.
     func clickInOverlay(atLocalPoint local: CGPoint) {
         let region = navigator.region(forOffset: offset(forLocalPoint: local))
         route(machine.handle(.click(over: sliceTarget(region))), region: region)
@@ -165,11 +163,10 @@ final class RadialMenuController: ObservableObject {
     }
 
     private func press(trigger: MenuTrigger, mode: InteractionMode, at cursor: CGPoint) {
-        // Resolve the interaction settings fresh while closed, so a Preferences change applies
-        // on the next open rather than mid-session (Bringr-93j.76 mirrors the US-009 mode read).
+        // Resolve the interaction mode fresh while closed, so a Preferences change applies on
+        // the next open rather than mid-session (AC3 of US-009).
         if !machine.isOpen {
             machine.mode = mode
-            machine.clickToActivate = clickToActivateProvider()
         }
         switch machine.handle(.triggerPressed) {
         case .open: summon(trigger: trigger, at: cursor)
@@ -333,8 +330,9 @@ final class RadialMenuController: ObservableObject {
     }
 
     /// Route a global key/mouse-down that bypassed the overlay to a cancel: Esc in
-    /// either mode, or a click outside the wheel which the state machine cancels in
-    /// click-to-stay and ignores in hold-to-select (where the chord is still held).
+    /// either mode, or a click outside the wheel — which, after Bringr-93j.91 made
+    /// click-to-activate always-on, cancels in either mode (a `click(over: .none)`
+    /// resolves to `.cancel`).
     private func handleDismissEvent(_ event: NSEvent) {
         switch event.type {
         case .keyDown where event.keyCode == Self.escapeKeyCode:
