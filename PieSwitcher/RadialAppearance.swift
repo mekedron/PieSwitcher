@@ -58,7 +58,9 @@ struct RadialAppearance: Equatable, Sendable {
     /// Zero by default — pure glass, so the genuine Liquid Glass material shows through
     /// at rest with no frost on top; the user dials it up for a more filled, frosted ring.
     static let defaultFillOpacity = 0.0
-    static let defaultShowsLabels = true
+    /// Off by default — labels are optional and ride on top of the icon + window index
+    /// that always show, so the wheel ships icon-only and the user opts into labels.
+    static let defaultShowsLabels = false
     /// On by default, so the wheel ships with the Liquid Glass look; the user opts
     /// out to the plain frosted fallback.
     static let defaultUsesLiquidGlass = true
