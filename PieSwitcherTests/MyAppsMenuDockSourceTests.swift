@@ -169,6 +169,8 @@ final class MyAppsMenuDockSourceTests: XCTestCase {
     func testCuratedListPrecedesAppendedDockApps() {
         // The curated block leads; Dock-only apps follow. With keepCuratedOrder ON (default)
         // both blocks stay in their natural order — curated in user order, Dock in Dock order.
+        // Pin keepFinderLast OFF so the Bringr-93j.108 override doesn't displace Finder — this
+        // test isolates the curated-vs-Dock-only ordering, not the Finder-last rule.
         let source = stub([])
         let menu = MyAppsMenu(
             enumerator: makeEnumerator(source),
@@ -180,6 +182,7 @@ final class MyAppsMenuDockSourceTests: XCTestCase {
             },
             showOtherRunningApps: { false },
             keepCuratedOrder: { true },
+            keepFinderLast: { false },
             includeAllDockApps: { true },
             dockApps: {
                 [

@@ -178,19 +178,48 @@ struct MyAppsMenu: MenuDefinition {
                         enumerator: enumerator, runningPID: runningPID
                     )
                 }
-                guard showOthers else { return curatedNodes }
-                // Append every other running app in the apps scope — those whose pid no curated
-                // entry already represents. A curated app running with windows resolves to a
-                // live pid (and an expand node above), so excluding those pids avoids listing
-                // it twice; a curated launch node owns no live window here, so it never
-                // collides. The appended nodes are the raw wheel's app nodes (no bundle id).
-                let curatedPIDs = Set(curated.compactMap { runningPID($0.bundleIdentifier) })
-                let others = live
-                    .filter { !curatedPIDs.contains($0.id.pid) }
-                    .map { WindowSwitcherMenu.appNode($0, windowsScope: windowsScope, enumerator: enumerator) }
-                return curatedNodes + others
+                let combined: [MenuNode]
+                if showOthers {
+                    // Append every other running app in the apps scope — those whose pid no
+                    // curated entry already represents. A curated app running with windows
+                    // resolves to a live pid (and an expand node above), so excluding those
+                    // pids avoids listing it twice; a curated launch node owns no live window
+                    // here, so it never collides. The appended nodes are the raw wheel's app
+                    // nodes (no bundle id).
+                    let curatedPIDs = Set(curated.compactMap { runningPID($0.bundleIdentifier) })
+                    let others = live
+                        .filter { !curatedPIDs.contains($0.id.pid) }
+                        .map { WindowSwitcherMenu.appNode($0, windowsScope: windowsScope, enumerator: enumerator) }
+                    combined = curatedNodes + others
+                } else {
+                    combined = curatedNodes
+                }
+                // "Keep Finder last" overrides the manual / Dock / others position of Finder
+                // (Bringr-93j.108): the toggle promises Finder pinned to the end of the wheel
+                // regardless of how it was collected. WindowEnumerator already moves Finder to
+                // the end of `live` for the `.dockPosition` sort, so an `others`-only Finder is
+                // already last; the patch here covers the curated path, where a Dock-included
+                // or manually-listed Finder would otherwise sit in the curated block. Only
+                // meaningful under `.dockPosition` — the only order that surfaces the toggle.
+                guard appSortOrder() == .dockPosition && keepFinderLast() else { return combined }
+                return Self.movingFinderNodeLast(combined)
             }
         )
+    }
+
+    /// Move any Finder node — identified by its bundle id — to the absolute end of `nodes`.
+    /// Used when "Keep Finder last" overrides the natural curated/Dock placement of Finder
+    /// (Bringr-93j.108). Curated entries carry their bundle id explicitly; an `others`-block
+    /// Finder lands at the end of `nodes` already (WindowEnumerator's `.dockPosition` sort
+    /// applies the same rule to `live`) and carries `nil` for `bundleIdentifier`, so the lookup
+    /// here only ever finds — and moves — a curated Finder.
+    private static func movingFinderNodeLast(_ nodes: [MenuNode]) -> [MenuNode] {
+        guard let idx = nodes.firstIndex(where: { $0.bundleIdentifier == DockOrder.finderBundleID }),
+              idx != nodes.count - 1 else { return nodes }
+        var result = nodes
+        let finder = result.remove(at: idx)
+        result.append(finder)
+        return result
     }
 
     /// One curated entry's node: the running-with-windows app node when its running pid

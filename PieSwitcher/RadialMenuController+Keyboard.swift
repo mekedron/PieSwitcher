@@ -18,7 +18,9 @@ extension RadialMenuController {
 
     /// Handle one navigation key. Returns `true` when the key was consumed (so the monitor stops
     /// it reaching the app underneath), `false` to let it pass through — including keys for a
-    /// sub-mode the user disabled.
+    /// sub-mode the user disabled and any key dismissed via the close-on-unused-key policy,
+    /// because the user's input is sacred and must reach the underlying app unmodified
+    /// (Bringr-93j.108). Only Escape is treated as an intentional dismissal and consumed.
     @discardableResult
     func handleKeyboardNavKey(_ key: KeyboardNavKey) -> Bool {
         guard acceptsKeyboardNav, let outcome = keyboardOutcome(for: key) else { return false }
@@ -38,6 +40,12 @@ extension RadialMenuController {
         case .close:
             escapePressed() // top-level Escape cancels and restores, in either mode (US-015).
             return true
+        case .closePassThrough:
+            // Close the wheel exactly like Escape, but let the key reach the underlying app
+            // (Bringr-93j.108): an unused key dismissing the pie must never eat the keystroke —
+            // e.g. Fn + Backspace = forward delete still has to work while the pie is open.
+            escapePressed()
+            return false
         }
     }
 
@@ -47,10 +55,15 @@ extension RadialMenuController {
     /// (commits arrow focus or confirms number focus). A key whose category is off is treated as
     /// unsupported (Bringr-93j.95), so the close-on-unused policy fires on it just like on a key
     /// the wheel never used. `nil` means "not for keyboard nav" — pass it through.
+    ///
+    /// Escape is the only key whose unsupported path consumes when it closes the wheel
+    /// (Bringr-93j.108): it is the natural "close this" key, so the user pressing it is
+    /// intentionally dismissing the pie rather than typing Esc into the underlying app. Every
+    /// other unsupported key passes the keystroke through after closing.
     private func keyboardOutcome(for key: KeyboardNavKey) -> KeyboardNavOutcome? {
         switch key {
         case .escape:
-            guard keyboardConfig.isEnabled else { return unsupportedOutcome() }
+            guard keyboardConfig.isEnabled else { return escapeUnsupportedOutcome() }
             return navigator.keyboardEscape()
         case .arrow(let arrow):
             guard keyboardConfig.arrowsEnabled else { return unsupportedOutcome() }
@@ -71,9 +84,18 @@ extension RadialMenuController {
         }
     }
 
-    /// The outcome for a key with no function in the wheel: close on press when the policy is on
-    /// (a full cancel/restore via `escapePressed`), otherwise pass it through (Bringr-93j.73/.95).
+    /// The outcome for a non-Escape key with no function in the wheel: close on press when the
+    /// policy is on, **and let the key pass through** so the user's input still reaches the
+    /// underlying app — only Escape gets eaten (Bringr-93j.73/.95/.108). Without the policy,
+    /// the key is ignored entirely.
     private func unsupportedOutcome() -> KeyboardNavOutcome? {
+        keyboardConfig.closesOnUnsupportedKey ? .closePassThrough : nil
+    }
+
+    /// The outcome for Escape when keyboard navigation itself is off (so `keyboardEscape()`
+    /// isn't consulted): close-and-consume when the close-on-unused policy is on, ignore
+    /// otherwise. Escape stays consumed — see `keyboardOutcome(for:)`'s doc and Bringr-93j.108.
+    private func escapeUnsupportedOutcome() -> KeyboardNavOutcome? {
         keyboardConfig.closesOnUnsupportedKey ? .close : nil
     }
 

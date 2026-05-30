@@ -26,8 +26,12 @@ struct KeyboardNavigationSettings: View {
                 Text("Master")
             } footer: {
                 Text("Move and choose with the keyboard while the wheel is open. The focused "
-                     + "item previews exactly like a hovered one. \"Close on unused key\" "
-                     + "dismisses the wheel when a key that has no current binding is pressed.")
+                     + "item previews exactly like a hovered one.\n\n"
+                     + "\"Close on unused key\" dismisses the wheel when a key that has no "
+                     + "current binding is pressed. The keystroke still reaches the app "
+                     + "underneath unchanged — only Escape is consumed (it's the natural "
+                     + "\"close this\" key), so shortcuts like Fn + Backspace keep working "
+                     + "while the wheel is open.")
             }
 
             if enabled {

@@ -35,9 +35,12 @@ enum KeyboardNavigation {
     static let arrowsDefault = false
     static let numbersDefault = true
     static let confirmDefault = false
-    /// Off by default (Bringr-93j.93): an unrecognised key passes through rather than closing
-    /// the wheel, so a stray press never strands the summon.
-    static let closeOnUnsupportedDefault = false
+    /// ON by default (Bringr-93j.108): a key the wheel doesn't navigate with closes it so a
+    /// stray press never strands an open summon. Because the close-on-unused path **always
+    /// passes the key through** to the underlying app (the only exception is Escape, which is
+    /// the natural "close this" key and stays consumed), turning it on can't eat keystrokes —
+    /// so making it the default is safe and matches what most users expect.
+    static let closeOnUnsupportedDefault = true
     static let commitAppWithoutWindowChoiceDefault = false
 
     static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
@@ -56,8 +59,15 @@ enum KeyboardNavigation {
         defaults.bool(forKey: confirmKey)
     }
 
+    /// Whether the wheel closes on a key it doesn't navigate with (Bringr-93j.73/.95/.108). True
+    /// by default — see `closeOnUnsupportedDefault`. Falls back to the ON default when unset:
+    /// `bool(forKey:)` alone returns `false` for an absent key, which would silently flip the
+    /// intended default, so the unset case is checked explicitly (mirroring `numbersEnabled`).
     static func closesOnUnsupportedKey(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: closeOnUnsupportedKey)
+        guard defaults.object(forKey: closeOnUnsupportedKey) != nil else {
+            return closeOnUnsupportedDefault
+        }
+        return defaults.bool(forKey: closeOnUnsupportedKey)
     }
 
     static func commitsAppWithoutWindowChoice(from defaults: UserDefaults = .standard) -> Bool {
@@ -203,10 +213,13 @@ enum KeyboardNavMath {
 /// What a keyboard key did to the wheel, so the controller can perform the matching side
 /// effect: ignore it (pass the key through to the app underneath), consume it after moving
 /// focus/preview, commit a selection (the navigator already focused the target and restored the
-/// rest), or close the whole menu (Escape at the top level).
+/// rest), close the whole menu and consume the key (Escape at the top level), or close the
+/// whole menu while still passing the key through (the close-on-unused-key path — the user's
+/// input must reach the underlying app unmodified, Bringr-93j.108).
 enum KeyboardNavOutcome: Equatable {
     case ignored
     case handled
     case committed(RadialCommitResult)
     case close
+    case closePassThrough
 }
