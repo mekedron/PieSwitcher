@@ -112,6 +112,41 @@ final class MouseChordTests: XCTestCase {
         XCTAssertEqual(detector.handle(up(.right, at: 0.32)), .consume)
     }
 
+    // MARK: - Bringr-93j.94: drag while holding releases the buffered press
+
+    func testMotionWhileHoldingFirstPressReleasesTheHold() {
+        var detector = MouseChordDetector(threshold: 0.12)
+        XCTAssertEqual(detector.handle(down(.left, at: 0)), .hold)
+        XCTAssertTrue(
+            detector.motionDetected(),
+            "a drag during the chord-pursuit window means the user is dragging — release the held press"
+        )
+        // After the release the machine is idle, so a partner that lands later is treated as a
+        // fresh first press, never as the back half of a stale chord.
+        XCTAssertEqual(detector.handle(down(.right, at: 0.10)), .hold)
+    }
+
+    func testMotionWhenIdleDoesNothing() {
+        var detector = MouseChordDetector(threshold: 0.12)
+        XCTAssertFalse(
+            detector.motionDetected(),
+            "no press is buffered — motion is the live tap's pass-through case"
+        )
+    }
+
+    func testMotionDuringChordDoesNotReleaseAnything() {
+        var detector = MouseChordDetector(threshold: 0.12)
+        _ = detector.handle(down(.left, at: 0))
+        _ = detector.handle(down(.right, at: 0.05))
+        XCTAssertFalse(
+            detector.motionDetected(),
+            "the chord has already summoned and its presses were consumed — nothing left to release"
+        )
+        // The chord is still latched: the chord buttons keep being consumed until both go up.
+        XCTAssertEqual(detector.handle(up(.left, at: 0.20)), .consume)
+        XCTAssertEqual(detector.handle(up(.right, at: 0.22)), .consume)
+    }
+
     // MARK: - Clean recovery between gestures
 
     func testAfterAChordANewSingleClickPassesThrough() {
