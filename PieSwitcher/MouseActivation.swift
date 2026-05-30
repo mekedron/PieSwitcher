@@ -106,6 +106,13 @@ enum MouseActivationMethod: Int, CaseIterable, Sendable, Hashable {
         }
     }
 
+    /// Whether this method fires on a single button. Single-button methods can't tell a tap
+    /// apart from a deliberate hold without *some* delay — the gesture is identical until
+    /// time passes — so the detector enforces a floor on the user-configured hold delay for
+    /// them (Bringr-93j.100). Multi-button chords don't need the floor: pressing two specific
+    /// buttons together is itself an intentional signal, so 0 ms summon-on-simultaneity works.
+    var isSingleButton: Bool { requiredButtons.count == 1 }
+
     /// Human-readable label for the Preferences checkbox.
     var displayName: String {
         switch self {
@@ -174,12 +181,13 @@ enum MouseActivationConfig {
     /// independently after the hold delay.
     static let blockingDefaultsKey = "activation.mouse.blocking"
 
-    /// Default: OFF (non-blocking). The CRITICAL constraint on Bringr-93j.96 is that the new
-    /// detection must not introduce system-wide lag like the pre-93j.94 chord stutter — and
-    /// non-blocking is the only mode that guarantees that. Users who want strict no-leak
-    /// behaviour (e.g. to keep a middle-click paste from firing while pursuing Middle+Left)
-    /// can opt in.
-    static let defaultBlocking = false
+    /// Default: ON (blocking). Suppresses the chosen buttons' normal action during the hold-delay
+    /// window, so a stray middle-click paste or right-click menu doesn't fire while the user is
+    /// pursuing a chord. The user can opt out for the non-blocking path, which guarantees no
+    /// added latency on the activation buttons but lets their normal action leak through (the
+    /// constraint that drove the pre-93j.94 stutter is now satisfied either way — the chord
+    /// detector replays held buttons on drag, so blocking no longer stalls window drags).
+    static let defaultBlocking = true
 
     /// Whether blocking mode is active. Absent key returns the default; an explicit `false`
     /// stays off (the presence check distinguishes the two cases the same way the methods
@@ -216,6 +224,25 @@ enum MouseActivationHoldDelay {
     /// The persisted delay in **seconds**, clamped to the range, ready for a timer.
     static func current(from defaults: UserDefaults = .standard) -> TimeInterval {
         milliseconds(from: defaults) / 1000
+    }
+
+    /// Floor applied to the configured hold delay when the matched method fires on a single
+    /// button and the user has left the delay at 0 ms (Bringr-93j.100). A normal mouse click
+    /// completes in well under 100 ms, so 200 ms is comfortably above the tap envelope while
+    /// still feeling fast for a deliberate hold — without this floor, picking Middle as the
+    /// activation method silently breaks normal middle-click (the press fires the wheel before
+    /// the focused app ever sees it). An explicit non-zero delay is always respected as-is:
+    /// the user opted into that latency.
+    static let singleButtonMinimumMilliseconds: Double = 200
+
+    /// The effective hold delay (seconds) the detector and monitor should use for `method`,
+    /// applying `singleButtonMinimumMilliseconds` only when the method is single-button and
+    /// the user-configured delay is exactly 0. Both the detector (deciding `.summon` vs
+    /// `.hold`) and the monitor (scheduling the hold-delay timer) call this so they agree on
+    /// the same effective value for the same method.
+    static func effective(for method: MouseActivationMethod, configured: TimeInterval) -> TimeInterval {
+        guard method.isSingleButton, configured == 0 else { return configured }
+        return singleButtonMinimumMilliseconds / 1000
     }
 
     /// The persisted delay in milliseconds (the stored unit), clamped to the range. An

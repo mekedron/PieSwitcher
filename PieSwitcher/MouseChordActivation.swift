@@ -22,10 +22,13 @@ import os
 /// - `releaseHeldWithCurrent`: append the current event to the buffer and replay the whole
 ///   buffer in order, then drop the original current event — a pursuit ended without summoning,
 ///   so its buffered events are the user's normal clicks.
-/// - `summon`: a method matched with a 0 ms hold delay; discard the buffered pursuit events
-///   (so they never leak) and fire the trigger right now. With a non-zero hold delay this
-///   never appears: the live monitor uses the hold-delay timer instead, and only triggers
-///   the summon side effect after the timer fires.
+/// - `summon`: a method matched with an effectively-0 ms hold delay; discard the buffered
+///   pursuit events (so they never leak) and fire the trigger right now. With a non-zero
+///   effective hold delay this never appears: the live monitor uses the hold-delay timer
+///   instead, and only triggers the summon side effect after the timer fires. "Effectively
+///   zero" applies the single-button floor (Bringr-93j.100), so a single-button method at
+///   user-configured 0 ms still takes the `.hold`/timer path — letting a quick tap fall
+///   through as a normal click.
 enum MouseChordReaction: Equatable {
     case pass
     case consume
@@ -172,7 +175,7 @@ struct MouseChordDetector {
         switch state {
         case .idle:
             guard canStillBePursuit else { return .pass }
-            if pursuit != nil, holdDelay == 0 {
+            if let pursuit, MouseActivationHoldDelay.effective(for: pursuit, configured: holdDelay) == 0 {
                 state = .chord
                 return .summon
             }
@@ -202,7 +205,7 @@ struct MouseChordDetector {
         holdDelay: TimeInterval
     ) -> MouseChordReaction {
         if canStillBePursuit {
-            if pursuit != nil, holdDelay == 0 {
+            if let pursuit, MouseActivationHoldDelay.effective(for: pursuit, configured: holdDelay) == 0 {
                 state = .chord
                 return .summon
             }

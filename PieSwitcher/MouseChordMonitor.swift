@@ -299,14 +299,23 @@ final class MouseChordMonitor {
     /// produces the same timing in both. The pursuit timer only runs while we have buffered
     /// events: in non-blocking mode there's nothing to replay, so leaving the detector in a
     /// long-lived partial-match state is fine — the user can complete the combo at any time.
+    ///
+    /// The timer is scheduled against the *effective* hold delay (`MouseActivationHoldDelay
+    /// .effective(for:configured:)`), which applies the single-button floor: configured 0 ms
+    /// stays 0 ms for multi-button chords, but bumps to the floor for single-button methods so
+    /// a quick tap can be replayed as a normal click instead of being eaten by the wheel
+    /// (Bringr-93j.100).
     private func updateMatchTrackers(holdDelay: TimeInterval) {
         guard !chordActive else { return }
         let matched = detector.matchedMethod
         if matched != pendingMatch {
             cancelHoldDelayTimer()
             pendingMatch = matched
-            if matched != nil, holdDelay > 0 {
-                scheduleHoldDelayTimer(delay: holdDelay)
+            if let matched {
+                let effective = MouseActivationHoldDelay.effective(for: matched, configured: holdDelay)
+                if effective > 0 {
+                    scheduleHoldDelayTimer(delay: effective)
+                }
             }
         }
         if matched == nil, !heldEvents.isEmpty {

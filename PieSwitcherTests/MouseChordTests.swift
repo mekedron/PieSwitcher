@@ -162,20 +162,26 @@ final class MouseChordTests: XCTestCase {
 
     // MARK: - Bringr-93j.96: new methods — middle, side buttons, multi-button combos
 
-    func testMiddleAloneMatchesAndSummons() {
+    func testMiddleAloneAtNonZeroDelayMatchesAndSummonsViaChordSummoned() {
+        // With a non-zero (user-chosen) hold delay, the live monitor drives the timer; the
+        // detector just holds and exposes the matched method until `chordSummoned()` lands.
         var detector = MouseChordDetector(pursuitTimeout: 0.12)
-        XCTAssertEqual(detector.handle(down(.middle, at: 0), methods: [.middle]), .summon)
+        XCTAssertEqual(detector.handle(down(.middle, at: 0), methods: [.middle], holdDelay: 0.25), .hold)
+        XCTAssertEqual(detector.matchedMethod, .middle)
+        detector.chordSummoned()
         XCTAssertTrue(detector.isChordActive)
     }
 
-    func testForwardAloneMatchesAndSummons() {
+    func testForwardAloneAtNonZeroDelayMatches() {
         var detector = MouseChordDetector(pursuitTimeout: 0.12)
-        XCTAssertEqual(detector.handle(down(.forward, at: 0), methods: [.forward]), .summon)
+        XCTAssertEqual(detector.handle(down(.forward, at: 0), methods: [.forward], holdDelay: 0.25), .hold)
+        XCTAssertEqual(detector.matchedMethod, .forward)
     }
 
-    func testBackwardAloneMatchesAndSummons() {
+    func testBackwardAloneAtNonZeroDelayMatches() {
         var detector = MouseChordDetector(pursuitTimeout: 0.12)
-        XCTAssertEqual(detector.handle(down(.backward, at: 0), methods: [.backward]), .summon)
+        XCTAssertEqual(detector.handle(down(.backward, at: 0), methods: [.backward], holdDelay: 0.25), .hold)
+        XCTAssertEqual(detector.matchedMethod, .backward)
     }
 
     func testMiddlePlusLeftSummonsOnFullMatch() {
@@ -188,6 +194,65 @@ final class MouseChordTests: XCTestCase {
         var detector = MouseChordDetector(pursuitTimeout: 0.12)
         XCTAssertEqual(detector.handle(down(.forward, at: 0), methods: [.forwardBackward]), .hold)
         XCTAssertEqual(detector.handle(down(.backward, at: 0.05), methods: [.forwardBackward]), .summon)
+    }
+
+    // MARK: - Bringr-93j.100: single-button methods need a hold floor at 0 ms
+
+    func testSingleButtonAtZeroDelayHoldsInsteadOfSummoning() {
+        // Without the floor, a normal middle/side-button click would be eaten by the detector
+        // before the focused app ever saw it — picking a single-button method as activation
+        // would silently break the button's normal action (e.g. middle-click opens new tab).
+        // The detector must hold and let the monitor's timer (or a quick release) decide.
+        for method: MouseActivationMethod in [.middle, .forward, .backward] {
+            var detector = MouseChordDetector(pursuitTimeout: 0.12)
+            let button = method.requiredButtons.first!  // single-button by definition here
+            XCTAssertEqual(
+                detector.handle(down(button, at: 0), methods: [method], holdDelay: 0), .hold,
+                "\(method) must hold instead of summon at 0 ms"
+            )
+            XCTAssertEqual(detector.matchedMethod, method)
+            XCTAssertFalse(detector.isChordActive)
+        }
+    }
+
+    func testQuickSingleButtonTapAtZeroDelayReplaysAsNormalClick() {
+        // The fix's whole point: tap-then-release for a single-button method at the default
+        // 0 ms hold delay falls through as the user's normal click.
+        var detector = MouseChordDetector(pursuitTimeout: 0.12)
+        XCTAssertEqual(detector.handle(down(.middle, at: 0), methods: [.middle], holdDelay: 0), .hold)
+        XCTAssertEqual(
+            detector.handle(up(.middle, at: 0.05), methods: [.middle], holdDelay: 0),
+            .releaseHeldWithCurrent,
+            "release before the floor elapses ⇒ replay buffered press alongside the up as a normal click"
+        )
+    }
+
+    func testSingleButtonAtZeroDelaySummonsAfterChordSummoned() {
+        // The monitor's hold-delay timer (scheduled at the effective delay) ultimately calls
+        // `chordSummoned()`; the detector then transitions to the active chord state just like
+        // the multi-button path.
+        var detector = MouseChordDetector(pursuitTimeout: 0.12)
+        XCTAssertEqual(detector.handle(down(.middle, at: 0), methods: [.middle], holdDelay: 0), .hold)
+        detector.chordSummoned()
+        XCTAssertTrue(detector.isChordActive)
+        XCTAssertEqual(
+            detector.handle(up(.middle, at: 0.30), methods: [.middle], holdDelay: 0), .consume,
+            "after the timer summons, the trailing up belongs to the chord teardown — never to the app"
+        )
+    }
+
+    func testMultiButtonChordStillSummonsAtZeroDelay() {
+        // The floor only applies to single-button methods. L+R must still fire instantly on
+        // simultaneity at 0 ms — that's exactly the .96 behaviour the floor preserves.
+        var detector = MouseChordDetector(pursuitTimeout: 0.12)
+        XCTAssertEqual(detector.handle(down(.left, at: 0), methods: leftRight, holdDelay: 0), .hold)
+        XCTAssertEqual(detector.handle(down(.right, at: 0.02), methods: leftRight, holdDelay: 0), .summon)
+    }
+
+    func testNonZeroHoldDelayForSingleButtonIsRespected() {
+        // Explicit non-zero delays bypass the floor — the user asked for that latency.
+        var detector = MouseChordDetector(pursuitTimeout: 0.12)
+        XCTAssertEqual(detector.handle(down(.middle, at: 0), methods: [.middle], holdDelay: 0.5), .hold)
     }
 
     func testThirdButtonOutsideAnyMethodEndsPursuit() {
@@ -218,13 +283,17 @@ final class MouseChordTests: XCTestCase {
     func testMethodsAreIndependentlyMatchable() {
         // Both Middle (single button) and Middle+Left enabled. Middle alone matches Middle;
         // Middle+Left matches the combo. Each press is interpreted against the full set.
+        // The single-button floor (Bringr-93j.100) means Middle holds at 0 ms instead of
+        // summoning immediately, but with a non-zero delay the user-configured value is
+        // respected and the detector exposes the match for the monitor's timer to drive.
         let methods: Set<MouseActivationMethod> = [.middle, .middleLeft]
         var detector = MouseChordDetector(pursuitTimeout: 0.12)
         XCTAssertEqual(
-            detector.handle(down(.middle, at: 0), methods: methods, holdDelay: 0),
-            .summon,
-            "Middle alone exactly matches the single-button method, so it summons at once"
+            detector.handle(down(.middle, at: 0), methods: methods, holdDelay: 0.25),
+            .hold,
+            "Middle alone exactly matches the single-button method, so it's the pursuit's matched method"
         )
+        XCTAssertEqual(detector.matchedMethod, .middle)
     }
 
     // MARK: - Helpers
@@ -235,136 +304,5 @@ final class MouseChordTests: XCTestCase {
 
     private func up(_ button: MouseButton, at timestamp: TimeInterval) -> MouseButtonEvent {
         MouseButtonEvent(button: button, phase: .up, timestamp: timestamp)
-    }
-}
-
-/// Covers the persisted mouse-activation config (Bringr-93j.96): methods bitmask round-trips,
-/// the default set, the "stored 0 vs absent key" distinction for the methods key, the hold
-/// delay shape, and the blocking toggle.
-final class MouseActivationConfigTests: XCTestCase {
-
-    func testDefaultMethodsIsLeftRight() {
-        XCTAssertEqual(MouseActivationConfig.defaultMethods, [.leftRight])
-    }
-
-    func testMethodsDefaultsKeyIsStable() {
-        XCTAssertEqual(MouseActivationConfig.methodsDefaultsKey, "activation.mouse.methods")
-    }
-
-    func testMethodsDefaultWhenUnset() {
-        XCTAssertEqual(MouseActivationConfig.methods(from: makeDefaults()), [.leftRight])
-        XCTAssertTrue(MouseActivationConfig.isEnabled(from: makeDefaults()))
-    }
-
-    func testStoredZeroDisablesEverything() {
-        // Storing 0 (the user unchecked every method) must NOT fall back to the default the
-        // way an absent key does.
-        let defaults = makeDefaults()
-        defaults.set(0, forKey: MouseActivationConfig.methodsDefaultsKey)
-        XCTAssertTrue(MouseActivationConfig.methods(from: defaults).isEmpty)
-        XCTAssertFalse(MouseActivationConfig.isEnabled(from: defaults))
-    }
-
-    func testEncodeDecodeRoundTrip() {
-        let methods: Set<MouseActivationMethod> = [.leftRight, .middle, .forwardBackward]
-        let bitmask = MouseActivationConfig.encodeMethods(methods)
-        XCTAssertEqual(MouseActivationConfig.decodeMethods(bitmask: bitmask), methods)
-    }
-
-    func testStrayBitsAreMaskedAway() {
-        // A future or corrupted bitmask must not produce a phantom case.
-        let stray = MouseActivationConfig.encodeMethods([.middle]) | (1 << 30)
-        XCTAssertEqual(MouseActivationConfig.decodeMethods(bitmask: stray), [.middle])
-    }
-
-    func testEveryMethodHasUniqueBit() {
-        var seenBits: Set<Int> = []
-        for method in MouseActivationMethod.allCases {
-            XCTAssertFalse(seenBits.contains(method.bit), "bit collision for \(method)")
-            seenBits.insert(method.bit)
-        }
-    }
-
-    func testRequiredButtonsAreConsistent() {
-        XCTAssertEqual(MouseActivationMethod.leftRight.requiredButtons, [.left, .right])
-        XCTAssertEqual(MouseActivationMethod.middle.requiredButtons, [.middle])
-        XCTAssertEqual(MouseActivationMethod.middleLeft.requiredButtons, [.middle, .left])
-        XCTAssertEqual(MouseActivationMethod.middleRight.requiredButtons, [.middle, .right])
-        XCTAssertEqual(MouseActivationMethod.forward.requiredButtons, [.forward])
-        XCTAssertEqual(MouseActivationMethod.backward.requiredButtons, [.backward])
-        XCTAssertEqual(MouseActivationMethod.forwardBackward.requiredButtons, [.forward, .backward])
-    }
-
-    // MARK: Blocking toggle
-
-    func testBlockingDefaultIsOff() {
-        // Default must be OFF to honour the CRITICAL no-stutter constraint of Bringr-93j.96.
-        XCTAssertFalse(MouseActivationConfig.defaultBlocking)
-        XCTAssertFalse(MouseActivationConfig.blocking(from: makeDefaults()))
-    }
-
-    func testBlockingStoredValueRoundTrips() {
-        for value in [true, false] {
-            let defaults = makeDefaults()
-            defaults.set(value, forKey: MouseActivationConfig.blockingDefaultsKey)
-            XCTAssertEqual(MouseActivationConfig.blocking(from: defaults), value)
-        }
-    }
-
-    private func makeDefaults() -> UserDefaults {
-        let suiteName = "MouseActivationConfigTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            fatalError("could not create a test UserDefaults suite")
-        }
-        return defaults
-    }
-}
-
-/// Covers the persisted mouse hold delay (Bringr-93j.96): the 0 ms default, the ms↔seconds
-/// readers, the "stored 0 vs absent key" guard, and clamping.
-final class MouseActivationHoldDelayTests: XCTestCase {
-
-    func testDefaultMillisecondsIsZero() {
-        XCTAssertEqual(MouseActivationHoldDelay.defaultMilliseconds, 0)
-    }
-
-    func testDefaultsKeyIsStable() {
-        XCTAssertEqual(MouseActivationHoldDelay.defaultsKey, "activation.mouse.holdDelayMilliseconds")
-    }
-
-    func testCurrentDefaultsToZeroWhenUnset() {
-        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: makeDefaults()), 0)
-        XCTAssertEqual(MouseActivationHoldDelay.current(from: makeDefaults()), 0, accuracy: 1e-9)
-    }
-
-    func testStoredValueRoundTripsInBothUnits() {
-        let defaults = makeDefaults()
-        defaults.set(250.0, forKey: MouseActivationHoldDelay.defaultsKey)
-        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: defaults), 250)
-        XCTAssertEqual(MouseActivationHoldDelay.current(from: defaults), 0.25, accuracy: 1e-9)
-    }
-
-    func testValuesAreClampedToRange() {
-        let high = makeDefaults()
-        high.set(5000.0, forKey: MouseActivationHoldDelay.defaultsKey)
-        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: high), 1000)
-
-        let low = makeDefaults()
-        low.set(-25.0, forKey: MouseActivationHoldDelay.defaultsKey)
-        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: low), 0)
-    }
-
-    func testClampMillisecondsHelper() {
-        XCTAssertEqual(MouseActivationHoldDelay.clampMilliseconds(1500), 1000)
-        XCTAssertEqual(MouseActivationHoldDelay.clampMilliseconds(-5), 0)
-        XCTAssertEqual(MouseActivationHoldDelay.clampMilliseconds(300), 300)
-    }
-
-    private func makeDefaults() -> UserDefaults {
-        let suiteName = "MouseActivationHoldDelayTests.\(UUID().uuidString)"
-        guard let defaults = UserDefaults(suiteName: suiteName) else {
-            fatalError("could not create a test UserDefaults suite")
-        }
-        return defaults
     }
 }

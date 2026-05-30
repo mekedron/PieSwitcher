@@ -63,8 +63,10 @@ struct MouseActivationSettings: View {
             }
 
             Text("Hold the chosen buttons at least this long before the wheel opens. "
-                 + "At 0 ms the wheel opens the instant all the method's buttons are held; "
-                 + "a longer delay lets you dismiss the combo by releasing before it elapses.")
+                 + "At 0 ms a multi-button chord (e.g. Left + Right) opens the instant both "
+                 + "buttons are held; a longer delay lets you dismiss it by releasing before "
+                 + "it elapses. Single-button methods (Middle, Forward, Backward) always need "
+                 + "a brief hold so a quick tap stays a normal click.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

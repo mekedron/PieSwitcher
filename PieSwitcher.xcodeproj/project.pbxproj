@@ -32,6 +32,7 @@
 		1A00000000000000000000F8 /* MouseActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000F7 /* MouseActivation.swift */; };
 		1A00000000000000000000FA /* MouseActivationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000F9 /* MouseActivationSettingsView.swift */; };
 		1A00000000000000000000FC /* MouseChordMonitor+Timers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000FB /* MouseChordMonitor+Timers.swift */; };
+		1A00000000000000000000FE /* MouseActivationConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000FD /* MouseActivationConfigTests.swift */; };
 		1A0000000000000000000046 /* MouseChordTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000045 /* MouseChordTests.swift */; };
 		1A0000000000000000000048 /* InteractionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000047 /* InteractionMode.swift */; };
 		1A000000000000000000004A /* InteractionModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000049 /* InteractionModeTests.swift */; };
@@ -145,6 +146,7 @@
 		1A00000000000000000000F7 /* MouseActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseActivation.swift; sourceTree = "<group>"; };
 		1A00000000000000000000F9 /* MouseActivationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseActivationSettingsView.swift; sourceTree = "<group>"; };
 		1A00000000000000000000FB /* MouseChordMonitor+Timers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MouseChordMonitor+Timers.swift"; sourceTree = "<group>"; };
+		1A00000000000000000000FD /* MouseActivationConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseActivationConfigTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000045 /* MouseChordTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseChordTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000047 /* InteractionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionMode.swift; sourceTree = "<group>"; };
 		1A0000000000000000000049 /* InteractionModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionModeTests.swift; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 				1A0000000000000000000039 /* PermissionAlertTests.swift */,
 				1A0000000000000000000041 /* RadialLayoutTests.swift */,
 				1A0000000000000000000045 /* MouseChordTests.swift */,
+				1A00000000000000000000FD /* MouseActivationConfigTests.swift */,
 				1A0000000000000000000049 /* InteractionModeTests.swift */,
 				1A000000000000000000004D /* RadialNavigatorTests.swift */,
 				1A0000000000000000000057 /* RadialNavigatorCommitTests.swift */,
@@ -546,6 +549,7 @@
 				1A000000000000000000003A /* PermissionAlertTests.swift in Sources */,
 				1A0000000000000000000042 /* RadialLayoutTests.swift in Sources */,
 				1A0000000000000000000046 /* MouseChordTests.swift in Sources */,
+				1A00000000000000000000FE /* MouseActivationConfigTests.swift in Sources */,
 				1A000000000000000000004A /* InteractionModeTests.swift in Sources */,
 				1A000000000000000000004E /* RadialNavigatorTests.swift in Sources */,
 				1A0000000000000000000058 /* RadialNavigatorCommitTests.swift in Sources */,
