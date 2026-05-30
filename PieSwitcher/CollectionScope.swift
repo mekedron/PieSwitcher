@@ -72,6 +72,15 @@ struct CollectionPreferences: Equatable, Sendable {
     /// `windowsScope`, so the apps ring and windows sub-wheel honour them alike.
     let includeMinimized: Bool
     let includeHidden: Bool
+    /// Whether the wheel additionally includes every app in the user's Dock, even those that
+    /// aren't currently running and have no windows (Bringr-93j.98). Off by default — Docks
+    /// often hold many apps, so the wheel can fill up; turning it on makes every Dock app a
+    /// pickable slice, with not-running apps launching like a Dock click on commit
+    /// (Bringr-93j.39). Independent of `MyApps` and the existing Dock-only filter
+    /// (Bringr-93j.51) — this is about the *source* of apps, not the order or ignore list.
+    /// Read by `MyAppsMenu` via `CollectionPreferences.includesAllDockApps` rather than
+    /// resolving into a `CollectionScope`, since it isn't a per-level screen/Space decision.
+    let includeAllDockApps: Bool
 
     /// `UserDefaults` keys — the single source of truth shared by the Preferences
     /// `@AppStorage` bindings and `current(from:)` so the two cannot drift.
@@ -81,6 +90,7 @@ struct CollectionPreferences: Equatable, Sendable {
     static let windowsAllSpacesDefaultsKey = "collection.windows.allSpaces"
     static let includeMinimizedDefaultsKey = "collection.includeMinimized"
     static let includeHiddenDefaultsKey = "collection.includeHidden"
+    static let includeAllDockAppsDefaultsKey = "collection.includeAllDockApps"
 
     /// Per-flag defaults (Bringr-93j.93). The screen / minimized / hidden trio ships ON so
     /// the wheel collects the broadest set out of the box; the Spaces flags ship OFF to
@@ -91,6 +101,8 @@ struct CollectionPreferences: Equatable, Sendable {
     static let windowsAllSpacesDefault = false
     static let includeMinimizedDefault = true
     static let includeHiddenDefault = true
+    /// Off by default (Bringr-93j.98) — Docks often hold many apps, so opting in is explicit.
+    static let includeAllDockAppsDefault = false
 
     init(
         appsAllScreens: Bool,
@@ -98,7 +110,8 @@ struct CollectionPreferences: Equatable, Sendable {
         windowsAllScreens: Bool,
         windowsAllSpaces: Bool,
         includeMinimized: Bool = false,
-        includeHidden: Bool = false
+        includeHidden: Bool = false,
+        includeAllDockApps: Bool = false
     ) {
         self.appsAllScreens = appsAllScreens
         self.appsAllSpaces = appsAllSpaces
@@ -106,6 +119,7 @@ struct CollectionPreferences: Equatable, Sendable {
         self.windowsAllSpaces = windowsAllSpaces
         self.includeMinimized = includeMinimized
         self.includeHidden = includeHidden
+        self.includeAllDockApps = includeAllDockApps
     }
 
     /// The apps ring's scope, resolved against the summon `display`: that display unless
@@ -142,8 +156,19 @@ struct CollectionPreferences: Equatable, Sendable {
             windowsAllScreens: read(windowsAllScreensDefaultsKey, default: windowsAllScreensDefault, from: defaults),
             windowsAllSpaces: read(windowsAllSpacesDefaultsKey, default: windowsAllSpacesDefault, from: defaults),
             includeMinimized: read(includeMinimizedDefaultsKey, default: includeMinimizedDefault, from: defaults),
-            includeHidden: read(includeHiddenDefaultsKey, default: includeHiddenDefault, from: defaults)
+            includeHidden: read(includeHiddenDefaultsKey, default: includeHiddenDefault, from: defaults),
+            includeAllDockApps: read(
+                includeAllDockAppsDefaultsKey, default: includeAllDockAppsDefault, from: defaults
+            )
         )
+    }
+
+    /// Standalone read of the Dock-as-source flag (Bringr-93j.98), so `MyAppsMenu` can inject
+    /// it as a one-line closure without resolving every other collection key on every summon.
+    /// Mirrors `CuratedApps.showsOtherRunningApps` / `keepsCuratedOrder` — same shape, same
+    /// unset-vs-stored handling.
+    static func includesAllDockApps(from defaults: UserDefaults = .standard) -> Bool {
+        read(includeAllDockAppsDefaultsKey, default: includeAllDockAppsDefault, from: defaults)
     }
 
     /// Read a `Bool` key, falling back to the supplied default when the key is unset.

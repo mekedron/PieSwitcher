@@ -65,6 +65,7 @@
 		1A0000000000000000000086 /* MyAppsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000085 /* MyAppsMenu.swift */; };
 		1A0000000000000000000088 /* MyAppsMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000087 /* MyAppsMenuTests.swift */; };
 		1A000000000000000000008A /* MyAppsMenuSortingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */; };
+		1A0000000000000000000100 /* MyAppsMenuDockSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000FF /* MyAppsMenuDockSourceTests.swift */; };
 		1A0000000000000000000092 /* DockIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000091 /* DockIconManager.swift */; };
 		1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000093 /* DockIconManagerTests.swift */; };
 		1A00000000000000000000E2 /* RadialNavigatorSkipLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */; };
@@ -179,6 +180,7 @@
 		1A0000000000000000000085 /* MyAppsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenu.swift; sourceTree = "<group>"; };
 		1A0000000000000000000087 /* MyAppsMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuSortingTests.swift; sourceTree = "<group>"; };
+		1A00000000000000000000FF /* MyAppsMenuDockSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuDockSourceTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000091 /* DockIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManager.swift; sourceTree = "<group>"; };
 		1A0000000000000000000093 /* DockIconManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManagerTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorSkipLevelTests.swift; sourceTree = "<group>"; };
@@ -355,6 +357,7 @@
 				1A0000000000000000000083 /* RadialNavigatorLaunchTests.swift */,
 				1A0000000000000000000087 /* MyAppsMenuTests.swift */,
 				1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */,
+				1A00000000000000000000FF /* MyAppsMenuDockSourceTests.swift */,
 				1A0000000000000000000093 /* DockIconManagerTests.swift */,
 				1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */,
 				1A00000000000000000000A1 /* HideOnCommitTests.swift */,
@@ -568,6 +571,7 @@
 				1A0000000000000000000084 /* RadialNavigatorLaunchTests.swift in Sources */,
 				1A0000000000000000000088 /* MyAppsMenuTests.swift in Sources */,
 				1A000000000000000000008A /* MyAppsMenuSortingTests.swift in Sources */,
+				1A0000000000000000000100 /* MyAppsMenuDockSourceTests.swift in Sources */,
 				1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */,
 				1A00000000000000000000E2 /* RadialNavigatorSkipLevelTests.swift in Sources */,
 				1A00000000000000000000A2 /* HideOnCommitTests.swift in Sources */,

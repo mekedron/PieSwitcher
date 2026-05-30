@@ -13,7 +13,8 @@ final class CollectionScopeTests: XCTestCase {
     func testEveryFlagDefaultsToItsBakedDefault() {
         // Bringr-93j.93: screens/minimized/hidden ship ON so the wheel collects the broadest
         // set out of the box; Spaces flags stay OFF (current Space only is the safe,
-        // non-phantom-prone behaviour).
+        // non-phantom-prone behaviour). Bringr-93j.98: the Dock-as-source flag also defaults
+        // OFF because Docks tend to hold many apps and the wheel can fill up.
         let prefs = CollectionPreferences.current(from: ephemeralDefaults())
 
         XCTAssertTrue(prefs.appsAllScreens)
@@ -22,6 +23,7 @@ final class CollectionScopeTests: XCTestCase {
         XCTAssertFalse(prefs.windowsAllSpaces)
         XCTAssertTrue(prefs.includeMinimized)
         XCTAssertTrue(prefs.includeHidden)
+        XCTAssertFalse(prefs.includeAllDockApps)
     }
 
     func testEachFlagDefaultConstantMatches() {
@@ -33,6 +35,7 @@ final class CollectionScopeTests: XCTestCase {
         XCTAssertFalse(CollectionPreferences.windowsAllSpacesDefault)
         XCTAssertTrue(CollectionPreferences.includeMinimizedDefault)
         XCTAssertTrue(CollectionPreferences.includeHiddenDefault)
+        XCTAssertFalse(CollectionPreferences.includeAllDockAppsDefault)
     }
 
     func testStoredFalseOverridesOnDefault() {
@@ -83,9 +86,43 @@ final class CollectionScopeTests: XCTestCase {
             CollectionPreferences.windowsAllScreensDefaultsKey,
             CollectionPreferences.windowsAllSpacesDefaultsKey,
             CollectionPreferences.includeMinimizedDefaultsKey,
-            CollectionPreferences.includeHiddenDefaultsKey
+            CollectionPreferences.includeHiddenDefaultsKey,
+            CollectionPreferences.includeAllDockAppsDefaultsKey
         ])
-        XCTAssertEqual(keys.count, 6)
+        XCTAssertEqual(keys.count, 7)
+    }
+
+    // MARK: - "Include all Dock apps" flag (Bringr-93j.98)
+
+    func testIncludesAllDockAppsDefaultsToFalseWhenUnset() {
+        // OFF by default: Docks often hold many apps, so opting in must be explicit. An unset
+        // key reads as OFF, matching the bakеd default.
+        XCTAssertFalse(CollectionPreferences.includesAllDockApps(from: ephemeralDefaults()))
+    }
+
+    func testIncludesAllDockAppsReadsPersistedTrue() {
+        let defaults = ephemeralDefaults()
+        defaults.set(true, forKey: CollectionPreferences.includeAllDockAppsDefaultsKey)
+        XCTAssertTrue(CollectionPreferences.includesAllDockApps(from: defaults))
+    }
+
+    func testIncludesAllDockAppsReadsPersistedFalse() {
+        let defaults = ephemeralDefaults()
+        defaults.set(false, forKey: CollectionPreferences.includeAllDockAppsDefaultsKey)
+        XCTAssertFalse(CollectionPreferences.includesAllDockApps(from: defaults),
+                       "an explicit false must round-trip — no harm here since the default is OFF too")
+    }
+
+    func testIncludeAllDockAppsRoundTripsThroughCurrent() {
+        // Setting the key flips the parsed `CollectionPreferences.current` value too, so the
+        // struct property and the standalone helper see the same persisted state.
+        let defaults = ephemeralDefaults()
+        defaults.set(true, forKey: CollectionPreferences.includeAllDockAppsDefaultsKey)
+        XCTAssertTrue(CollectionPreferences.current(from: defaults).includeAllDockApps)
+    }
+
+    func testIncludeAllDockAppsDefaultsKeyIsStable() {
+        XCTAssertEqual(CollectionPreferences.includeAllDockAppsDefaultsKey, "collection.includeAllDockApps")
     }
 
     // MARK: - Resolution against the summon display

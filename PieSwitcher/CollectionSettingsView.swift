@@ -29,6 +29,12 @@ struct CollectionSettings: View {
     private var includeMinimized = CollectionPreferences.includeMinimizedDefault
     @AppStorage(CollectionPreferences.includeHiddenDefaultsKey)
     private var includeHidden = CollectionPreferences.includeHiddenDefault
+    /// Off by default (Bringr-93j.98): when on, every Dock app — including ones not running —
+    /// is added to the wheel. `MyAppsMenu` reads the same key fresh at each summon via
+    /// `CollectionPreferences.includesAllDockApps`, so a change applies on the next open
+    /// without a relaunch.
+    @AppStorage(CollectionPreferences.includeAllDockAppsDefaultsKey)
+    private var includeAllDockApps = CollectionPreferences.includeAllDockAppsDefault
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -51,6 +57,17 @@ struct CollectionSettings: View {
                 Text("Minimized windows and windows of apps you've hidden (Hide, ⌘H — including "
                     + "ones PieSwitcher hides for you) are normally left out. Turn these on to include "
                     + "them in the wheel.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Dock apps").font(.headline)
+                Toggle("Include all apps from the Dock", isOn: $includeAllDockApps)
+                Text("Add every app from your Dock to the wheel — even ones that aren't running "
+                    + "and have no windows. Picking a not-running Dock app launches it, just like "
+                    + "clicking its Dock icon. Off by default, since the Dock often holds many "
+                    + "apps and the wheel can fill up.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

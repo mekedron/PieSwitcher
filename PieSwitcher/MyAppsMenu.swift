@@ -60,7 +60,20 @@ struct MyAppsMenu: MenuDefinition {
     /// dropped before any node is built, so an excluded app never appears even when pinned —
     /// the enumerator already drops it from `live`, so the appended others honour it too.
     private let ignoreList: () -> AppIgnoreList
+    /// The "include all Dock apps" Collection setting (Bringr-93j.98), read fresh per summon
+    /// through a closure (mirroring `curatedApps`); tests inject a fixed value. When true, every
+    /// Dock app — including ones not currently running — is added to the wheel as a launch
+    /// node (or an expand node if already running with windows), so the wheel reflects the full
+    /// Dock rather than only the running apps gathered today. Off by default since Docks tend
+    /// to hold many apps and the wheel can fill up. Independent of the existing My Apps list:
+    /// a Dock app already curated is deduped, so it never appears twice.
+    private let includeAllDockApps: () -> Bool
+    /// The Dock's apps as `CuratedApp` entries (Bringr-93j.98) — the source for the
+    /// "include all Dock apps" option. Read through a closure so tests inject fixed entries
+    /// without hitting Launch Services; the live default uses `DockOrder.currentApps`.
+    private let dockApps: () -> [CuratedApp]
 
+    // swiftlint:disable:next function_default_parameter_at_end
     init(
         enumerator: WindowEnumerator,
         curatedApps: @escaping () -> [CuratedApp] = { CuratedApps.current() },
@@ -70,6 +83,8 @@ struct MyAppsMenu: MenuDefinition {
         dockOrder: @escaping () -> [String] = { DockOrder.current() },
         keepFinderLast: @escaping () -> Bool = { DockOrder.keepsFinderLast() },
         ignoreList: @escaping () -> AppIgnoreList = { AppIgnoreList.current() },
+        includeAllDockApps: @escaping () -> Bool = { CollectionPreferences.includesAllDockApps() },
+        dockApps: @escaping () -> [CuratedApp] = { DockOrder.currentApps() },
         runningPID: @escaping (String) -> pid_t? = {
             CuratedApp.runningApplication(forBundleIdentifier: $0)?.processIdentifier
         }
@@ -83,7 +98,29 @@ struct MyAppsMenu: MenuDefinition {
         self.dockOrder = dockOrder
         self.keepFinderLast = keepFinderLast
         self.ignoreList = ignoreList
+        self.includeAllDockApps = includeAllDockApps
+        self.dockApps = dockApps
         self.runningPID = runningPID
+    }
+
+    /// The curated source for this summon: the user's `MyApps` list with excluded apps
+    /// dropped, plus — when the Collection "include all Dock apps" option is on
+    /// (Bringr-93j.98) — every other Dock app, deduped by bundle id and filtered through the
+    /// same ignore list. The merged list flows through the existing curated logic in
+    /// `makeRoot`, so a Dock app running with windows on the scope resolves to an expand
+    /// node and a not-running Dock app becomes a launch node (Bringr-93j.39), selecting which
+    /// starts it like a Dock-icon click (Bringr-93j.61 covers the windowless-running case).
+    /// Off by default since Docks often hold many apps, so opting in is explicit.
+    private func curatedAppsForSummon(ignore: AppIgnoreList) -> [CuratedApp] {
+        let curatedRaw = curatedApps()
+            .filter { !ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.name) }
+        guard includeAllDockApps() else { return curatedRaw }
+        let curatedIDs = Set(curatedRaw.map(\.bundleIdentifier))
+        let extra = dockApps().filter {
+            !curatedIDs.contains($0.bundleIdentifier)
+                && !ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.name)
+        }
+        return curatedRaw + extra
     }
 
     func makeRoot(appsScope: CollectionScope, windowsScope: CollectionScope) -> MenuNode {
@@ -91,13 +128,15 @@ struct MyAppsMenu: MenuDefinition {
         // curated (Bringr-93j.59); the appended others come from `live`, which the enumerator
         // already filters.
         let ignore = ignoreList()
-        let curated = curatedApps().filter { !ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.name) }
+        let curated = curatedAppsForSummon(ignore: ignore)
         let showOthers = showOtherRunningApps()
         // Empty list + show-others (the default) → the current full wheel, unchanged (AC:
         // "an empty list reproduces the current wheel"). The general path below would build
         // the same nodes, but routing this documented case straight through the fallback keeps
         // the no-regression guarantee literal. Empty list + others-off intentionally yields an
-        // empty ring — "show only the curated apps", of which there are none.
+        // empty ring — "show only the curated apps", of which there are none. With "include
+        // all Dock apps" on, `curated` already absorbs the Dock content, so an empty `curated`
+        // here means both sources came up empty (no pinned apps, no Dock apps resolved).
         if curated.isEmpty && showOthers {
             return fallback.makeRoot(appsScope: appsScope, windowsScope: windowsScope)
         }

@@ -135,6 +135,23 @@ enum DockOrder {
         return [finderBundleID] + pinnedIDs
     }
 
+    /// The Dock's apps as `CuratedApp` entries — bundle id from `current()` plus the on-disk
+    /// display name (Bringr-93j.98). The shape `MyAppsMenu` already understands, so the
+    /// "include all Dock apps" option reuses the same launch/expand logic the curated list
+    /// rides on. Apps whose bundle id no longer resolves on disk (uninstalled but still
+    /// pinned) are skipped — a launchable entry needs a real on-disk URL. The untestable
+    /// live shell of `current()` plus a Launch Services lookup; tests inject fixed
+    /// `[CuratedApp]` via `MyAppsMenu`'s `dockApps` closure.
+    static func currentApps() -> [CuratedApp] {
+        current().compactMap { bundleID in
+            guard let url = CuratedApp.bundleURL(forBundleIdentifier: bundleID) else { return nil }
+            return CuratedApp(
+                bundleIdentifier: bundleID,
+                name: CuratedApp.displayName(forBundleAt: url)
+            )
+        }
+    }
+
     /// Sort `items` to match the Dock order. Each item resolves to a bundle id via `bundleID`;
     /// items whose id is in `dockOrder` sort by that position, and items not in the Dock
     /// (running but not pinned) trail at the end in their original relative order — a stable
