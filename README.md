@@ -156,6 +156,33 @@ SwiftLint is a separate binary; install it with `brew install swiftlint`. Its
 rules live in [`.swiftlint.yml`](.swiftlint.yml). Unit tests live in the
 `PieSwitcherTests` target (a host-based bundle loaded into `PieSwitcher.app`).
 
+## Releasing
+
+Releases are produced by `.github/workflows/release.yml`, which triggers on
+any pushed `v*.*.*` tag, builds a universal `PieSwitcher.app`, codesigns it
+with a Developer ID Application certificate, notarizes it with Apple, wraps
+it in a DMG, signs the DMG with the Sparkle EdDSA key, publishes a GitHub
+Release, and (optionally) updates a Homebrew tap.
+
+First-time setup is a two-step process:
+
+1. Follow [`docs/release-setup.md`](docs/release-setup.md) to generate the
+   Apple Developer certificate, the App Store Connect API key, and (optionally)
+   the Homebrew tap PAT.
+2. From the repo root, run:
+
+   ```sh
+   ./scripts/bootstrap-release-secrets.sh
+   # …or, if you do not have a Homebrew tap yet:
+   ./scripts/bootstrap-release-secrets.sh --skip-homebrew
+   ```
+
+   The script uploads every needed `gh secret` and tells you exactly which
+   ones were set, reused, regenerated, or skipped.
+
+After both steps, push a tag (e.g., `git tag v0.1.0 && git push origin v0.1.0`)
+to cut a release.
+
 ## Repository
 
 <https://github.com/mekedron/PieSwitcher>
