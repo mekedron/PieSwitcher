@@ -131,16 +131,17 @@ final class MouseChordMonitor {
         // the chord hold and let the down through immediately (Bringr-93j.94). Without them
         // the buffered down sits for the full pursuit timeout, which the user sees as a
         // system-wide drag-start stutter.
+        let bit: (CGEventType) -> CGEventMask = { CGEventMask(1) << $0.rawValue }
         let mask: CGEventMask =
-            (1 << CGEventType.leftMouseDown.rawValue) |
-            (1 << CGEventType.leftMouseUp.rawValue) |
-            (1 << CGEventType.rightMouseDown.rawValue) |
-            (1 << CGEventType.rightMouseUp.rawValue) |
-            (1 << CGEventType.otherMouseDown.rawValue) |
-            (1 << CGEventType.otherMouseUp.rawValue) |
-            (1 << CGEventType.leftMouseDragged.rawValue) |
-            (1 << CGEventType.rightMouseDragged.rawValue) |
-            (1 << CGEventType.otherMouseDragged.rawValue)
+            bit(.leftMouseDown) |
+            bit(.leftMouseUp) |
+            bit(.rightMouseDown) |
+            bit(.rightMouseUp) |
+            bit(.otherMouseDown) |
+            bit(.otherMouseUp) |
+            bit(.leftMouseDragged) |
+            bit(.rightMouseDragged) |
+            bit(.otherMouseDragged)
 
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
