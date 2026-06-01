@@ -139,7 +139,7 @@ push_secret() {
         record "$name" "SKIPPED"
         return
     fi
-    printf '%s' "$value" | gh secret set "$name" --repo "$REPO_SLUG" --body -
+    printf '%s' "$value" | gh secret set "$name" --repo "$REPO_SLUG"
     ok "Set ${BOLD}${name}${RESET}"
     record "$name" "$status"
 }
