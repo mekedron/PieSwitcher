@@ -38,27 +38,6 @@ jobs:
           # Decode .p12 from base64
           echo -n "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode -o "$CERT_PATH"
 
-          # DIAG: prove the .p12 transferred intact and the password matches.
-          # Only metadata (lengths + md5 of .p12) is printed — no secret bytes.
-          # Local .p12 md5 is 3ba269c9c928eceba91b95aa73577268 (3266 bytes).
-          echo "DIAG base64 secret length: $(printf '%s' "$MACOS_CERTIFICATE_P12_BASE64" | wc -c)"
-          echo "DIAG decoded .p12 size:    $(stat -f %z "$CERT_PATH")"
-          echo "DIAG decoded .p12 md5:     $(md5 -q "$CERT_PATH")"
-          echo "DIAG decoded .p12 file:    $(file "$CERT_PATH")"
-          echo "DIAG password length:      $(printf '%s' "$MACOS_CERTIFICATE_P12_PASSWORD" | wc -c)"
-          if openssl pkcs12 -in "$CERT_PATH" -nokeys -passin "pass:$MACOS_CERTIFICATE_P12_PASSWORD" -info -legacy >/dev/null 2>&1; then
-            echo "DIAG openssl -legacy:      ok"
-          else
-            echo "DIAG openssl -legacy:      FAIL"
-          fi
-          if openssl pkcs12 -in "$CERT_PATH" -nokeys -passin "pass:$MACOS_CERTIFICATE_P12_PASSWORD" -info >/dev/null 2>&1; then
-            echo "DIAG openssl modern:       ok"
-          else
-            echo "DIAG openssl modern:       FAIL"
-          fi
-          echo "DIAG security version:     $(security -v 2>&1 || true)"
-          echo "DIAG sw_vers:              $(sw_vers -productVersion)"
-
           # Create + unlock a temporary keychain for this run only
           security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -300,51 +279,16 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          # Write private key to temp file
+          # Write private key (base64 of the 32-byte Ed25519 seed) to a temp
+          # file and sign with -f. Sparkle 2.9.2 sign_update accepts the
+          # "new format" (32-byte seed) or the legacy 96-byte format; the
+          # bootstrap script writes the 32-byte form.
           KEYFILE=$(mktemp)
           printf '%s' "${SPARKLE_PRIVATE_KEY}" > "$KEYFILE"
-
-          # DIAG: prove sign_update binary + key are present before invoking.
-          echo "DIAG sparkle-dist layout:"
-          ls -la sparkle-dist 2>&1 | head -20 || true
-          echo "DIAG sparkle-dist/bin:"
-          ls -la sparkle-dist/bin 2>&1 || true
-          echo "DIAG keyfile size:  $(wc -c < "$KEYFILE") bytes"
-          echo "DIAG env key length: $(printf '%s' "$SPARKLE_PRIVATE_KEY" | wc -c) bytes"
-          echo "DIAG sign_update --help (best effort):"
-          sparkle-dist/bin/sign_update --help 2>&1 | head -30 || true
-
-          # Sign the DMG. sign_update flag spellings have shifted across
-          # Sparkle versions, so try the common variants — non-fatal so we
-          # can see every attempt's actual error rather than have set -e
-          # kill the step inside a `||` chain of $(...) substitutions.
-          set +e
-          echo "=== sign_update try 1: --ed-key-file ==="
-          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" --ed-key-file "$KEYFILE" 2>&1)
-          EXIT_CODE=$?
-          echo "exit=$EXIT_CODE"
-          echo "$SIGN_OUTPUT"
-
-          if [ $EXIT_CODE -ne 0 ] || ! echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
-            echo "=== sign_update try 2: -f KEYFILE ==="
-            SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -f "$KEYFILE" 2>&1)
-            EXIT_CODE=$?
-            echo "exit=$EXIT_CODE"
-            echo "$SIGN_OUTPUT"
-          fi
-
-          if [ $EXIT_CODE -ne 0 ] || ! echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
-            echo "=== sign_update try 3: -s <inline> ==="
-            SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -s "${SPARKLE_PRIVATE_KEY}" 2>&1)
-            EXIT_CODE=$?
-            echo "exit=$EXIT_CODE"
-            echo "$SIGN_OUTPUT"
-          fi
-          set -e
-
+          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -f "$KEYFILE" 2>&1)
           rm -f "$KEYFILE"
 
-          echo "sign_update final output: ${SIGN_OUTPUT}"
+          echo "sign_update output: ${SIGN_OUTPUT}"
 
           # Extract edSignature
           ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')

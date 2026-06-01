@@ -176,10 +176,13 @@ else
     # NOT to a file. We do it ourselves with openssl so the key lives in the
     # gitignored sparkle_private_key file, which matches the existing pattern
     # in this repo and lets us hand the same string to sign_update later.
-    # Sparkle 2.x sign_update accepts a base64 Ed25519 private key concatenated
-    # with the 32-byte public key. We use Python to derive it via openssl's
-    # pyca/cryptography-free path: openssl genpkey produces PEM; we extract the
-    # raw 32-byte private + 32-byte public and base64 them together.
+    # Sparkle 2.7+ sign_update expects the "new format" private key file:
+    # base64 of the 32-byte Ed25519 seed only (NOT seed+pubkey concatenated).
+    # The older 96-byte format also still works, but 64-byte seed+pub does
+    # NOT — sign_update 2.9.2 rejects it with a misleading "must be 64 or 96
+    # bytes" error message even though it really wants 32 or 96 (verified
+    # empirically against the 2.9.2 sign_update binary). The 32-byte seed is
+    # canonical: `generate_keys -x` produces the same.
     PEM="${TMPDIR}/ed25519.pem"
     openssl genpkey -algorithm ED25519 -out "$PEM"
     SPARKLE_PUB=$(python3 - "$PEM" "$SPARKLE_KEY_FILE" <<'PYEOF'
@@ -196,9 +199,10 @@ pub_der = subprocess.check_output(["openssl", "pkey", "-in", pem_path, "-pubout"
 # The DER encoding of an Ed25519 public key ends with the 32-byte key.
 pub_raw = pub_der[-32:]
 
-# Sparkle stores private = base64(priv_raw + pub_raw) and verifies with
-# the public key embedded in the app's Info.plist as SUPublicEDKey.
-priv_b64 = base64.b64encode(priv_raw + pub_raw).decode()
+# Sparkle's "new format" private key is base64 of the 32-byte seed only.
+# The public key is derived deterministically from the seed and lives in
+# the app's Info.plist as SUPublicEDKey.
+priv_b64 = base64.b64encode(priv_raw).decode()
 pub_b64 = base64.b64encode(pub_raw).decode()
 
 with open(out_path, "w") as f:
