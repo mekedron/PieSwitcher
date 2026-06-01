@@ -304,15 +304,47 @@ jobs:
           KEYFILE=$(mktemp)
           printf '%s' "${SPARKLE_PRIVATE_KEY}" > "$KEYFILE"
 
+          # DIAG: prove sign_update binary + key are present before invoking.
+          echo "DIAG sparkle-dist layout:"
+          ls -la sparkle-dist 2>&1 | head -20 || true
+          echo "DIAG sparkle-dist/bin:"
+          ls -la sparkle-dist/bin 2>&1 || true
+          echo "DIAG keyfile size:  $(wc -c < "$KEYFILE") bytes"
+          echo "DIAG env key length: $(printf '%s' "$SPARKLE_PRIVATE_KEY" | wc -c) bytes"
+          echo "DIAG sign_update --help (best effort):"
+          sparkle-dist/bin/sign_update --help 2>&1 | head -30 || true
+
           # Sign the DMG. sign_update flag spellings have shifted across
-          # Sparkle versions, so try the common variants.
-          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" --ed-key-file "$KEYFILE" 2>&1) || \
-          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -f "$KEYFILE" 2>&1) || \
-          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -s "${SPARKLE_PRIVATE_KEY}" 2>&1)
+          # Sparkle versions, so try the common variants — non-fatal so we
+          # can see every attempt's actual error rather than have set -e
+          # kill the step inside a `||` chain of $(...) substitutions.
+          set +e
+          echo "=== sign_update try 1: --ed-key-file ==="
+          SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" --ed-key-file "$KEYFILE" 2>&1)
+          EXIT_CODE=$?
+          echo "exit=$EXIT_CODE"
+          echo "$SIGN_OUTPUT"
+
+          if [ $EXIT_CODE -ne 0 ] || ! echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
+            echo "=== sign_update try 2: -f KEYFILE ==="
+            SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -f "$KEYFILE" 2>&1)
+            EXIT_CODE=$?
+            echo "exit=$EXIT_CODE"
+            echo "$SIGN_OUTPUT"
+          fi
+
+          if [ $EXIT_CODE -ne 0 ] || ! echo "$SIGN_OUTPUT" | grep -q 'sparkle:edSignature='; then
+            echo "=== sign_update try 3: -s <inline> ==="
+            SIGN_OUTPUT=$(sparkle-dist/bin/sign_update "release/${DMG_NAME}" -s "${SPARKLE_PRIVATE_KEY}" 2>&1)
+            EXIT_CODE=$?
+            echo "exit=$EXIT_CODE"
+            echo "$SIGN_OUTPUT"
+          fi
+          set -e
 
           rm -f "$KEYFILE"
 
-          echo "sign_update output: ${SIGN_OUTPUT}"
+          echo "sign_update final output: ${SIGN_OUTPUT}"
 
           # Extract edSignature
           ED_SIGNATURE=$(echo "$SIGN_OUTPUT" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
