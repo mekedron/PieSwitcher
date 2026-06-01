@@ -80,7 +80,8 @@ struct RadialMenuView: View {
             ForEach(controller.rings) { ring in
                 RadialRingContent(
                     ring: ring,
-                    showsLabels: controller.appearance.showsLabels,
+                    showsAppLabels: controller.appearance.showsAppLabels,
+                    showsWindowLabels: controller.appearance.showsWindowLabels,
                     shadowOpacity: controller.appearance.contentShadowOpacity
                 )
             }
@@ -212,10 +213,14 @@ struct RadialRingEmphasis: View {
 }
 
 /// One ring's content: an icon/label per node, placed at its slice's mid-ring point
-/// and rendered last so the glass never blurs it.
+/// and rendered last so the glass never blurs it. The two label flags (Bringr-93j.110)
+/// are independent — the apps ring reads `showsAppLabels`, the windows sub-wheel reads
+/// `showsWindowLabels`, and `RadialSliceLabel` routes each node to the right one based
+/// on whether it represents an app.
 struct RadialRingContent: View {
     let ring: RadialRing
-    let showsLabels: Bool
+    let showsAppLabels: Bool
+    let showsWindowLabels: Bool
     let shadowOpacity: Double
 
     var body: some View {
@@ -224,7 +229,8 @@ struct RadialRingContent: View {
                 RadialSliceLabel(
                     node: node,
                     index: index,
-                    showsLabels: showsLabels,
+                    showsAppLabels: showsAppLabels,
+                    showsWindowLabels: showsWindowLabels,
                     shadowOpacity: shadowOpacity,
                     maxLabelWidth: ring.layout.sliceLabelMaxWidth(at: index)
                 )
@@ -290,9 +296,12 @@ struct RadialWedge: Shape {
 struct RadialSliceLabel: View {
     let node: MenuNode
     let index: Int
-    /// When false (US-014 label-visibility off), the text title is hidden; the app
-    /// icon and the window index number stay so slices remain identifiable.
-    let showsLabels: Bool
+    /// Whether app slices on the apps ring show their application name (Bringr-93j.110).
+    /// When false, only the app icon shows. Window slices ignore this flag.
+    let showsAppLabels: Bool
+    /// Whether window slices on the windows sub-wheel show their title (Bringr-93j.110).
+    /// When false, only the 1-based window index shows. App slices ignore this flag.
+    let showsWindowLabels: Bool
     /// Opacity of the shadow behind the icon and text (Bringr-93j.66), so the user can
     /// strengthen it for legibility on busy backgrounds or remove it entirely.
     let shadowOpacity: Double
@@ -307,7 +316,7 @@ struct RadialSliceLabel: View {
         VStack(spacing: 4) {
             if node.representsApp {
                 appIcon
-                if showsLabels {
+                if showsAppLabels {
                     Text(node.title)
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
@@ -318,7 +327,7 @@ struct RadialSliceLabel: View {
                 Text("\(index + 1)")
                     .font(.title3.weight(.bold).monospacedDigit())
                     .foregroundStyle(.primary)
-                if showsLabels {
+                if showsWindowLabels {
                     Text(node.title)
                         .font(.caption2.weight(.medium))
                         .lineLimit(1)

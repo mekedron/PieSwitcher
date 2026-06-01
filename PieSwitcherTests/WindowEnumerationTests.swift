@@ -96,16 +96,6 @@ final class WindowEnumerationTests: XCTestCase {
         XCTAssertEqual(apps[0].windows[0].title, "Inbox — Mail")
     }
 
-    func testTitleFallsBackToOneBasedIndexWhenEmpty() {
-        let source = FakeWindowEnumerationSource(selfPID: selfPID, windows: [
-            raw(number: 1, pid: 10, name: "Chrome", title: ""),
-            raw(number: 2, pid: 10, name: "Chrome", title: "   ")
-        ])
-        let apps = WindowEnumerator(source: source).enumerate()
-
-        XCTAssertEqual(apps[0].windows.map(\.title), ["Window 1", "Window 2"])
-    }
-
     // MARK: - AC4: timing recorded; AC1: empty input
 
     func testLastDurationRecordedOnlyAfterEnumerate() {
@@ -311,6 +301,11 @@ final class FakeWindowEnumerationSource: WindowEnumerationSource {
     /// `isOnscreen`/`isMinimized`/`isHidden` (Bringr-93j.48 / Bringr-93j.50). `nil` serves
     /// the base `windows` for both modes, so the single-list tests are unaffected.
     private let offscreenWindows: [RawWindow]?
+    /// AX titles to return when the enumerator asks for them (Bringr-93j.110), keyed first
+    /// by owning pid and then by CG window number — the same shape the live AX read produces.
+    /// Defaults to empty so existing tests inherit the no-AX behaviour (every blank CG title
+    /// falls through to the synthetic "<App> — Window N" fallback).
+    private let axTitlesByPID: [pid_t: [Int: String]]
     /// The `includingOffscreen` of the most recent call, so a test can assert the enumerator
     /// broadened the query when a Space/minimized/hidden flag was set.
     private(set) var lastIncludedOffscreen: Bool?
@@ -322,11 +317,20 @@ final class FakeWindowEnumerationSource: WindowEnumerationSource {
     /// the windows sub-wheel re-reads instead of re-hitting the source on every hover.
     private(set) var broadenedCallCount = 0
     private(set) var narrowCallCount = 0
+    /// Pids the enumerator asked AX titles for, in call order, so a test can assert the
+    /// per-app gating: a summon's AX title read fires only for apps with at least one blank
+    /// CG title (Bringr-93j.110).
+    private(set) var axTitlesCalls: [pid_t] = []
 
-    init(selfPID: pid_t, windows: [RawWindow], offscreenWindows: [RawWindow]? = nil) {
+    init(
+        selfPID: pid_t, windows: [RawWindow],
+        offscreenWindows: [RawWindow]? = nil,
+        axTitles: [pid_t: [Int: String]] = [:]
+    ) {
         self.selfPID = selfPID
         self.windows = windows
         self.offscreenWindows = offscreenWindows
+        self.axTitlesByPID = axTitles
     }
 
     func rawWindows(includingOffscreen: Bool, validatingOnscreen: Bool) -> [RawWindow] {
@@ -339,5 +343,10 @@ final class FakeWindowEnumerationSource: WindowEnumerationSource {
             narrowCallCount += 1
         }
         return windows
+    }
+
+    func axTitles(forPID pid: pid_t) -> [Int: String] {
+        axTitlesCalls.append(pid)
+        return axTitlesByPID[pid] ?? [:]
     }
 }

@@ -126,8 +126,9 @@ final class MenuModelTests: XCTestCase {
         ])
         XCTAssertTrue(chromeWindows[0].resolvedChildren().isEmpty)
 
-        // Ghostty's untitled window falls back to an index label.
-        XCTAssertEqual(apps[1].resolvedChildren().map(\.title), ["Window 1"])
+        // Ghostty's untitled window falls back to the app-name fallback (Bringr-93j.110),
+        // so a slice is never blank when window labels are on.
+        XCTAssertEqual(apps[1].resolvedChildren().map(\.title), ["Ghostty — Window 1"])
     }
 
     func testAppSubWheelRebuildsFromLiveStateOnResolve() {

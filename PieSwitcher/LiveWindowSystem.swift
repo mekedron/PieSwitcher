@@ -44,6 +44,28 @@ final class LiveWindowSystem: WindowControlling {
         return ids
     }
 
+    /// Real window titles for `app` from AX, keyed by `kCGWindowNumber` (Bringr-93j.110).
+    /// CG's `kCGWindowName` requires Screen Recording — a v1 non-goal — so AX's
+    /// `kAXTitleAttribute` is the only way to learn the window title (document name,
+    /// browser tab, email subject) the user expects to see in the sub-wheel. Skips
+    /// windows AX can't tag with a CG number (rare) and those without a title attribute
+    /// (the empty/missing-title case the enumerator falls back from); the result is
+    /// empty when AX can't enumerate the app (denied, terminating, etc.). Sibling of
+    /// `windows(of:)`, sharing the same AX traversal — separate so a caller that only
+    /// needs titles can ask for them without populating `elementCache`.
+    func windowTitles(of app: AppID) -> [Int: String] {
+        let appElement = AXUIElementCreateApplication(app.pid)
+        guard let axWindows = copyWindows(appElement) else { return [:] }
+
+        var titles: [Int: String] = [:]
+        for axWindow in axWindows {
+            guard let number = windowNumber(of: axWindow),
+                  let title = stringAttribute(axWindow, kAXTitleAttribute) else { continue }
+            titles[number] = title
+        }
+        return titles
+    }
+
     func frontmostApp() -> AppID? {
         guard let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != selfPID else { return nil }
@@ -142,6 +164,16 @@ final class LiveWindowSystem: WindowControlling {
         let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
         guard result == .success, let boolValue = value as? Bool else { return false }
         return boolValue
+    }
+
+    /// Generic AX string-attribute read. Returns `nil` for the absent/wrong-type cases —
+    /// the title attribute is missing on background windows, panels, and other surfaces
+    /// AX still lists, so a missing read is normal, not an error.
+    private func stringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        guard result == .success else { return nil }
+        return value as? String
     }
 
     private func cachedElement(for window: WindowID, operation: String) -> AXUIElement? {

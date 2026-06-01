@@ -15,6 +15,14 @@ final class CGWindowSource: WindowEnumerationSource {
     /// Window control mutates its own separate instance.
     private let stateProbe = LiveWindowSystem()
 
+    /// AX-reported window titles for `pid`, used by `WindowEnumerator` when the CG window
+    /// list left a window title blank — the common case under Accessibility-only permission
+    /// (Bringr-93j.110). Defers to `stateProbe`, which holds the AX path the rest of the
+    /// classifier already uses, so the per-app traversal logic stays in one place.
+    func axTitles(forPID pid: pid_t) -> [Int: String] {
+        stateProbe.windowTitles(of: AppID(pid: pid))
+    }
+
     func rawWindows(includingOffscreen: Bool, validatingOnscreen: Bool) -> [RawWindow] {
         // `.optionOnScreenOnly` limits the list to windows on the current Space that aren't
         // minimized or hidden; dropping it (an all-windows query) is the only public way to

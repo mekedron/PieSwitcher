@@ -2,19 +2,23 @@ import SwiftUI
 
 /// The "Appearance" Preferences pane (US-014): the wheel's size, distance from the
 /// summon point, slice fill opacity, glass and content shadows (Bringr-93j.66), label
-/// visibility, the Liquid Glass toggle (Bringr-93j.65), and the skip-single-window
-/// shortcut. Bringr-93j.106 reorganised this into a `PreferencesPane`-backed `Form`
-/// with three sections so the controls align in a clean two-column layout (label on
-/// the right, slider/toggle on the left), matching Logic Pro's Preferences screens.
-/// Every key is read fresh by `RadialAppearance.current` at each summon, so a change
-/// applies on the next open without a relaunch.
+/// visibility (Bringr-93j.110 splits this into app names on the ring and real window
+/// titles on the sub-wheel), the Liquid Glass toggle (Bringr-93j.65), and the
+/// skip-single-window shortcut. Bringr-93j.106 reorganised this into a
+/// `PreferencesPane`-backed `Form` with three sections so the controls align in a
+/// clean two-column layout (label on the right, slider/toggle on the left), matching
+/// Logic Pro's Preferences screens. Every key is read fresh by
+/// `RadialAppearance.current` at each summon, so a change applies on the next open
+/// without a relaunch.
 struct AppearanceSettings: View {
     @AppStorage(RadialAppearance.radiusDefaultsKey)
     private var outerRadius = Double(RadialAppearance.defaultOuterRadius)
     @AppStorage(RadialAppearance.opacityDefaultsKey)
     private var fillOpacity = RadialAppearance.defaultFillOpacity
-    @AppStorage(RadialAppearance.labelsDefaultsKey)
-    private var showsLabels = RadialAppearance.defaultShowsLabels
+    @AppStorage(RadialAppearance.showsAppLabelsDefaultsKey)
+    private var showsAppLabels = RadialAppearance.defaultShowsAppLabels
+    @AppStorage(RadialAppearance.showsWindowLabelsDefaultsKey)
+    private var showsWindowLabels = RadialAppearance.defaultShowsWindowLabels
     @AppStorage(RadialAppearance.glassDefaultsKey)
     private var usesLiquidGlass = RadialAppearance.defaultUsesLiquidGlass
     @AppStorage(RadialAppearance.innerPaddingDefaultsKey)
@@ -74,7 +78,19 @@ struct AppearanceSettings: View {
             }
 
             Section {
-                Toggle("Show labels", isOn: $showsLabels)
+                Toggle("Show application names", isOn: $showsAppLabels)
+                Toggle("Show window titles", isOn: $showsWindowLabels)
+            } header: {
+                Text("Labels")
+            } footer: {
+                Text("Application names label each slice on the apps ring. Window titles "
+                     + "label each slice on the windows sub-wheel with the same title "
+                     + "macOS shows in Mission Control or the Window menu (e.g., the "
+                     + "document name or browser tab); a window with no title falls back "
+                     + "to a numbered label so the slice is never blank.")
+            }
+
+            Section {
                 Toggle("Liquid Glass effect", isOn: $usesLiquidGlass)
                 Toggle("Skip the windows ring for single-window apps", isOn: $skipSingleWindowLevel)
             } header: {

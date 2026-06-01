@@ -21,14 +21,16 @@ final class RadialAppearanceTests: XCTestCase {
         let defaults = makeDefaults()
         defaults.set(200.0, forKey: RadialAppearance.radiusDefaultsKey)
         defaults.set(0.4, forKey: RadialAppearance.opacityDefaultsKey)
-        defaults.set(false, forKey: RadialAppearance.labelsDefaultsKey)
+        defaults.set(true, forKey: RadialAppearance.showsAppLabelsDefaultsKey)
+        defaults.set(false, forKey: RadialAppearance.showsWindowLabelsDefaultsKey)
         defaults.set(false, forKey: RadialAppearance.glassDefaultsKey)
         defaults.set(40.0, forKey: RadialAppearance.innerPaddingDefaultsKey)
 
         let appearance = RadialAppearance.current(from: defaults)
         XCTAssertEqual(appearance.outerRadius, 200, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, 0.4, accuracy: opacityAccuracy)
-        XCTAssertFalse(appearance.showsLabels)
+        XCTAssertTrue(appearance.showsAppLabels)
+        XCTAssertFalse(appearance.showsWindowLabels)
         XCTAssertFalse(appearance.usesLiquidGlass)
         XCTAssertEqual(appearance.innerRadiusPadding, 40, accuracy: accuracy)
     }
@@ -61,14 +63,16 @@ final class RadialAppearanceTests: XCTestCase {
     }
 
     func testEachFieldFallsBackToItsDefaultIndependently() {
-        // Only labels were ever changed; size, opacity, and padding keep their defaults.
+        // Only the apps-ring label was explicitly toggled; every other field falls back to
+        // its own default (Bringr-93j.110: window labels stay on by default for discoverability).
         let defaults = makeDefaults()
-        defaults.set(false, forKey: RadialAppearance.labelsDefaultsKey)
+        defaults.set(false, forKey: RadialAppearance.showsAppLabelsDefaultsKey)
 
         let appearance = RadialAppearance.current(from: defaults)
         XCTAssertEqual(appearance.outerRadius, RadialAppearance.defaultOuterRadius, accuracy: accuracy)
         XCTAssertEqual(appearance.fillOpacity, RadialAppearance.defaultFillOpacity, accuracy: opacityAccuracy)
-        XCTAssertFalse(appearance.showsLabels)
+        XCTAssertFalse(appearance.showsAppLabels)
+        XCTAssertTrue(appearance.showsWindowLabels)
         XCTAssertEqual(appearance.usesLiquidGlass, RadialAppearance.defaultUsesLiquidGlass)
         XCTAssertEqual(
             appearance.innerRadiusPadding, RadialAppearance.defaultInnerRadiusPadding, accuracy: accuracy
@@ -229,7 +233,10 @@ final class RadialAppearanceTests: XCTestCase {
     // MARK: - Helpers
 
     private func appearance(radius: CGFloat, opacity: Double = 0.2, padding: CGFloat = 0) -> RadialAppearance {
-        RadialAppearance(outerRadius: radius, fillOpacity: opacity, showsLabels: true, innerRadiusPadding: padding)
+        RadialAppearance(
+            outerRadius: radius, fillOpacity: opacity,
+            showsAppLabels: true, showsWindowLabels: true, innerRadiusPadding: padding
+        )
     }
 
     private func readingRadius(_ value: Double) -> CGFloat {

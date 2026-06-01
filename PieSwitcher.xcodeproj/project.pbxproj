@@ -119,6 +119,8 @@
 		1A00000000000000000000DD /* RadialNavigatorKeyboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */; };
 		1A00000000000000000000DF /* RadialNavigatorKeyboardFollowupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E0 /* RadialNavigatorKeyboardFollowupTests.swift */; };
 		1A00000000000000000000E3 /* RadialLayoutLabelWidthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E4 /* RadialLayoutLabelWidthTests.swift */; };
+		1A000000000000000000011E /* WindowEnumeratorTitleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011D /* WindowEnumeratorTitleTests.swift */; };
+		1A0000000000000000000120 /* RadialAppearanceSplitLabelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011F /* RadialAppearanceSplitLabelsTests.swift */; };
 		1A00000000000000000000F1 /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000F0 /* SparkleUpdater.swift */; };
 		1A00000000000000000000F3 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00000000000000000000F2 /* Sparkle */; };
 /* End PBXBuildFile section */
@@ -209,6 +211,8 @@
 		1A00000000000000000000A9 /* CollectionScopeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionScopeTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000AB /* CollectionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSettingsView.swift; sourceTree = "<group>"; };
 		1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeratorSpacesTests.swift; sourceTree = "<group>"; };
+		1A000000000000000000011D /* WindowEnumeratorTitleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowEnumeratorTitleTests.swift; sourceTree = "<group>"; };
+		1A000000000000000000011F /* RadialAppearanceSplitLabelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialAppearanceSplitLabelsTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000AF /* CGWindowSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CGWindowSource.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B1 /* SortingSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortingSettingsView.swift; sourceTree = "<group>"; };
 		1A00000000000000000000B3 /* DockOrderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockOrderTests.swift; sourceTree = "<group>"; };
@@ -404,6 +408,8 @@
 				1A00000000000000000000A9 /* CollectionScopeTests.swift */,
 				1A00000000000000000000CE /* WindowEnumeratorOnscreenValidationTests.swift */,
 				1A00000000000000000000AD /* WindowEnumeratorSpacesTests.swift */,
+				1A000000000000000000011D /* WindowEnumeratorTitleTests.swift */,
+				1A000000000000000000011F /* RadialAppearanceSplitLabelsTests.swift */,
 				1A00000000000000000000B3 /* DockOrderTests.swift */,
 				1A00000000000000000000DC /* KeyboardNavigationTests.swift */,
 				1A00000000000000000000DE /* RadialNavigatorKeyboardTests.swift */,
@@ -632,6 +638,8 @@
 				1A00000000000000000000AA /* CollectionScopeTests.swift in Sources */,
 				1A00000000000000000000CD /* WindowEnumeratorOnscreenValidationTests.swift in Sources */,
 				1A00000000000000000000AE /* WindowEnumeratorSpacesTests.swift in Sources */,
+				1A000000000000000000011E /* WindowEnumeratorTitleTests.swift in Sources */,
+				1A0000000000000000000120 /* RadialAppearanceSplitLabelsTests.swift in Sources */,
 				1A00000000000000000000B4 /* DockOrderTests.swift in Sources */,
 				1A00000000000000000000DB /* KeyboardNavigationTests.swift in Sources */,
 				1A00000000000000000000DD /* RadialNavigatorKeyboardTests.swift in Sources */,

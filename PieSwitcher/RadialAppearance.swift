@@ -23,10 +23,19 @@ struct RadialAppearance: Equatable, Sendable {
     /// step up from this by fixed deltas (clamped to 1), so this single knob moves
     /// the whole emphasis set together.
     var fillOpacity: Double
-    /// Whether slices show their text labels (app name / window title). The app
-    /// icon and the window index number always show, so a slice stays identifiable
-    /// even with labels off.
-    var showsLabels: Bool
+    /// Whether app slices on the apps ring show their application name label
+    /// (Bringr-93j.110). Independent of `showsWindowLabels`, so the two wheel levels
+    /// can convey different information. The app icon always shows, so a slice stays
+    /// identifiable even with names off.
+    var showsAppLabels: Bool
+    /// Whether window slices on the windows sub-wheel show their real window title
+    /// (Bringr-93j.110) — the same string macOS shows in Mission Control or the
+    /// Window menu. Independent of `showsAppLabels`. The 1-based window index
+    /// number always shows (windows have no icon), so a slice stays identifiable even
+    /// with titles off. When a real title is unavailable (AX denied, off-Space, or
+    /// blank), the displayed text falls back to "<App> — Window <N>" so a slice is
+    /// never blank.
+    var showsWindowLabels: Bool
     /// Whether the wheel renders with the genuine Liquid Glass material (macOS 26+).
     /// When off — or on any OS before macOS 26, which has no Liquid Glass — it uses
     /// the same frosted `.ultraThinMaterial` fallback: a plain look for users who
@@ -58,9 +67,14 @@ struct RadialAppearance: Equatable, Sendable {
     /// Zero by default — pure glass, so the genuine Liquid Glass material shows through
     /// at rest with no frost on top; the user dials it up for a more filled, frosted ring.
     static let defaultFillOpacity = 0.0
-    /// Off by default — labels are optional and ride on top of the icon + window index
-    /// that always show, so the wheel ships icon-only and the user opts into labels.
-    static let defaultShowsLabels = false
+    /// Off by default for the apps ring — slices ship icon-only and the user opts into
+    /// names (Bringr-93j.110). Mirrors the original `defaultShowsLabels` shipped before
+    /// labels were split.
+    static let defaultShowsAppLabels = false
+    /// On by default for the windows sub-wheel — a fresh install reveals the real-window-
+    /// titles feature without the user hunting through Preferences (Bringr-93j.110). The
+    /// migration in `current(from:)` preserves an existing user's prior labels-off choice.
+    static let defaultShowsWindowLabels = true
     /// On by default, so the wheel ships with the Liquid Glass look; the user opts
     /// out to the plain frosted fallback.
     static let defaultUsesLiquidGlass = true
@@ -81,7 +95,8 @@ struct RadialAppearance: Equatable, Sendable {
     static let `default` = RadialAppearance(
         outerRadius: defaultOuterRadius,
         fillOpacity: defaultFillOpacity,
-        showsLabels: defaultShowsLabels,
+        showsAppLabels: defaultShowsAppLabels,
+        showsWindowLabels: defaultShowsWindowLabels,
         usesLiquidGlass: defaultUsesLiquidGlass,
         innerRadiusPadding: defaultInnerRadiusPadding,
         glassShadowOpacity: defaultGlassShadowOpacity,
@@ -105,7 +120,17 @@ struct RadialAppearance: Equatable, Sendable {
     /// `@AppStorage` bindings and `current(from:)` so the two cannot drift.
     static let radiusDefaultsKey = "appearance.outerRadius"
     static let opacityDefaultsKey = "appearance.fillOpacity"
+    /// Pre-Bringr-93j.110 single labels toggle (`appearance.showsLabels`). Retained so
+    /// `current(from:)` can migrate an existing user's choice into the two split keys
+    /// below the first time the new code reads defaults: labels-on becomes app names + window
+    /// titles on; labels-off becomes both off. A user who never set the old key gets the new
+    /// defaults — window titles on for discoverability. Once either new key is set, the old
+    /// key is no longer consulted for that field, so toggling one no longer flips the other.
     static let labelsDefaultsKey = "appearance.showsLabels"
+    /// New apps-ring label key (Bringr-93j.110), independent of the windows sub-wheel.
+    static let showsAppLabelsDefaultsKey = "appearance.showsAppLabels"
+    /// New windows sub-wheel label key (Bringr-93j.110), independent of the apps ring.
+    static let showsWindowLabelsDefaultsKey = "appearance.showsWindowLabels"
     static let glassDefaultsKey = "appearance.usesLiquidGlass"
     static let innerPaddingDefaultsKey = "appearance.innerRadiusPadding"
     static let glassShadowDefaultsKey = "appearance.glassShadowOpacity"
@@ -148,9 +173,18 @@ struct RadialAppearance: Equatable, Sendable {
         if defaults.object(forKey: opacityDefaultsKey) != nil {
             appearance.fillOpacity = clampedOpacity(defaults.double(forKey: opacityDefaultsKey))
         }
-        if defaults.object(forKey: labelsDefaultsKey) != nil {
-            appearance.showsLabels = defaults.bool(forKey: labelsDefaultsKey)
-        }
+        // Bringr-93j.110: the new keys win when set, then the old unified key migrates the
+        // user's prior choice into either field independently. The first new toggle in
+        // Preferences writes a new key, after which the old key never overrides it again —
+        // so the two settings become fully independent on first interaction. A fresh install
+        // (neither key set) gets each field's default; window titles on by default makes the
+        // feature discoverable without hunting through Preferences.
+        appearance.showsAppLabels = readSplitLabel(
+            from: defaults, newKey: showsAppLabelsDefaultsKey, default: defaultShowsAppLabels
+        )
+        appearance.showsWindowLabels = readSplitLabel(
+            from: defaults, newKey: showsWindowLabelsDefaultsKey, default: defaultShowsWindowLabels
+        )
         if defaults.object(forKey: glassDefaultsKey) != nil {
             appearance.usesLiquidGlass = defaults.bool(forKey: glassDefaultsKey)
         }
@@ -168,6 +202,21 @@ struct RadialAppearance: Equatable, Sendable {
             appearance.skipSingleWindowLevel = defaults.bool(forKey: skipSingleWindowLevelDefaultsKey)
         }
         return appearance
+    }
+
+    /// Resolve one half of the split labels setting (Bringr-93j.110): the new per-level key
+    /// wins when set; otherwise migrate from the pre-split `labelsDefaultsKey` so an upgrade
+    /// preserves the user's prior choice; otherwise fall back to the field's default.
+    private static func readSplitLabel(
+        from defaults: UserDefaults, newKey: String, default fallback: Bool
+    ) -> Bool {
+        if defaults.object(forKey: newKey) != nil {
+            return defaults.bool(forKey: newKey)
+        }
+        if defaults.object(forKey: labelsDefaultsKey) != nil {
+            return defaults.bool(forKey: labelsDefaultsKey)
+        }
+        return fallback
     }
 
     private static func clampedRadius(_ value: CGFloat) -> CGFloat {

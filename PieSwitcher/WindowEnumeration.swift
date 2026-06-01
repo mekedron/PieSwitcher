@@ -26,6 +26,16 @@ protocol WindowEnumerationSource {
     func rawWindows(includingOffscreen: Bool, validatingOnscreen: Bool) -> [RawWindow]
     /// This process's pid, so PieSwitcher's own windows can be excluded.
     var selfPID: pid_t { get }
+    /// AX-reported window titles for `pid`, keyed by window number (Bringr-93j.110). Lets
+    /// the enumerator fill in titles the CG list left blank — `kCGWindowName` needs Screen
+    /// Recording (a v1 non-goal), so Accessibility is everyday life's only path to a real
+    /// title. Empty when AX can't resolve them (denied, app has none listed).
+    func axTitles(forPID pid: pid_t) -> [Int: String]
+}
+
+extension WindowEnumerationSource {
+    /// Default: no AX titles. Test sources that don't care inherit this; live sources override.
+    func axTitles(forPID pid: pid_t) -> [Int: String] { [:] }
 }
 
 /// Reports which apps currently have on-screen windows and the windows each
@@ -320,13 +330,18 @@ final class WindowEnumerator {
         return pidOrder.map { pid in
             let raws = byPID[pid] ?? []
             let appID = AppID(pid: pid)
+            let ownerName = raws.first?.ownerName ?? ""
+            // Only ask AX for titles when at least one CG title is blank (Bringr-93j.110):
+            // Screen Recording populates every CG title, so the per-app AX read is skipped.
+            let needsAX = raws.contains { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let axTitles = needsAX ? source.axTitles(forPID: pid) : [:]
             let infos = raws.enumerated().map { index, raw in
                 WindowInfo(
                     id: WindowID(app: appID, token: raw.windowNumber),
-                    title: title(for: raw, index: index)
+                    title: title(for: raw, ownerName: ownerName, axTitles: axTitles, index: index)
                 )
             }
-            return AppWindows(id: appID, name: raws.first?.ownerName ?? "", windows: infos)
+            return AppWindows(id: appID, name: ownerName, windows: infos)
         }
     }
 
@@ -368,11 +383,18 @@ final class WindowEnumerator {
         }
     }
 
-    /// CoreGraphics window titles need Screen Recording permission, which PieSwitcher
-    /// does not request in v1, so titles are usually empty; fall back to a
-    /// 1-based index label, which US-006 permits for window slices.
-    private func title(for window: RawWindow, index: Int) -> String {
-        let trimmed = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Window \(index + 1)" : trimmed
+    /// Displayed title (Bringr-93j.110): CG `kCGWindowName` if populated, then AX title for
+    /// blank-CG windows, then "<App> — Window <N>" so a slice is never blank with window
+    /// labels on. The app-name fallback disambiguates untitled windows; an ownerless edge
+    /// case collapses to "Window <N>".
+    private func title(
+        for window: RawWindow, ownerName: String, axTitles: [Int: String], index: Int
+    ) -> String {
+        let cg = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cg.isEmpty { return cg }
+        if let ax = axTitles[window.windowNumber]?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !ax.isEmpty { return ax }
+        let owner = ownerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return owner.isEmpty ? "Window \(index + 1)" : "\(owner) — Window \(index + 1)"
     }
 }
