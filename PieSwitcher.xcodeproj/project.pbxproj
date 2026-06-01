@@ -77,6 +77,9 @@
 		1A0000000000000000000111 /* RadialDwellOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000112 /* RadialDwellOverlay.swift */; };
 		1A0000000000000000000113 /* PreferencesLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000114 /* PreferencesLayout.swift */; };
 		1A0000000000000000000115 /* MyAppsMenuFinderLastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000116 /* MyAppsMenuFinderLastTests.swift */; };
+		1A0000000000000000000117 /* ActivationExclusionList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000118 /* ActivationExclusionList.swift */; };
+		1A0000000000000000000119 /* ActivationExclusionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011A /* ActivationExclusionSettingsView.swift */; };
+		1A000000000000000000011B /* ActivationExclusionListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011C /* ActivationExclusionListTests.swift */; };
 		1A0000000000000000000092 /* DockIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000091 /* DockIconManager.swift */; };
 		1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000093 /* DockIconManagerTests.swift */; };
 		1A00000000000000000000E2 /* RadialNavigatorSkipLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */; };
@@ -243,6 +246,9 @@
 		1A0000000000000000000112 /* RadialDwellOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialDwellOverlay.swift; sourceTree = "<group>"; };
 		1A0000000000000000000114 /* PreferencesLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesLayout.swift; sourceTree = "<group>"; };
 		1A0000000000000000000116 /* MyAppsMenuFinderLastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuFinderLastTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000118 /* ActivationExclusionList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionList.swift; sourceTree = "<group>"; };
+		1A000000000000000000011A /* ActivationExclusionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionSettingsView.swift; sourceTree = "<group>"; };
+		1A000000000000000000011C /* ActivationExclusionListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionListTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -350,6 +356,8 @@
 				1A000000000000000000010E /* DwellActivationSettingsView.swift */,
 				1A0000000000000000000112 /* RadialDwellOverlay.swift */,
 				1A0000000000000000000114 /* PreferencesLayout.swift */,
+				1A0000000000000000000118 /* ActivationExclusionList.swift */,
+				1A000000000000000000011A /* ActivationExclusionSettingsView.swift */,
 			);
 			path = PieSwitcher;
 			sourceTree = "<group>";
@@ -402,6 +410,7 @@
 				1A00000000000000000000E0 /* RadialNavigatorKeyboardFollowupTests.swift */,
 				1A00000000000000000000E4 /* RadialLayoutLabelWidthTests.swift */,
 				1A0000000000000000000110 /* DwellActivationTests.swift */,
+				1A000000000000000000011C /* ActivationExclusionListTests.swift */,
 			);
 			path = PieSwitcherTests;
 			sourceTree = "<group>";
@@ -575,6 +584,8 @@
 				1A000000000000000000010D /* DwellActivationSettingsView.swift in Sources */,
 				1A0000000000000000000111 /* RadialDwellOverlay.swift in Sources */,
 				1A0000000000000000000113 /* PreferencesLayout.swift in Sources */,
+				1A0000000000000000000117 /* ActivationExclusionList.swift in Sources */,
+				1A0000000000000000000119 /* ActivationExclusionSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -627,6 +638,7 @@
 				1A00000000000000000000DF /* RadialNavigatorKeyboardFollowupTests.swift in Sources */,
 				1A00000000000000000000E3 /* RadialLayoutLabelWidthTests.swift in Sources */,
 				1A000000000000000000010F /* DwellActivationTests.swift in Sources */,
+				1A000000000000000000011B /* ActivationExclusionListTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

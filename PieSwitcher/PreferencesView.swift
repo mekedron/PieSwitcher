@@ -153,6 +153,7 @@ private struct GeneralTab: View {
 enum ActivationSubTab: String, PreferencesSubTab {
     case mouse
     case keyboard
+    case exclusions
 
     static let defaultsKey = "preferences.activationSubTab"
     static let `default`: ActivationSubTab = .mouse
@@ -161,6 +162,7 @@ enum ActivationSubTab: String, PreferencesSubTab {
         switch self {
         case .mouse: return "Mouse"
         case .keyboard: return "Keyboard"
+        case .exclusions: return "Excluded Apps"
         }
     }
 }
@@ -180,6 +182,7 @@ private struct ActivationTab: View {
             switch selection.wrappedValue {
             case .mouse: MouseActivationSettings()
             case .keyboard: KeyboardActivationSettings()
+            case .exclusions: ActivationExclusionSettings()
             }
         }
     }

@@ -187,6 +187,11 @@ final class ModifierHoldMonitor {
     /// The hold delay in seconds, read fresh on each rising edge so a Preferences change
     /// applies on the next hold. Injected so tests can pin a value.
     private let delayProvider: () -> TimeInterval
+    /// Whether activation should be suppressed because the frontmost app is on the user's
+    /// exclusion list (Bringr-93j.109). Checked on the detector's rising edge so a fresh
+    /// hold over an excluded app is dropped, while an in-progress hold's falling edge still
+    /// flows through cleanly. Read fresh per event, mirroring the other providers.
+    private let exclusionProvider: () -> Bool
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -200,6 +205,11 @@ final class ModifierHoldMonitor {
         onRelease: @escaping () -> Void = {},
         armedProvider: @escaping () -> [ModifierCombination] = { ModifierActivation.armedCombinations() },
         delayProvider: @escaping () -> TimeInterval = { ActivationHoldDelay.current() },
+        exclusionProvider: @escaping () -> Bool = {
+            ActivationExclusionList.shouldSuppressActivation(
+                frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            )
+        },
         onProgressStart: @escaping (TimeInterval) -> Void = { _ in },
         onProgressEnd: @escaping () -> Void = {}
     ) {
@@ -207,6 +217,7 @@ final class ModifierHoldMonitor {
         self.onRelease = onRelease
         self.armedProvider = armedProvider
         self.delayProvider = delayProvider
+        self.exclusionProvider = exclusionProvider
         self.onProgressStart = onProgressStart
         self.onProgressEnd = onProgressEnd
     }
@@ -274,7 +285,13 @@ final class ModifierHoldMonitor {
 
         let held = ModifierCombination(cgFlags: event.flags)
         switch detector.handle(held: held, armed: armedProvider()) {
-        case .press: scheduleDelayedPress()
+        case .press:
+            // Frontmost-app exclusion (Bringr-93j.109): a fresh hold over an excluded app is
+            // dropped, but the detector still tracks state so a later release of the same hold
+            // (via the .release branch below) flows through cleanly — the gate stays idle, so
+            // `handleRelease` returns `.ignore` and no stray dismiss fires.
+            guard !exclusionProvider() else { break }
+            scheduleDelayedPress()
         case .release: handleRelease()
         case .none: break
         }

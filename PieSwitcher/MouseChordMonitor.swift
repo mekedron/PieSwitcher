@@ -38,6 +38,10 @@ final class MouseChordMonitor {
     /// (Bringr-93j.103). Read fresh per drag event so a Preferences change applies on the
     /// next gesture. Internal for the same reason as `lockProvider`.
     let moveThresholdProvider: () -> CGFloat
+    /// Whether activation should be suppressed because the frontmost app is on the user's
+    /// exclusion list (Bringr-93j.109). Read fresh per event so a focus shift to or from an
+    /// excluded app takes effect on the next press without a relaunch.
+    private let exclusionProvider: () -> Bool
     /// Fires when the hold-delay timer is armed, with the delay in seconds. The progress
     /// indicator (Bringr-93j.103) uses it to start the on-cursor countdown.
     let onProgressStart: (TimeInterval) -> Void
@@ -90,6 +94,11 @@ final class MouseChordMonitor {
         blockingProvider: @escaping () -> Bool = { MouseActivationConfig.blocking() },
         lockProvider: @escaping () -> Bool = { MouseActivationConfig.lock() },
         moveThresholdProvider: @escaping () -> CGFloat = { MouseActivationMoveThreshold.current() },
+        exclusionProvider: @escaping () -> Bool = {
+            ActivationExclusionList.shouldSuppressActivation(
+                frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            )
+        },
         onChord: @escaping () -> Void,
         onChordReleased: @escaping () -> Void = {},
         onProgressStart: @escaping (TimeInterval) -> Void = { _ in },
@@ -101,6 +110,7 @@ final class MouseChordMonitor {
         self.blockingProvider = blockingProvider
         self.lockProvider = lockProvider
         self.moveThresholdProvider = moveThresholdProvider
+        self.exclusionProvider = exclusionProvider
         self.onChord = onChord
         self.onChordReleased = onChordReleased
         self.onProgressStart = onProgressStart
@@ -193,15 +203,11 @@ final class MouseChordMonitor {
         // No methods enabled = mouse activation is off; flush any half-buffered press and let
         // every event through untouched. Avoids stranding a buffered press if the user disables
         // methods mid-pursuit.
-        if methods.isEmpty {
-            if !heldEvents.isEmpty { replayHeldEvents() }
-            pressLocation = nil
-            cancelPursuitTimer()
-            cancelHoldDelayTimer()
-            pendingMatch = nil
-            detector.reset()
-            return Unmanaged.passUnretained(event)
-        }
+        if methods.isEmpty { return passThroughAndReset(event) }
+
+        // Frontmost-app exclusion (Bringr-93j.109): the user listed the active app, so the
+        // wheel stays out of the way and the input passes through — same shape as above.
+        if exclusionProvider() { return passThroughAndReset(event) }
 
         // Our own replayed presses carry the sentinel — never re-detect them.
         if event.getIntegerValueField(.eventSourceUserData) == Self.replaySentinel {
@@ -342,6 +348,19 @@ final class MouseChordMonitor {
             return
         }
         updateMatchTrackers(holdDelay: holdDelay)
+    }
+
+    /// Drop pursuit state and deliver `event` untouched. Used by both fast-path bailouts in
+    /// `handle`: no-methods-enabled and the Bringr-93j.109 frontmost-app exclusion. Replaying
+    /// any half-buffered press avoids stranding it when a bailout triggers mid-pursuit.
+    private func passThroughAndReset(_ event: CGEvent) -> Unmanaged<CGEvent> {
+        if !heldEvents.isEmpty { replayHeldEvents() }
+        pressLocation = nil
+        cancelPursuitTimer()
+        cancelHoldDelayTimer()
+        pendingMatch = nil
+        detector.reset()
+        return Unmanaged.passUnretained(event)
     }
 
     /// Bring the pursuit and hold-delay timers in sync with the detector's current
