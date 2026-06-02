@@ -55,6 +55,18 @@ PieSwitcher offers two global triggers, both configurable in Preferences:
 
 You can also open the wheel from the menu-bar icon via **Open Window Switcher**.
 
+## First-launch onboarding
+
+The very first time PieSwitcher runs after installation, a Welcome window
+appears that walks you through setting your activation shortcut, lets you try
+the wheel on the spot, and explains the mouse-button trigger. The window is a
+plain movable window — closing it (or quitting from it) counts as "seen" and
+the next launch will not re-pop it.
+
+You can re-open the same window at any time from the menu-bar icon via
+**Show Welcome…**. Re-opening from the menu does **not** reset your shortcut
+or any other preference.
+
 How a release behaves depends on the interaction mode:
 
 - **Hold to select** (default): the wheel stays open while you hold the trigger;

@@ -20,6 +20,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// actually starts polling when `SUFeedURL` is set in Info.plist, so debug builds
     /// without an appcast wired up stay quiet.
     let updater = SparkleUpdater()
+    /// Owns the first-launch onboarding window and the "Show Welcome…" menu entry
+    /// (Bringr-93j.112). Eagerly constructed via `lazy var` so the menu-bar SwiftUI
+    /// scene — which captures `appDelegate.onboarding` at scene-build time, before
+    /// `applicationDidFinishLaunching` runs — sees a non-nil presenter and the "Show
+    /// Welcome…" item renders. Re-clicks reuse the same instance because the lazy
+    /// initializer fires only once.
+    private(set) lazy var onboarding = OnboardingPresenter(
+        permissions: permissions,
+        dockIcon: dockIcon
+    )
     /// The pre-warmed radial menu, summoned by the menu-bar item (and, later, the
     /// global activation triggers in US-007/US-008). `nil` under XCTest, where the
     /// launch bootstrap is skipped.
@@ -60,6 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startModifierMonitor()
         startKeyboardNavMonitor()
         updater.start()
+
+        // First-launch auto-open (Bringr-93j.112). The presenter is the same
+        // `lazy var` the menu bar reads, so first access here is also the one
+        // that constructs it — no separate code path that could drift.
+        onboarding.showOnAutoOpenIfNeeded()
 
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {

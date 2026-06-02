@@ -131,6 +131,14 @@
 		1A000000000000000000012B /* KeyboardShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000012C /* KeyboardShortcutTests.swift */; };
 		1A000000000000000000012D /* KeyboardShortcutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000012E /* KeyboardShortcutMigrationTests.swift */; };
 		1A000000000000000000012F /* KeyboardShortcutParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000130 /* KeyboardShortcutParserTests.swift */; };
+		1A0000000000000000000131 /* OnboardingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000132 /* OnboardingState.swift */; };
+		1A0000000000000000000133 /* OnboardingMouseDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000134 /* OnboardingMouseDetector.swift */; };
+		1A0000000000000000000135 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000136 /* OnboardingView.swift */; };
+		1A0000000000000000000137 /* OnboardingWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000138 /* OnboardingWindow.swift */; };
+		1A0000000000000000000139 /* OnboardingStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000013A /* OnboardingStateTests.swift */; };
+		1A000000000000000000013B /* OnboardingMouseDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000013C /* OnboardingMouseDetectorTests.swift */; };
+		1A000000000000000000013D /* OnboardingSuggestionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000013E /* OnboardingSuggestionsTests.swift */; };
+		1A000000000000000000013F /* OnboardingSuggestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000140 /* OnboardingSuggestion.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -269,6 +277,14 @@
 		1A000000000000000000012C /* KeyboardShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutTests.swift; sourceTree = "<group>"; };
 		1A000000000000000000012E /* KeyboardShortcutMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMigrationTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000130 /* KeyboardShortcutParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutParserTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000132 /* OnboardingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingState.swift; sourceTree = "<group>"; };
+		1A0000000000000000000134 /* OnboardingMouseDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingMouseDetector.swift; sourceTree = "<group>"; };
+		1A0000000000000000000136 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		1A0000000000000000000138 /* OnboardingWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindow.swift; sourceTree = "<group>"; };
+		1A000000000000000000013A /* OnboardingStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStateTests.swift; sourceTree = "<group>"; };
+		1A000000000000000000013C /* OnboardingMouseDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingMouseDetectorTests.swift; sourceTree = "<group>"; };
+		1A000000000000000000013E /* OnboardingSuggestionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSuggestionsTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000140 /* OnboardingSuggestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSuggestion.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -383,6 +399,11 @@
 				1A0000000000000000000114 /* PreferencesLayout.swift */,
 				1A0000000000000000000118 /* ActivationExclusionList.swift */,
 				1A000000000000000000011A /* ActivationExclusionSettingsView.swift */,
+				1A0000000000000000000132 /* OnboardingState.swift */,
+				1A0000000000000000000134 /* OnboardingMouseDetector.swift */,
+				1A0000000000000000000136 /* OnboardingView.swift */,
+				1A0000000000000000000138 /* OnboardingWindow.swift */,
+				1A0000000000000000000140 /* OnboardingSuggestion.swift */,
 			);
 			path = PieSwitcher;
 			sourceTree = "<group>";
@@ -441,6 +462,9 @@
 				1A00000000000000000000E4 /* RadialLayoutLabelWidthTests.swift */,
 				1A0000000000000000000110 /* DwellActivationTests.swift */,
 				1A000000000000000000011C /* ActivationExclusionListTests.swift */,
+				1A000000000000000000013A /* OnboardingStateTests.swift */,
+				1A000000000000000000013C /* OnboardingMouseDetectorTests.swift */,
+				1A000000000000000000013E /* OnboardingSuggestionsTests.swift */,
 			);
 			path = PieSwitcherTests;
 			sourceTree = "<group>";
@@ -621,6 +645,11 @@
 				1A0000000000000000000113 /* PreferencesLayout.swift in Sources */,
 				1A0000000000000000000117 /* ActivationExclusionList.swift in Sources */,
 				1A0000000000000000000119 /* ActivationExclusionSettingsView.swift in Sources */,
+				1A0000000000000000000131 /* OnboardingState.swift in Sources */,
+				1A0000000000000000000133 /* OnboardingMouseDetector.swift in Sources */,
+				1A0000000000000000000135 /* OnboardingView.swift in Sources */,
+				1A0000000000000000000137 /* OnboardingWindow.swift in Sources */,
+				1A000000000000000000013F /* OnboardingSuggestion.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -679,6 +708,9 @@
 				1A00000000000000000000E3 /* RadialLayoutLabelWidthTests.swift in Sources */,
 				1A000000000000000000010F /* DwellActivationTests.swift in Sources */,
 				1A000000000000000000011B /* ActivationExclusionListTests.swift in Sources */,
+				1A0000000000000000000139 /* OnboardingStateTests.swift in Sources */,
+				1A000000000000000000013B /* OnboardingMouseDetectorTests.swift in Sources */,
+				1A000000000000000000013D /* OnboardingSuggestionsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
