@@ -20,8 +20,21 @@ struct OnboardingShortcutSuggestion: Hashable {
     }
 
     /// The fixed suggestion list shown on screen 1. Order matters — left to
-    /// right is the order the chips render.
+    /// right is the order the chips render. Right Command leads as of
+    /// Bringr-93j.113: it is the new fresh-install default, so a user who
+    /// cleared the slot can restore it without typing. Right Option and Fn
+    /// follow as one-click alternatives for users on layouts where Right
+    /// Command is awkward.
     static let all: [OnboardingShortcutSuggestion] = [
+        OnboardingShortcutSuggestion(
+            id: "right-command",
+            label: "Right Command",
+            shortcut: KeyboardShortcut(
+                modifiers: [SidedModifier(.command, .right)],
+                keyCode: nil,
+                sideAgnostic: false
+            )
+        ),
         OnboardingShortcutSuggestion(
             id: "right-option",
             label: "Right Option",
@@ -36,15 +49,6 @@ struct OnboardingShortcutSuggestion: Hashable {
             label: "Fn",
             shortcut: KeyboardShortcut(
                 modifiers: [SidedModifier(.function, .either)],
-                keyCode: nil,
-                sideAgnostic: false
-            )
-        ),
-        OnboardingShortcutSuggestion(
-            id: "right-command",
-            label: "Right Command",
-            shortcut: KeyboardShortcut(
-                modifiers: [SidedModifier(.command, .right)],
                 keyCode: nil,
                 sideAgnostic: false
             )

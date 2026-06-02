@@ -9,9 +9,20 @@ final class KeyboardNavigationTests: XCTestCase {
 
     // MARK: - Settings defaults
 
-    func testTopLevelToggleDefaultsOff() {
-        XCTAssertFalse(KeyboardNavigation.enabledDefault)
-        XCTAssertFalse(KeyboardNavigation.isEnabled(from: makeDefaults()))
+    func testTopLevelToggleDefaultsOn() {
+        // Bringr-93j.113: keyboard navigation now ships ON by default. The reader must
+        // presence-check the key — without it, `bool(forKey:)` would silently flip the
+        // intended ON default to OFF for fresh installs (mirroring `closesOnUnsupportedKey`).
+        XCTAssertTrue(KeyboardNavigation.enabledDefault)
+        XCTAssertTrue(KeyboardNavigation.isEnabled(from: makeDefaults()),
+                      "absent key must read as the ON default — presence check load-bearing")
+    }
+
+    func testTopLevelToggleStoredFalseSurvivesPresenceCheck() {
+        // Bringr-93j.113 ON default plus presence check: an explicit OFF must stick.
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: KeyboardNavigation.enabledKey)
+        XCTAssertFalse(KeyboardNavigation.isEnabled(from: defaults))
     }
 
     func testSubTogglesDefaultPerSourceWhenUnset() {
@@ -24,26 +35,29 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertFalse(KeyboardNavigation.requiresConfirmation(from: defaults))
     }
 
-    func testCloseOnUnsupportedDefaultsOnAndCommitAppDefaultsOff() {
-        // Bringr-93j.108: close-on-unused defaults ON now — the policy never eats the keystroke
-        // (only Escape stays consumed), so the safe default is to dismiss the wheel on a stray
-        // key. Commit-app-without-window-choice still ships OFF (a window pick is required).
+    func testCloseOnUnsupportedAndCommitAppBothDefaultOn() {
+        // Bringr-93j.108: close-on-unused defaults ON — the policy never eats the keystroke
+        // (only Escape stays consumed), so the safe default is to dismiss the wheel on a
+        // stray key. Bringr-93j.113: commit-app-without-window-choice also defaults ON now,
+        // pairing with the number-jump flow so typing a number reaches an app's window even
+        // when that app has several.
         let defaults = makeDefaults()
         XCTAssertTrue(KeyboardNavigation.closeOnUnsupportedDefault)
         XCTAssertTrue(KeyboardNavigation.closesOnUnsupportedKey(from: defaults),
                       "an absent key reads as the ON default — presence check load-bearing")
-        XCTAssertFalse(KeyboardNavigation.commitAppWithoutWindowChoiceDefault)
-        XCTAssertFalse(KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults))
+        XCTAssertTrue(KeyboardNavigation.commitAppWithoutWindowChoiceDefault)
+        XCTAssertTrue(KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults),
+                      "an absent key reads as the ON default — presence check load-bearing")
     }
 
-    func testCloseOnUnsupportedAndCommitAppReadStoredValue() {
+    func testCloseOnUnsupportedAndCommitAppReadStoredFalse() {
         let defaults = makeDefaults()
-        // Stored false must survive the presence check — without it, the ON default would
-        // silently flip back to true (Bringr-93j.108).
+        // Stored false must survive the presence check on both keys — without it, the ON
+        // defaults would silently flip back to true (Bringr-93j.108 / Bringr-93j.113).
         defaults.set(false, forKey: KeyboardNavigation.closeOnUnsupportedKey)
-        defaults.set(true, forKey: KeyboardNavigation.commitAppWithoutWindowChoiceKey)
+        defaults.set(false, forKey: KeyboardNavigation.commitAppWithoutWindowChoiceKey)
         XCTAssertFalse(KeyboardNavigation.closesOnUnsupportedKey(from: defaults))
-        XCTAssertTrue(KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults))
+        XCTAssertFalse(KeyboardNavigation.commitsAppWithoutWindowChoice(from: defaults))
     }
 
     func testSubTogglesReadStoredValue() {
@@ -105,22 +119,25 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertTrue(config.numbersEnabled, "arrow and number navigation are independent toggles")
     }
 
-    func testConfigCloseDefaultsOnAndCommitDefaultsOffWhenNavigationOn() {
-        // Bringr-93j.108: close-on-unsupported ships ON now (it can't eat keystrokes — only
-        // Escape stays consumed — so being on by default is safe). Commit-app-without-window-
-        // choice stays opt-in; the top-level enable doesn't flip it on.
+    func testConfigCloseAndCommitBothDefaultOnWhenNavigationOn() {
+        // Bringr-93j.108: close-on-unsupported ships ON (it can't eat keystrokes — only
+        // Escape stays consumed). Bringr-93j.113: commit-app-without-window-choice also
+        // ships ON, so typing a number reaches a multi-window app's active window on
+        // release without an extra window pick.
         let defaults = makeDefaults()
         defaults.set(true, forKey: KeyboardNavigation.enabledKey)
         let config = KeyboardNavigationConfig.current(from: defaults)
         XCTAssertTrue(config.closesOnUnsupportedKey,
                       "close-on-unsupported defaults ON — see Bringr-93j.108 rationale")
-        XCTAssertFalse(config.commitsAppWithoutWindowChoice, "the no-window-choice commit is opt-in")
+        XCTAssertTrue(config.commitsAppWithoutWindowChoice,
+                      "commit-app-without-window-choice defaults ON — see Bringr-93j.113 rationale")
     }
 
     func testCommitAppFlagGatesOnTopLevelSwitch() {
         let defaults = makeDefaults()
-        // Commit-app-without-window-choice is meaningless without the keyboard-driven number flow,
-        // so it gates behind the master switch and stays off while it is off.
+        // Commit-app-without-window-choice is meaningless without the keyboard-driven number
+        // flow, so it gates behind the master switch and stays off while it is off — even
+        // though the underlying default flipped ON in Bringr-93j.113.
         defaults.set(false, forKey: KeyboardNavigation.enabledKey)
         defaults.set(true, forKey: KeyboardNavigation.commitAppWithoutWindowChoiceKey)
         let config = KeyboardNavigationConfig.current(from: defaults)

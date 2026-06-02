@@ -11,8 +11,13 @@ final class RevealStrategyTests: XCTestCase {
 
     // MARK: - Persistence helpers (AC1, AC4, AC5 default)
 
-    func testDefaultStrategyIsRaiseToFront() {
-        XCTAssertEqual(RevealStrategy.default, .raiseToFront)
+    func testDefaultStrategyIsHideOthers() {
+        // Bringr-93j.113: the fresh-install default flipped from `.raiseToFront` to
+        // `.hideOthers` to match the converged "best combination" — the strongest
+        // isolation, so the wheel acts as a visual filter that makes the choice
+        // unambiguous before committing. Users who prefer the lowest-disruption option
+        // can switch back to `.raiseToFront` in Preferences.
+        XCTAssertEqual(RevealStrategy.default, .hideOthers)
     }
 
     func testDefaultsKeyIsStable() {
@@ -51,17 +56,23 @@ final class RevealStrategyTests: XCTestCase {
         XCTAssertFalse(RevealStrategy.allCases.map(\.detail).contains(where: \.isEmpty))
     }
 
-    // MARK: - raise-to-front is the controller's default (proves the wiring, AC5)
+    // MARK: - hide-others is the controller's default (proves the wiring, AC5)
 
-    func testUnconfiguredControllerRaisesToFront() {
+    func testUnconfiguredControllerHidesOthers() {
+        // Bringr-93j.113: the controller's default strategy follows `RevealStrategy.default`,
+        // which flipped from `.raiseToFront` to `.hideOthers`. An unconfigured controller
+        // therefore hides every non-target app on `revealApp`; the target itself isn't
+        // explicitly activated (it becomes the only visible app, which is what the user
+        // wants from a "leave only my target on screen" reveal — the existing
+        // hide-others tests below confirm the same primitive behaviour).
         let fake = FakeWindowSystem(apps: [makeApp(1), makeApp(2), makeApp(3)], frontmost: AppID(pid: 1))
-        let controller = WindowController(system: fake) // no setStrategy → default (Bringr-93j.93)
+        let controller = WindowController(system: fake) // no setStrategy → default
 
         controller.revealApp(AppID(pid: 2))
 
-        XCTAssertEqual(fake.frontmost, AppID(pid: 2), "the hovered app is brought to the front")
-        XCTAssertFalse(fake.isHidden(AppID(pid: 1)), "raise-to-front hides nothing")
-        XCTAssertFalse(fake.isHidden(AppID(pid: 3)))
+        XCTAssertTrue(fake.isHidden(AppID(pid: 1)), "hide-others isolates the target by hiding the rest")
+        XCTAssertTrue(fake.isHidden(AppID(pid: 3)))
+        XCTAssertFalse(fake.isHidden(AppID(pid: 2)), "the target itself stays visible")
     }
 
     // MARK: - AC2/AC3: raise-to-front at both levels

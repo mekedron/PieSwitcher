@@ -8,8 +8,12 @@ import XCTest
 /// tests were added.
 final class MouseActivationConfigTests: XCTestCase {
 
-    func testDefaultMethodsIsLeftRight() {
-        XCTAssertEqual(MouseActivationConfig.defaultMethods, [.leftRight])
+    func testDefaultMethodsIsMiddle() {
+        // Bringr-93j.113: flipped from `{leftRight}` to `{middle}`. Left and Right are
+        // too easy to fire by accident during normal app use; Middle has no scroll
+        // behaviour and only a couple of niche bindings (close tab / open in new tab in
+        // browsers), so capturing it is the least disruptive default.
+        XCTAssertEqual(MouseActivationConfig.defaultMethods, [.middle])
     }
 
     func testMethodsDefaultsKeyIsStable() {
@@ -17,7 +21,7 @@ final class MouseActivationConfigTests: XCTestCase {
     }
 
     func testMethodsDefaultWhenUnset() {
-        XCTAssertEqual(MouseActivationConfig.methods(from: makeDefaults()), [.leftRight])
+        XCTAssertEqual(MouseActivationConfig.methods(from: makeDefaults()), [.middle])
         XCTAssertTrue(MouseActivationConfig.isEnabled(from: makeDefaults()))
     }
 
@@ -114,17 +118,23 @@ final class MouseActivationConfigTests: XCTestCase {
 /// effective-delay floor.
 final class MouseActivationHoldDelayTests: XCTestCase {
 
-    func testDefaultMillisecondsIsZero() {
-        XCTAssertEqual(MouseActivationHoldDelay.defaultMilliseconds, 0)
+    func testDefaultMillisecondsIs150() {
+        // Bringr-93j.113: bumped from 0 ms to 150 ms. The 0 ms default suited the prior
+        // `{leftRight}` chord (two-button simultaneity is itself an intentional signal);
+        // with the new fresh-install default `{middle}` a delay is what separates a
+        // normal middle-click from a deliberate summon — without it, picking Middle
+        // would silently break normal middle-click. 150 ms is comfortably above the tap
+        // envelope while still feeling fast for a deliberate hold.
+        XCTAssertEqual(MouseActivationHoldDelay.defaultMilliseconds, 150)
     }
 
     func testDefaultsKeyIsStable() {
         XCTAssertEqual(MouseActivationHoldDelay.defaultsKey, "activation.mouse.holdDelayMilliseconds")
     }
 
-    func testCurrentDefaultsToZeroWhenUnset() {
-        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: makeDefaults()), 0)
-        XCTAssertEqual(MouseActivationHoldDelay.current(from: makeDefaults()), 0, accuracy: 1e-9)
+    func testCurrentDefaultsTo150WhenUnset() {
+        XCTAssertEqual(MouseActivationHoldDelay.milliseconds(from: makeDefaults()), 150)
+        XCTAssertEqual(MouseActivationHoldDelay.current(from: makeDefaults()), 0.150, accuracy: 1e-9)
     }
 
     func testStoredValueRoundTripsInBothUnits() {

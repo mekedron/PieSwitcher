@@ -307,14 +307,14 @@ struct OnboardingMouseHintScreen: View {
         switch variant {
         case .externalNonAppleMouse:
             return "Looks like you have an external mouse — you can summon the pie menu "
-                + "with a mouse button too. The default is Left + Right click together, "
-                + "but Middle click, Forward, Backward, or any combination work and "
+                + "with a mouse button too. The default is Middle click held briefly, but "
+                + "Left + Right together, Forward, Backward, or any combination work and "
                 + "leave the other buttons free for their normal use."
         case .generic:
             return "If you ever connect a mouse with extra buttons, you can summon the "
-                + "pie menu with one of them too. The default mouse trigger is Left + "
-                + "Right click together; Middle click, Forward, Backward, and combinations "
-                + "are also available."
+                + "pie menu with one of them too. The default mouse trigger is Middle "
+                + "click held briefly; Left + Right together, Forward, Backward, and "
+                + "combinations are also available."
         }
     }
 

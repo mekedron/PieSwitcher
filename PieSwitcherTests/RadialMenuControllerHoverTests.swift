@@ -99,12 +99,17 @@ final class RadialMenuControllerHoverTests: XCTestCase {
     }
 
     func testDoesNotAcceptKeyboardNavWhenFeatureOff() {
-        // The feature defaults off; close-on-unused defaults ON now (Bringr-93j.108), so pin it
-        // off explicitly here. With BOTH the main feature and the close-on-unused policy off,
-        // an open wheel must let every key pass through untouched.
+        // Bringr-93j.108 close-on-unused defaults ON; Bringr-93j.113 main switch defaults
+        // ON too — pin both off explicitly. With BOTH the main feature and the
+        // close-on-unused policy off, an open wheel must let every key pass through
+        // untouched.
         let defaults = UserDefaults.standard
+        defaults.set(false, forKey: KeyboardNavigation.enabledKey)
         defaults.set(false, forKey: KeyboardNavigation.closeOnUnsupportedKey)
-        addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.closeOnUnsupportedKey) }
+        addTeardownBlock {
+            defaults.removeObject(forKey: KeyboardNavigation.enabledKey)
+            defaults.removeObject(forKey: KeyboardNavigation.closeOnUnsupportedKey)
+        }
         let controller = makeController(mode: .clickToStay, installer: MonitorRecorder().installer())
         controller.triggerPressed(for: .mouseChord, at: CGPoint(x: 400, y: 400))
         XCTAssertFalse(controller.acceptsKeyboardNav)
@@ -130,6 +135,9 @@ final class RadialMenuControllerHoverTests: XCTestCase {
     /// (e.g. Fn+Backspace = forward delete must keep working while the pie is open). Escape is
     /// the natural "close this" key, so it stays consumed.
     func testEveryKeyClosesWheelWhenMainSwitchOffAndCloseOnUnsupportedOn() {
+        // Bringr-93j.113 flipped the main switch default ON, so pin it off explicitly
+        // here — the test only makes sense with the main switch off.
+        setMainSwitchOff()
         setCloseOnUnsupportedEnabled()
         let passThroughKeys: [KeyboardNavKey] = [
             .arrow(.left), .arrow(.right), .arrow(.up), .arrow(.down),
@@ -254,6 +262,14 @@ final class RadialMenuControllerHoverTests: XCTestCase {
     private func setKeyboardNavEnabled() {
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: KeyboardNavigation.enabledKey)
+        addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.enabledKey) }
+    }
+
+    /// Set up: pin the keyboard-navigation main switch off. The default flipped ON in
+    /// Bringr-93j.113, so tests that depend on the off-path must opt in explicitly.
+    private func setMainSwitchOff() {
+        let defaults = UserDefaults.standard
+        defaults.set(false, forKey: KeyboardNavigation.enabledKey)
         addTeardownBlock { defaults.removeObject(forKey: KeyboardNavigation.enabledKey) }
     }
 

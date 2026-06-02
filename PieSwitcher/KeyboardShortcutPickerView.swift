@@ -17,7 +17,8 @@ struct KeyboardShortcutSlotView: View {
     /// button — used for the secondary slot's "Remove" action vs the primary's reset.
     let onClear: (() -> Void)?
     /// If non-nil, a Reset button is shown that fires this callback. Used by Shortcut 1
-    /// to restore the Right Option default.
+    /// to restore the fresh-install default (Right Command since Bringr-93j.113;
+    /// pre-93j.113 it was Right Option).
     let onReset: (() -> Void)?
 
     @State private var capture = KeyboardShortcutCaptureMachine()

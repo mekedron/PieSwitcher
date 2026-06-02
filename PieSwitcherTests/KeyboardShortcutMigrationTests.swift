@@ -7,10 +7,15 @@ import XCTest
 /// be exercised without an Xcode session or a launched app.
 final class KeyboardShortcutMigrationTests: XCTestCase {
 
-    func testFreshInstallProducesRightOptionDefault() {
+    func testFreshInstallProducesRightCommandDefault() {
+        // Bringr-93j.113: the fresh-install default flipped from Right Option to Right
+        // Command. Option is heavily used as the dead-key modifier on many European
+        // keyboard layouts (Option-N → ñ, Option-U → ¨), so binding the wheel to Right
+        // Option risks colliding with normal typing. Right Command is much less commonly
+        // used as a system-wide modifier and is a safer out-of-the-box choice.
         let plan = MigrationPlanner.plan(reading: makeDefaults())
         XCTAssertEqual(plan.kind, .freshInstall)
-        XCTAssertEqual(plan.slot1?.modifiers, [SidedModifier(.option, .right)])
+        XCTAssertEqual(plan.slot1?.modifiers, [SidedModifier(.command, .right)])
         XCTAssertEqual(plan.slot1?.sideAgnostic, false)
         XCTAssertNil(plan.slot2)
         XCTAssertNil(plan.notice)

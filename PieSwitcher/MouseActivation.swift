@@ -135,16 +135,20 @@ enum MouseActivationMethod: Int, CaseIterable, Sendable, Hashable {
 /// live monitor so a Preferences change applies on the next summon with no relaunch.
 ///
 /// The pre-Bringr-93j.96 key (`activation.mouse.leftRightClick`) is abandoned, not migrated —
-/// matching the project's no-compat-shim convention. New installs get `{leftRight}` by default
-/// so the out-of-box mouse trigger is unchanged.
+/// matching the project's no-compat-shim convention. Bringr-93j.113 flipped the fresh-install
+/// default from `{leftRight}` to `{middle}`: Left and Right are too easy to fire by accident
+/// during normal app use, while Middle is rarely bound elsewhere on macOS and is a natural
+/// fit for "summon a menu". Combined with the hold-delay floor below, this is low-collision.
 enum MouseActivationConfig {
     /// `UserDefaults` key for the methods bitmask. One source of truth shared by Preferences
     /// `@AppStorage` and the monitor's reader, so the two cannot drift.
     static let methodsDefaultsKey = "activation.mouse.methods"
 
-    /// Default methods: the left+right click chord. Matches the pre-93j.96 default so an
-    /// upgrading user keeps the same mouse trigger on first launch.
-    static let defaultMethods: Set<MouseActivationMethod> = [.leftRight]
+    /// Default methods: the Middle button (Bringr-93j.113). Replaces the pre-93j.113 left+right
+    /// chord default — Middle is one of the least-used mouse buttons on macOS (its only common
+    /// roles are closing tabs and opening links in new tabs in browsers) and it has no scroll
+    /// behaviour, which makes it the least disruptive button to capture.
+    static let defaultMethods: Set<MouseActivationMethod> = [.middle]
 
     /// The persisted set of enabled methods. An absent key returns the default; a stored 0
     /// means "the user unchecked every method" (mouse activation disabled), distinct from
@@ -285,10 +289,15 @@ enum MouseActivationHoldDelay {
     /// (`activation.holdDelayMilliseconds`) so each input source carries its own delay.
     static let defaultsKey = "activation.mouse.holdDelayMilliseconds"
 
-    /// 0 ms by default per the Bringr-93j.96 spec: the existing left+right chord fired as soon
-    /// as both buttons were held, so a fresh install preserves that "fire on simultaneity"
-    /// feel until the user picks a longer delay.
-    static let defaultMilliseconds: Double = 0
+    /// 150 ms by default (Bringr-93j.113). The previous 0 ms default suited the left+right
+    /// chord (pressing two specific buttons together is already an intentional signal); with
+    /// the fresh-install default now Middle alone, a hold delay is what separates a normal
+    /// middle-click from a deliberate summon — without it, picking Middle as the activation
+    /// method would silently break normal middle-click. 150 ms is well above the tap envelope
+    /// of a normal click while still feeling fast for a deliberate hold. The user can drop it
+    /// back to 0 if they want immediate summons, in which case the single-button floor below
+    /// kicks in for single-button methods so click-vs-hold still works.
+    static let defaultMilliseconds: Double = 150
 
     /// The slider/field bounds, in milliseconds. 0 = no delay (fire on simultaneous press);
     /// 1000 ms is the spec's upper bound.

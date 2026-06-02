@@ -29,7 +29,12 @@ enum KeyboardNavigation {
     /// commits that app (and its active window) instead of reverting. Default OFF.
     static let commitAppWithoutWindowChoiceKey = "keyboardNav.commitAppWithoutWindowChoice"
 
-    static let enabledDefault = false
+    /// ON by default (Bringr-93j.113): keyboard navigation is part of the converged "best
+    /// combination" — the wheel reacts to the number keys (and optionally arrow keys) the
+    /// moment it's open, with no extra setup needed. The reader presence-checks so an
+    /// explicitly stored `false` keeps the wheel keyboard-silent without the ON default
+    /// silently flipping it back.
+    static let enabledDefault = true
     /// Off by default (Bringr-93j.93): number keys carry the keyboard navigation, so arrows
     /// are opt-in for those who want both.
     static let arrowsDefault = false
@@ -41,10 +46,19 @@ enum KeyboardNavigation {
     /// the natural "close this" key and stays consumed), turning it on can't eat keystrokes —
     /// so making it the default is safe and matches what most users expect.
     static let closeOnUnsupportedDefault = true
-    static let commitAppWithoutWindowChoiceDefault = false
+    /// ON by default (Bringr-93j.113): after a number jumps to a multi-window app, releasing
+    /// the trigger commits that app's active window instead of cancelling. Pairs naturally
+    /// with the "type a number to switch" flow — pressing 3 should reach an app's window
+    /// straight away even when the app has several. The reader presence-checks so an
+    /// explicitly stored `false` survives without the ON default silently flipping it back.
+    static let commitAppWithoutWindowChoiceDefault = true
 
+    /// Whether keyboard navigation is enabled. Default ON (Bringr-93j.113), so the unset case
+    /// is presence-checked explicitly: `bool(forKey:)` alone returns `false` for an absent key,
+    /// which would silently flip the intended default (mirroring `closesOnUnsupportedKey`).
     static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: enabledKey)
+        guard defaults.object(forKey: enabledKey) != nil else { return enabledDefault }
+        return defaults.bool(forKey: enabledKey)
     }
 
     static func arrowsEnabled(from defaults: UserDefaults = .standard) -> Bool {
@@ -70,8 +84,15 @@ enum KeyboardNavigation {
         return defaults.bool(forKey: closeOnUnsupportedKey)
     }
 
+    /// Whether a number-jumped multi-window app commits on release without a window pick.
+    /// Default ON (Bringr-93j.113), so the unset case is presence-checked explicitly:
+    /// `bool(forKey:)` alone returns `false` for an absent key, which would silently flip
+    /// the intended default (mirroring `closesOnUnsupportedKey`).
     static func commitsAppWithoutWindowChoice(from defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: commitAppWithoutWindowChoiceKey)
+        guard defaults.object(forKey: commitAppWithoutWindowChoiceKey) != nil else {
+            return commitAppWithoutWindowChoiceDefault
+        }
+        return defaults.bool(forKey: commitAppWithoutWindowChoiceKey)
     }
 
     /// A true-defaulted toggle: an absent key yields `true`, so an unset key still reads as

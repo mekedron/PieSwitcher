@@ -79,8 +79,12 @@ final class OnboardingSuggestionsTests: XCTestCase {
     }
 
     func testSuggestionsAreInPresentationOrder() {
+        // Bringr-93j.113: Right Command leads as the new fresh-install default, so the
+        // chip a user reaches for to restore the default is first; Right Option and Fn
+        // follow as one-click alternatives for users on layouts where Right Command is
+        // awkward.
         let ids = OnboardingShortcutSuggestion.all.map(\.id)
-        XCTAssertEqual(ids, ["right-option", "fn", "right-command"])
+        XCTAssertEqual(ids, ["right-command", "right-option", "fn"])
     }
 
     // MARK: -

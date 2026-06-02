@@ -28,11 +28,15 @@ enum KeyboardShortcutStore {
     /// preferences UI. Empty / absent string means "no pending notice".
     static let pendingMigrationNoticeKey = "activation.keyboard.pendingMigrationNotice"
 
-    /// The default for fresh installs (Bringr-93j.111 AC): a side-specific Right Option
-    /// held alone. Right Option rarely collides with system shortcuts so it's the
-    /// safest out-of-the-box choice; the user can re-record it in the picker.
+    /// The default for fresh installs (Bringr-93j.113): a side-specific Right Command
+    /// held alone. Right Option — the prior default — collides with the dead-key
+    /// modifier on many European keyboard layouts (Option-N → ñ, Option-U → ¨), so a
+    /// hold there interferes with normal typing. Right Command is much less commonly
+    /// used as a system-wide modifier, so it's a safer out-of-the-box choice that
+    /// still respects the "use a hand-specific modifier" principle. The user can
+    /// re-record it in the picker.
     static let freshInstallSlot1 = KeyboardShortcut(
-        modifiers: [SidedModifier(.option, .right)],
+        modifiers: [SidedModifier(.command, .right)],
         keyCode: nil,
         sideAgnostic: false
     )
