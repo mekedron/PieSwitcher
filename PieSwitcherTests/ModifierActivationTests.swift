@@ -2,10 +2,10 @@ import CoreGraphics
 import XCTest
 @testable import PieSwitcher
 
-/// Covers the configurable keyboard-shortcut activation (Bringr-93j.35, Bringr-93j.69): the
-/// `CGEventFlags` reduction, the persisted modifier-combination reader, the armed-set
-/// computation, and the pure `ModifierHoldDetector` edge logic — all in isolation from the
-/// live event tap.
+/// Covers the legacy `ModifierCombination` type and bitmask-backed `ModifierActivation`
+/// helpers. Bringr-93j.111 retired the live detector/monitor surface tested here in favour
+/// of the side-aware `KeyboardShortcut` model (see `KeyboardShortcutTests`); these tests
+/// stay because the legacy bitmask remains the migration source.
 final class ModifierActivationTests: XCTestCase {
 
     // MARK: - CGEventFlags → ModifierCombination
@@ -58,93 +58,6 @@ final class ModifierActivationTests: XCTestCase {
         let defaults = makeDefaults()
         defaults.set(ModifierCombination.function.rawValue | (1 << 20), forKey: ModifierActivation.keyboardDefaultsKey)
         XCTAssertEqual(ModifierActivation.keyboard(from: defaults), .function)
-    }
-
-    // MARK: - Armed combinations
-
-    func testArmedByDefaultIsKeyboardFnOnly() {
-        // Fresh install: the keyboard shortcut defaults to Fn, so Fn is the one armed combo;
-        // the mouse uses left+right click, which is not a modifier combination.
-        XCTAssertEqual(ModifierActivation.armedCombinations(from: makeDefaults()), [.function])
-    }
-
-    func testChosenKeyboardComboIsArmed() {
-        // Bringr-93j.69: one unified keyboard combination, so the armed set is exactly it.
-        let defaults = makeDefaults()
-        defaults.set(ModifierCombination([.command, .option]).rawValue, forKey: ModifierActivation.keyboardDefaultsKey)
-        XCTAssertEqual(ModifierActivation.armedCombinations(from: defaults), [[.command, .option]])
-    }
-
-    func testClearedKeyboardDisarmsEverything() {
-        // Unchecking every key (stored 0) disables the keyboard path entirely, so nothing is
-        // armed — the mouse's left+right click is then the only remaining trigger.
-        let defaults = makeDefaults()
-        defaults.set(0, forKey: ModifierActivation.keyboardDefaultsKey)
-        XCTAssertTrue(ModifierActivation.armedCombinations(from: defaults).isEmpty)
-    }
-
-    // MARK: - Detector: rising/falling edges
-
-    func testHoldingAnArmedComboPressesThenReleases() {
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .function, armed: [.function]), .press)
-        XCTAssertEqual(detector.handle(held: .function, armed: [.function]), .none, "no re-press while still held")
-        XCTAssertEqual(detector.handle(held: [], armed: [.function]), .release)
-        XCTAssertEqual(detector.handle(held: [], armed: [.function]), .none, "no re-release once idle")
-    }
-
-    func testMatchingIsExactSoExtraModifiersDoNotPress() {
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: [.function, .shift], armed: [.function]), .none,
-                       "holding Fn+Shift is not exactly Fn")
-    }
-
-    func testAddingAModifierToAnActiveComboReleasesIt() {
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .command, armed: [.command]), .press)
-        XCTAssertEqual(detector.handle(held: [.command, .shift], armed: [.command]), .release,
-                       "⌘⇧ is no longer the armed ⌘, so the menu gets out of the way")
-    }
-
-    func testCombinationRequiresEveryKey() {
-        let armed: [ModifierCombination] = [[.function, .control]]
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .function, armed: armed), .none, "Fn alone is not the full combo")
-        XCTAssertEqual(detector.handle(held: [.function, .control], armed: armed), .press)
-        XCTAssertEqual(detector.handle(held: .function, armed: armed), .release, "dropping Control ends it")
-    }
-
-    func testStaysActiveAcrossDistinctArmedCombos() {
-        // With two armed combos, sliding from one to the other never re-fires: it stays
-        // active until no armed combo is held.
-        let armed: [ModifierCombination] = [.function, [.command, .option]]
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .function, armed: armed), .press)
-        XCTAssertEqual(detector.handle(held: [.command, .option], armed: armed), .none,
-                       "moved to the other armed combo while still matching — no second press")
-        XCTAssertEqual(detector.handle(held: [], armed: armed), .release)
-    }
-
-    func testNoArmedCombosNeverPresses() {
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .function, armed: []), .none)
-        XCTAssertEqual(detector.handle(held: [.command, .shift], armed: []), .none)
-    }
-
-    func testEmptyArmedEntryIsIgnored() {
-        var detector = ModifierHoldDetector()
-        // An empty armed combination can never be "held" — releasing all keys must not
-        // be read as matching it.
-        XCTAssertEqual(detector.handle(held: [], armed: [[]]), .none)
-    }
-
-    func testResetClearsLatchedActivation() {
-        var detector = ModifierHoldDetector()
-        XCTAssertEqual(detector.handle(held: .function, armed: [.function]), .press)
-        detector.reset()
-        // After reset the prior hold is forgotten: still holding Fn presses afresh rather
-        // than being treated as already-active.
-        XCTAssertEqual(detector.handle(held: .function, armed: [.function]), .press)
     }
 
     // MARK: - Names (Preferences caption)

@@ -48,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !AppDelegate.isRunningTests else { return }
 
         permissions.startMonitoring()
+        // Bringr-93j.111: migrate the legacy `activation.keyboard.modifiers` bitmask into
+        // the new two-slot shortcut model before any monitor reads from defaults, so the
+        // first event tap callback already sees the migrated configuration.
+        KeyboardShortcutStore.runMigrationIfNeeded()
         prewarmRadialMenu()
         // Pre-warm the hold-progress indicator before the activation monitors so their
         // initialisers can capture a non-nil reference for the progress callbacks.

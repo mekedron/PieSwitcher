@@ -123,6 +123,14 @@
 		1A0000000000000000000120 /* RadialAppearanceSplitLabelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011F /* RadialAppearanceSplitLabelsTests.swift */; };
 		1A00000000000000000000F1 /* SparkleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000F0 /* SparkleUpdater.swift */; };
 		1A00000000000000000000F3 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00000000000000000000F2 /* Sparkle */; };
+		1A0000000000000000000121 /* KeyboardShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000122 /* KeyboardShortcut.swift */; };
+		1A0000000000000000000123 /* KeyboardShortcutMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000124 /* KeyboardShortcutMatching.swift */; };
+		1A0000000000000000000125 /* KeyboardShortcutStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000126 /* KeyboardShortcutStorage.swift */; };
+		1A0000000000000000000127 /* KeyboardShortcutCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000128 /* KeyboardShortcutCapture.swift */; };
+		1A0000000000000000000129 /* KeyboardShortcutPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000012A /* KeyboardShortcutPickerView.swift */; };
+		1A000000000000000000012B /* KeyboardShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000012C /* KeyboardShortcutTests.swift */; };
+		1A000000000000000000012D /* KeyboardShortcutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000012E /* KeyboardShortcutMigrationTests.swift */; };
+		1A000000000000000000012F /* KeyboardShortcutParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000130 /* KeyboardShortcutParserTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -253,6 +261,14 @@
 		1A0000000000000000000118 /* ActivationExclusionList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionList.swift; sourceTree = "<group>"; };
 		1A000000000000000000011A /* ActivationExclusionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionSettingsView.swift; sourceTree = "<group>"; };
 		1A000000000000000000011C /* ActivationExclusionListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationExclusionListTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000122 /* KeyboardShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcut.swift; sourceTree = "<group>"; };
+		1A0000000000000000000124 /* KeyboardShortcutMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMatching.swift; sourceTree = "<group>"; };
+		1A0000000000000000000126 /* KeyboardShortcutStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutStorage.swift; sourceTree = "<group>"; };
+		1A0000000000000000000128 /* KeyboardShortcutCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutCapture.swift; sourceTree = "<group>"; };
+		1A000000000000000000012A /* KeyboardShortcutPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutPickerView.swift; sourceTree = "<group>"; };
+		1A000000000000000000012C /* KeyboardShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutTests.swift; sourceTree = "<group>"; };
+		1A000000000000000000012E /* KeyboardShortcutMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutMigrationTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000130 /* KeyboardShortcutParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutParserTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -322,6 +338,11 @@
 				1A00000000000000000000FB /* MouseChordMonitor+Timers.swift */,
 				1A0000000000000000000053 /* ModifierActivation.swift */,
 				1A00000000000000000000B6 /* ModifierHoldDelay.swift */,
+				1A0000000000000000000122 /* KeyboardShortcut.swift */,
+				1A0000000000000000000124 /* KeyboardShortcutMatching.swift */,
+				1A0000000000000000000126 /* KeyboardShortcutStorage.swift */,
+				1A0000000000000000000128 /* KeyboardShortcutCapture.swift */,
+				1A000000000000000000012A /* KeyboardShortcutPickerView.swift */,
 				1A00000000000000000000B8 /* AppIgnoreList.swift */,
 				1A00000000000000000000BE /* SpaceSupport.swift */,
 				1A00000000000000000000BA /* IgnoreListSettingsView.swift */,
@@ -390,6 +411,9 @@
 				1A0000000000000000000065 /* RadialMenuControllerHoverTests.swift */,
 				1A0000000000000000000051 /* WindowMemoryTests.swift */,
 				1A0000000000000000000055 /* ModifierActivationTests.swift */,
+				1A000000000000000000012C /* KeyboardShortcutTests.swift */,
+				1A000000000000000000012E /* KeyboardShortcutMigrationTests.swift */,
+				1A0000000000000000000130 /* KeyboardShortcutParserTests.swift */,
 				1A000000000000000000005B /* RevealStateTests.swift */,
 				1A000000000000000000005F /* RadialAppearanceTests.swift */,
 				1A0000000000000000000072 /* RevealStrategyTests.swift */,
@@ -552,6 +576,11 @@
 				1A00000000000000000000FC /* MouseChordMonitor+Timers.swift in Sources */,
 				1A0000000000000000000054 /* ModifierActivation.swift in Sources */,
 				1A00000000000000000000B5 /* ModifierHoldDelay.swift in Sources */,
+				1A0000000000000000000121 /* KeyboardShortcut.swift in Sources */,
+				1A0000000000000000000123 /* KeyboardShortcutMatching.swift in Sources */,
+				1A0000000000000000000125 /* KeyboardShortcutStorage.swift in Sources */,
+				1A0000000000000000000127 /* KeyboardShortcutCapture.swift in Sources */,
+				1A0000000000000000000129 /* KeyboardShortcutPickerView.swift in Sources */,
 				1A00000000000000000000B7 /* AppIgnoreList.swift in Sources */,
 				1A00000000000000000000BD /* SpaceSupport.swift in Sources */,
 				1A00000000000000000000B9 /* IgnoreListSettingsView.swift in Sources */,
@@ -620,6 +649,9 @@
 				1A0000000000000000000066 /* RadialMenuControllerHoverTests.swift in Sources */,
 				1A0000000000000000000052 /* WindowMemoryTests.swift in Sources */,
 				1A0000000000000000000056 /* ModifierActivationTests.swift in Sources */,
+				1A000000000000000000012B /* KeyboardShortcutTests.swift in Sources */,
+				1A000000000000000000012D /* KeyboardShortcutMigrationTests.swift in Sources */,
+				1A000000000000000000012F /* KeyboardShortcutParserTests.swift in Sources */,
 				1A000000000000000000005C /* RevealStateTests.swift in Sources */,
 				1A0000000000000000000060 /* RadialAppearanceTests.swift in Sources */,
 				1A0000000000000000000071 /* RevealStrategyTests.swift in Sources */,

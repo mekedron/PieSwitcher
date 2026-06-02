@@ -1,30 +1,27 @@
 import SwiftUI
 
-/// The Keyboard pane of the Activation tab (Bringr-93j.106). Lives in its own file and
-/// `@AppStorage` so `PreferencesView` stays within its length budget, mirroring
-/// `MouseActivationSettings`. Every key is read fresh per event by
-/// `ModifierHoldMonitor`, so a change takes effect with no relaunch. Folded into a
-/// `PreferencesPane` Form so the modifier checklist, hold delay, and interaction-mode
-/// picker stay column-aligned with the rest of the window.
+/// The Keyboard pane of the Activation tab. Bringr-93j.111 replaced the modifier-
+/// checkbox picker with the two-slot `KeyboardShortcutPicker`, which can bind bare
+/// modifiers (with explicit left/right) and modifier+key combinations. Every key is
+/// read fresh per event by `ModifierHoldMonitor`, so a change takes effect with no
+/// relaunch. Folded into a `PreferencesPane` Form so the picker, hold delay, and
+/// interaction-mode picker stay column-aligned with the rest of the window.
 struct KeyboardActivationSettings: View {
-    @AppStorage(ModifierActivation.keyboardDefaultsKey)
-    private var keyboardModifiersRaw = ModifierActivation.keyboardDefault.rawValue
     @AppStorage(ActivationHoldDelay.defaultsKey)
     private var delayMilliseconds = ActivationHoldDelay.defaultMilliseconds
     @AppStorage(InteractionMode.keyboardDefaultsKey)
     private var modeRaw = InteractionMode.defaultForKeyboard.rawValue
 
     var body: some View {
-        let combo = ModifierCombination(rawValue: keyboardModifiersRaw).intersection(.all)
         PreferencesPane {
             Section {
-                ModifierKeysPicker(rawValue: $keyboardModifiersRaw)
+                KeyboardShortcutPicker()
             } header: {
-                Text("Modifier keys")
+                Text("Shortcuts")
             } footer: {
-                Text(combo.isEmpty
-                     ? "Pick one or more modifier keys to hold. Until then, the keyboard can't summon the wheel."
-                     : "Hold \(combo.names) to summon the wheel — no click or tap needed — then release to choose.")
+                Text("Hold a shortcut to summon the wheel — no click or tap needed — then release "
+                     + "to choose. Each slot accepts a single modifier held alone (e.g. Right Option) "
+                     + "or a modifier+key combination. Left and right modifiers are distinct.")
             }
 
             Section {
@@ -65,32 +62,6 @@ struct KeyboardActivationSettings: View {
             return "Tap the modifier keys to open the wheel; it stays open. Click a slice to "
                  + "choose, or the centre to cancel."
         }
-    }
-}
-
-/// A row of checkboxes for the five modifier keys, backed by a bitmask in `UserDefaults`
-/// so any combination round-trips through one `@AppStorage` value (Bringr-93j.35).
-struct ModifierKeysPicker: View {
-    @Binding var rawValue: Int
-
-    var body: some View {
-        HStack(spacing: 14) {
-            ForEach(ModifierCombination.keys) { key in
-                Toggle(key.name, isOn: binding(for: key.modifier))
-                    .toggleStyle(.checkbox)
-            }
-        }
-    }
-
-    private func binding(for modifier: ModifierCombination) -> Binding<Bool> {
-        Binding(
-            get: { ModifierCombination(rawValue: rawValue).contains(modifier) },
-            set: { isOn in
-                var combo = ModifierCombination(rawValue: rawValue).intersection(.all)
-                if isOn { combo.insert(modifier) } else { combo.remove(modifier) }
-                rawValue = combo.rawValue
-            }
-        )
     }
 }
 

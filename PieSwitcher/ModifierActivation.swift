@@ -62,25 +62,24 @@ struct ModifierCombination: OptionSet, Hashable, Sendable {
 // was replaced by the multi-method `MouseActivationConfig` in `MouseActivation.swift`. The
 // keyboard side intentionally stays separate so each input source carries its own settings.
 
-// MARK: - Persisted modifier combinations
+// MARK: - Persisted modifier combinations (legacy)
 
-/// The persisted keyboard-shortcut activation — one held modifier combination — plus the
-/// set of combinations currently "armed". Read fresh like the other settings, so a change
-/// applies immediately without a relaunch.
+/// The pre-Bringr-93j.111 persisted keyboard-shortcut activation — one held modifier
+/// combination stored as a bitmask. Kept around purely as the migration source for the
+/// new two-slot picker (see `KeyboardShortcutStore.runMigrationIfNeeded`); the new code
+/// path reads `KeyboardShortcutStore.armedShortcuts()` instead.
 ///
-/// Bringr-93j.69 unified the former separate mouse-modifier and trackpad-modifier settings
-/// into this single keyboard shortcut: the modifier hold is a global key event that never
-/// distinguished mouse from trackpad, so two persisted combinations were redundant. The mouse
-/// keeps its own, independent left+right-click trigger (see `MouseChordActivation`).
+/// Bringr-93j.69 unified the former separate mouse-modifier and trackpad-modifier
+/// settings into this single keyboard shortcut. Bringr-93j.111 replaced it with the
+/// two-slot, side-aware picker; we keep this enum so the upgrade path can read it once
+/// and rewrite the user's intent into the new shape.
 enum ModifierActivation {
-    /// `UserDefaults` key backing the persisted combination. The pre-Bringr-93j.69 keys
-    /// (`activation.mouse.modifiers`, `activation.trackpad.modifiers`) are abandoned, not
-    /// migrated — matching the project's no-compat-shim convention.
+    /// `UserDefaults` key backing the persisted bitmask. The migration planner reads
+    /// this once, then leaves it untouched — the new keys live alongside it.
     static let keyboardDefaultsKey = "activation.keyboard.modifiers"
 
-    /// Defaults to Fn: out of the box, holding Fn summons the menu with no mouse or trackpad
-    /// gesture. This was the prior trackpad default and is the only summon method on a laptop
-    /// without an external mouse.
+    /// Pre-Bringr-93j.111 default: Fn. Only used when the migration planner runs into
+    /// an upgrader whose legacy key is present but holds an invalid value.
     static let keyboardDefault: ModifierCombination = .function
 
     static func keyboard(from defaults: UserDefaults = .standard) -> ModifierCombination {
@@ -98,76 +97,30 @@ enum ModifierActivation {
         guard let raw = defaults.object(forKey: key) as? Int else { return fallback }
         return ModifierCombination(rawValue: raw).intersection(.all)
     }
-
-    /// Every modifier combination that should summon the menu right now: the single keyboard
-    /// shortcut, included only when non-empty so unchecking every key disables the keyboard
-    /// path rather than arming "no modifiers". Independent of the mouse's left+right-click
-    /// trigger (see `MouseChordActivation`), which is not a modifier combination and so is
-    /// not represented here. Returned as an array because the detector matches against a set
-    /// of armed combinations (a shape that also leaves room for future per-menu shortcuts).
-    static func armedCombinations(from defaults: UserDefaults = .standard) -> [ModifierCombination] {
-        let keyboard = keyboard(from: defaults)
-        return keyboard.isEmpty ? [] : [keyboard]
-    }
 }
 
-// MARK: - Detector (pure)
+// MARK: - Live monitor (CGEventTap on flagsChanged + keyDown/keyUp)
 
-/// Recognises when the held modifiers match one of the armed combinations, emitting a
-/// single `press` on the rising edge and a single `release` on the falling edge — the
-/// same press/release shape the hold-capable triggers feed the interaction state machine
-/// (US-009). Pure and value-typed, so the edge logic is unit-tested without an event tap.
+/// Watches global key changes through a `CGEventTap` and fires `onPress` / `onRelease`
+/// when the held state matches an armed `KeyboardShortcut` (Bringr-93j.35 / Bringr-93j.111).
+/// The keyboard shortcut is the only summon method on a laptop without an external mouse.
 ///
-/// Matching is *exact*: the held set must equal an armed set. Holding extra modifiers
-/// never summons, and adding a modifier to an active combination ends it — so a genuine
-/// shortcut like ⌘⇧4 never fires a ⌘-armed trigger, and the menu gets out of the way the
-/// moment the chord changes.
-struct ModifierHoldDetector {
-    enum Reaction: Equatable, Sendable {
-        case none
-        case press
-        case release
-    }
-
-    /// Whether an armed combination is currently held. Read-only to callers; only
-    /// `handle` transitions it, so the detector is the single source of truth.
-    private(set) var isActive = false
-
-    /// Feed the currently-held modifiers and the armed combinations and get the edge.
-    mutating func handle(held: ModifierCombination, armed: [ModifierCombination]) -> Reaction {
-        let matches = armed.contains { !$0.isEmpty && $0 == held }
-        switch (matches, isActive) {
-        case (true, false):
-            isActive = true
-            return .press
-        case (false, true):
-            isActive = false
-            return .release
-        case (true, true), (false, false):
-            return .none
-        }
-    }
-
-    /// Clear the latched state, so a stale hold from a previous session never resolves
-    /// into a new one. Called when the monitor (re)starts.
-    mutating func reset() { isActive = false }
-}
-
-// MARK: - Live monitor (CGEventTap on flagsChanged)
-
-/// Watches global modifier-key changes through a `CGEventTap` and fires `onPress` /
-/// `onRelease` when the held modifiers start / stop matching an armed combination
-/// (Bringr-93j.35). This is the keyboard shortcut — the only summon method on a laptop
-/// without an external mouse; it replaces the unreliable three-finger trackpad press.
+/// The tap **never consumes** an event — modifier keys and ordinary typing must keep
+/// working everywhere — it only observes and always passes the event through. It needs
+/// Accessibility permission like the mouse-chord tap, so `start()` fails gracefully
+/// without it and is retried once permission is granted. The armed shortcuts are read
+/// fresh on every change, so a Preferences change takes effect immediately with no
+/// relaunch.
 ///
-/// The tap **never consumes** an event — modifier keys must keep working everywhere — it
-/// only observes and always passes the event through. It needs Accessibility permission
-/// like the mouse-chord tap, so `start()` fails gracefully without it and is retried once
-/// permission is granted. The armed combinations are read fresh on every change, so a
-/// Preferences change takes effect immediately with no relaunch.
+/// Bringr-93j.111 widened the tap from `flagsChanged` only to `flagsChanged + keyDown +
+/// keyUp` so combo shortcuts like "Right Option + Space" can fire. The handler is still
+/// O(1) per event, so the extra coverage doesn't add noticeable latency to typing.
 @MainActor
 final class ModifierHoldMonitor {
-    private var detector = ModifierHoldDetector()
+    private var detector = KeyboardShortcutDetector()
+    /// Current held-keys snapshot. Updated incrementally on every event so the matcher
+    /// can answer "does anything match right now?" cheaply.
+    private var held = HeldKeys.empty
     /// Gates the rising edge behind the hold delay (Bringr-93j.58): a press is delivered
     /// only after the keys survive the delay, and a release before then cancels it.
     private var delayGate = ModifierHoldDelayGate()
@@ -181,9 +134,9 @@ final class ModifierHoldMonitor {
     /// Fires when the hold-delay timer is cancelled or completes (Bringr-93j.103), so the
     /// progress indicator clears.
     private let onProgressEnd: () -> Void
-    /// The armed combinations, read fresh on each modifier change so Preferences edits
-    /// apply at once. Injected so tests can pass fixed combinations.
-    private let armedProvider: () -> [ModifierCombination]
+    /// The armed shortcuts, read fresh on each event so Preferences edits apply at once.
+    /// Injected so tests can pass fixed shortcuts.
+    private let armedProvider: () -> [KeyboardShortcut]
     /// The hold delay in seconds, read fresh on each rising edge so a Preferences change
     /// applies on the next hold. Injected so tests can pin a value.
     private let delayProvider: () -> TimeInterval
@@ -203,7 +156,7 @@ final class ModifierHoldMonitor {
     init(
         onPress: @escaping () -> Void,
         onRelease: @escaping () -> Void = {},
-        armedProvider: @escaping () -> [ModifierCombination] = { ModifierActivation.armedCombinations() },
+        armedProvider: @escaping () -> [KeyboardShortcut] = { KeyboardShortcutStore.armedShortcuts() },
         delayProvider: @escaping () -> TimeInterval = { ActivationHoldDelay.current() },
         exclusionProvider: @escaping () -> Bool = {
             ActivationExclusionList.shouldSuppressActivation(
@@ -232,7 +185,11 @@ final class ModifierHoldMonitor {
     func start() -> Bool {
         guard eventTap == nil else { return true }
 
-        let mask: CGEventMask = 1 << CGEventType.flagsChanged.rawValue
+        // Bringr-93j.111 widens the mask: combo shortcuts like "Right Option + Space" need
+        // keyDown/keyUp too. We still never consume — the user keeps typing through us.
+        let mask: CGEventMask = (1 << CGEventType.flagsChanged.rawValue)
+            | (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.keyUp.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<ModifierHoldMonitor>.fromOpaque(userInfo).takeUnretainedValue()
@@ -260,6 +217,7 @@ final class ModifierHoldMonitor {
         eventTap = tap
         runLoopSource = source
         detector.reset()
+        held = .empty
         clearPendingPress()
         log.info("Modifier-hold tap installed.")
         return true
@@ -272,6 +230,7 @@ final class ModifierHoldMonitor {
         eventTap = nil
         runLoopSource = nil
         detector.reset()
+        held = .empty
         clearPendingPress()
     }
 
@@ -281,21 +240,51 @@ final class ModifierHoldMonitor {
             if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
-        guard type == .flagsChanged else { return Unmanaged.passUnretained(event) }
+        guard updateHeldSnapshot(type: type, event: event) else {
+            return Unmanaged.passUnretained(event)
+        }
+        applyEdge(detector.handle(held: held, armed: armedProvider()))
+        return Unmanaged.passUnretained(event)
+    }
 
-        let held = ModifierCombination(cgFlags: event.flags)
-        switch detector.handle(held: held, armed: armedProvider()) {
+    /// Refresh `held` from the event. Returns `false` for event types we don't care
+    /// about, so the caller can short-circuit without invoking the detector.
+    private func updateHeldSnapshot(type: CGEventType, event: CGEvent) -> Bool {
+        switch type {
+        case .flagsChanged:
+            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
+            return true
+        case .keyDown:
+            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
+            held.nonModifierKey = Int(event.getIntegerValueField(.keyboardEventKeycode))
+            return true
+        case .keyUp:
+            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
+            let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+            // Only clear the slot if the released key matches the one we were tracking;
+            // releasing a different key (rare during normal typing) shouldn't blank
+            // our snapshot.
+            if held.nonModifierKey == keyCode { held.nonModifierKey = nil }
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// React to a detector edge. Press fires through the hold-delay gate (unless the
+    /// frontmost app is on the exclusion list); release propagates straight through.
+    private func applyEdge(_ edge: KeyboardShortcutDetector.Reaction) {
+        switch edge {
         case .press:
             // Frontmost-app exclusion (Bringr-93j.109): a fresh hold over an excluded app is
             // dropped, but the detector still tracks state so a later release of the same hold
             // (via the .release branch below) flows through cleanly — the gate stays idle, so
             // `handleRelease` returns `.ignore` and no stray dismiss fires.
-            guard !exclusionProvider() else { break }
+            guard !exclusionProvider() else { return }
             scheduleDelayedPress()
         case .release: handleRelease()
         case .none: break
         }
-        return Unmanaged.passUnretained(event)
     }
 
     // MARK: - Hold delay (Bringr-93j.58)
