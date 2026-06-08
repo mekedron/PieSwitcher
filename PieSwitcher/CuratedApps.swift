@@ -117,7 +117,7 @@ enum CuratedApps {
     /// summon, so a Preferences change applies on the next open without a relaunch. Falls
     /// back to the ON default when unset: `bool(forKey:)` alone returns `false` for an absent
     /// key, which would silently flip the intended default, so the unset case is checked
-    /// explicitly (mirroring `RadialAppearance.usesLiquidGlass`).
+    /// explicitly (mirroring `RadialAppearance.skipSingleWindowLevel`).
     static func showsOtherRunningApps(from defaults: UserDefaults = .standard) -> Bool {
         guard defaults.object(forKey: showOtherRunningAppsDefaultsKey) != nil else {
             return showOtherRunningAppsDefault

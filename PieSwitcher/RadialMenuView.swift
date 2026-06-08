@@ -51,7 +51,9 @@ struct RadialMenuView: View {
     private var glass: some View {
         RadialGlassBackdrop(
             shape: RadialGlassShape(layouts: controller.rings.map(\.layout)),
-            usesLiquidGlass: controller.appearance.usesLiquidGlass
+            style: controller.appearance.glassStyle,
+            tint: controller.appearance.glassTint.tintColor,
+            fallbackMaterial: controller.appearance.offMaterialThickness.material
         )
         .frame(width: controller.overallDiameter, height: controller.overallDiameter)
         .shadow(color: .black.opacity(controller.appearance.glassShadowOpacity), radius: 12, y: 4)
@@ -108,27 +110,36 @@ struct RadialMenuView: View {
 }
 
 /// The wheel's single Liquid Glass backdrop, clipped to `shape` (the union of every
-/// visible ring's wedges). `Color.clear` carries the genuine `.regular` material on
-/// macOS 26+ because glass is a backdrop layer, independent of content alpha. When the
-/// user turns Liquid Glass off (`usesLiquidGlass == false`), or on any OS before macOS
-/// 26 which has no Liquid Glass, it falls back to a frosted `.ultraThinMaterial` in the
-/// same shape, lifted with a soft top-down sheen so the wheel still reads as a defined
-/// translucent object rather than a flat blur. The toggle reuses that fallback verbatim,
-/// so it doubles as a way to preview the pre-macOS-26 look on a current OS.
+/// visible ring's wedges). `Color.clear` carries the genuine material on macOS 26+
+/// because glass is a backdrop layer, independent of content alpha. The Appearance
+/// picker (Bringr-93j.115) chooses the variant: `.clear` is the most see-through and
+/// the shipped default; `.regular` is Apple's heavier frosted variant; `.off` — and any
+/// OS before macOS 26, which has no Liquid Glass — falls back to a frosted
+/// `.ultraThinMaterial` in the same shape, lifted with a soft top-down sheen so the
+/// wheel still reads as a defined translucent object rather than a flat blur. The
+/// off path reuses that fallback verbatim, so it doubles as a way to preview the
+/// pre-macOS-26 look on a current OS.
 struct RadialGlassBackdrop: View {
     let shape: RadialGlassShape
-    /// US-014: when false, skip the genuine Liquid Glass material and use the frosted
-    /// fallback even on macOS 26+.
-    let usesLiquidGlass: Bool
+    /// US-014 / Bringr-93j.115: which Liquid Glass variant to render, or off for the
+    /// frosted fallback (forced on macOS < 26, where Liquid Glass doesn't exist).
+    let style: RadialGlassStyle
+
+    /// Tint applied to the genuine Liquid Glass material via `Glass.tint(...)`. `nil` when
+    /// the user's tint has alpha 0, so the wheel renders untinted on the no-tint default.
+    let tint: Color?
+    /// Material picked for the `.off` fallback path (Bringr-93j.117). The five SwiftUI
+    /// materials run from light to heavy blur, so Off mode acts as a real blur knob.
+    let fallbackMaterial: Material
 
     var body: some View {
-        if #available(macOS 26.0, *), usesLiquidGlass {
+        if #available(macOS 26.0, *), style != .off {
             GlassEffectContainer(spacing: 0) {
-                Color.clear.glassEffect(.regular, in: shape)
+                Color.clear.glassEffect(style.glass.tint(tint), in: shape)
             }
         } else {
             shape
-                .fill(.ultraThinMaterial)
+                .fill(fallbackMaterial)
                 .overlay(
                     LinearGradient(
                         colors: [.white.opacity(0.16), .white.opacity(0.02)],
@@ -137,6 +148,50 @@ struct RadialGlassBackdrop: View {
                     )
                     .clipShape(shape)
                 )
+        }
+    }
+}
+
+/// Bridge between the pure-value `RadialColor` and SwiftUI `Color` (Bringr-93j.117).
+/// The model has no SwiftUI dependency by design, so the conversion lives here next to
+/// the only renderer that needs it.
+extension Color {
+    init(_ color: RadialColor) {
+        self.init(.sRGB, red: color.red, green: color.green, blue: color.blue, opacity: color.alpha)
+    }
+}
+
+extension RadialColor {
+    /// `nil` when alpha is 0 — so the `Glass.tint(nil)` no-tint path is hit instead of
+    /// tinting with a transparent colour, which renders subtly differently.
+    var tintColor: Color? {
+        alpha == 0 ? nil : Color(self)
+    }
+}
+
+extension RadialMaterialThickness {
+    /// The SwiftUI `Material` that backs each picker step — light to heavy blur.
+    var material: Material {
+        switch self {
+        case .ultraThin: return .ultraThinMaterial
+        case .thin: return .thinMaterial
+        case .regular: return .regularMaterial
+        case .thick: return .thickMaterial
+        case .ultraThick: return .ultraThickMaterial
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+private extension RadialGlassStyle {
+    /// The `SwiftUI.Glass` variant that backs this picker option. `.off` is unused —
+    /// `RadialGlassBackdrop` branches on `style == .off` *before* asking for a Glass,
+    /// so this returns the safe identity in that case rather than crashing.
+    var glass: Glass {
+        switch self {
+        case .clear: return .clear
+        case .regular: return .regular
+        case .off: return .identity
         }
     }
 }
@@ -188,7 +243,7 @@ struct RadialRingEmphasis: View {
                 let isKeyboardFocus = isHovered && highlightSource == .keyboard
                 let wedge = RadialWedge(layout: ring.layout, index: index)
 
-                wedge.fill((isKeyboardFocus ? Color.accentColor : Color.white).opacity(
+                wedge.fill((isKeyboardFocus ? Color.accentColor : Color(appearance.sliceFillColor)).opacity(
                     appearance.fillOpacity(hovered: isHovered, prehighlighted: isPrehighlighted)
                 ))
                 wedge.stroke(
@@ -200,15 +255,15 @@ struct RadialRingEmphasis: View {
     }
 
     private func rimColor(hovered: Bool, prehighlighted: Bool, keyboardFocus: Bool) -> Color {
-        if hovered { return keyboardFocus ? Color.accentColor : Color.primary.opacity(0.85) }
-        if prehighlighted { return Color.primary.opacity(0.5) }
-        return Color.primary.opacity(0.14)
+        if hovered { return keyboardFocus ? Color.accentColor : Color.primary.opacity(appearance.hoverRimOpacity) }
+        if prehighlighted { return Color.primary.opacity(appearance.prehighlightRimOpacity) }
+        return Color.primary.opacity(appearance.restingRimOpacity)
     }
 
     private func rimWidth(hovered: Bool, prehighlighted: Bool) -> CGFloat {
-        if hovered { return 2 }
-        if prehighlighted { return 1.5 }
-        return 0.75
+        if hovered { return appearance.hoverRimWidth }
+        if prehighlighted { return appearance.prehighlightRimWidth }
+        return appearance.restingRimWidth
     }
 }
 

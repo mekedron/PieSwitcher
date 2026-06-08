@@ -23,7 +23,7 @@ final class RadialAppearanceTests: XCTestCase {
         defaults.set(0.4, forKey: RadialAppearance.opacityDefaultsKey)
         defaults.set(true, forKey: RadialAppearance.showsAppLabelsDefaultsKey)
         defaults.set(false, forKey: RadialAppearance.showsWindowLabelsDefaultsKey)
-        defaults.set(false, forKey: RadialAppearance.glassDefaultsKey)
+        defaults.set(RadialGlassStyle.off.rawValue, forKey: RadialAppearance.glassStyleDefaultsKey)
         defaults.set(40.0, forKey: RadialAppearance.innerPaddingDefaultsKey)
 
         let appearance = RadialAppearance.current(from: defaults)
@@ -31,21 +31,40 @@ final class RadialAppearanceTests: XCTestCase {
         XCTAssertEqual(appearance.fillOpacity, 0.4, accuracy: opacityAccuracy)
         XCTAssertTrue(appearance.showsAppLabels)
         XCTAssertFalse(appearance.showsWindowLabels)
-        XCTAssertFalse(appearance.usesLiquidGlass)
+        XCTAssertEqual(appearance.glassStyle, .off)
         XCTAssertEqual(appearance.innerRadiusPadding, 40, accuracy: accuracy)
     }
 
-    func testUsesLiquidGlassDefaultsOnAndRoundTrips() {
-        // Ships on, so the wheel defaults to the Liquid Glass look.
-        XCTAssertTrue(RadialAppearance.default.usesLiquidGlass)
-        XCTAssertTrue(RadialAppearance.current(from: makeDefaults()).usesLiquidGlass)
+    func testGlassStyleDefaultsClearAndRoundTrips() {
+        // Bringr-93j.115: ships as clear glass, the most see-through Liquid Glass variant.
+        XCTAssertEqual(RadialAppearance.default.glassStyle, .clear)
+        XCTAssertEqual(RadialAppearance.current(from: makeDefaults()).glassStyle, .clear)
 
-        // Persists both ways, so the toggle (and the fallback preview it enables) sticks.
+        // Persists every option, so the picker sticks.
         let defaults = makeDefaults()
-        defaults.set(false, forKey: RadialAppearance.glassDefaultsKey)
-        XCTAssertFalse(RadialAppearance.current(from: defaults).usesLiquidGlass)
-        defaults.set(true, forKey: RadialAppearance.glassDefaultsKey)
-        XCTAssertTrue(RadialAppearance.current(from: defaults).usesLiquidGlass)
+        for style in RadialGlassStyle.allCases {
+            defaults.set(style.rawValue, forKey: RadialAppearance.glassStyleDefaultsKey)
+            XCTAssertEqual(RadialAppearance.current(from: defaults).glassStyle, style)
+        }
+    }
+
+    func testGlassStyleMigratesFromPreviousBoolKey() {
+        // Pre-picker (Bringr-93j.65) the setting was a single on/off bool. An existing user
+        // with the default-on bool should land on the new `.clear` default; one who turned
+        // it off should land on `.off`, preserving their fallback preference.
+        let onlyTrue = makeDefaults()
+        onlyTrue.set(true, forKey: RadialAppearance.glassDefaultsKey)
+        XCTAssertEqual(RadialAppearance.current(from: onlyTrue).glassStyle, .clear)
+
+        let onlyFalse = makeDefaults()
+        onlyFalse.set(false, forKey: RadialAppearance.glassDefaultsKey)
+        XCTAssertEqual(RadialAppearance.current(from: onlyFalse).glassStyle, .off)
+
+        // Once the picker is touched the new key wins; the old bool no longer overrides.
+        let both = makeDefaults()
+        both.set(true, forKey: RadialAppearance.glassDefaultsKey)
+        both.set(RadialGlassStyle.regular.rawValue, forKey: RadialAppearance.glassStyleDefaultsKey)
+        XCTAssertEqual(RadialAppearance.current(from: both).glassStyle, .regular)
     }
 
     func testSkipSingleWindowLevelDefaultsOnAndRoundTrips() {
@@ -73,7 +92,7 @@ final class RadialAppearanceTests: XCTestCase {
         XCTAssertEqual(appearance.fillOpacity, RadialAppearance.defaultFillOpacity, accuracy: opacityAccuracy)
         XCTAssertFalse(appearance.showsAppLabels)
         XCTAssertTrue(appearance.showsWindowLabels)
-        XCTAssertEqual(appearance.usesLiquidGlass, RadialAppearance.defaultUsesLiquidGlass)
+        XCTAssertEqual(appearance.glassStyle, RadialAppearance.defaultGlassStyle)
         XCTAssertEqual(
             appearance.innerRadiusPadding, RadialAppearance.defaultInnerRadiusPadding, accuracy: accuracy
         )
@@ -86,6 +105,29 @@ final class RadialAppearanceTests: XCTestCase {
     }
 
     // MARK: - Shadow opacities (Bringr-93j.66)
+
+    func testRestingRimRoundTripsAndClamps() {
+        // Round-trip both fields together so a user's custom hairline sticks.
+        let defaults = makeDefaults()
+        defaults.set(0.32, forKey: RadialAppearance.restingRimOpacityDefaultsKey)
+        defaults.set(1.5, forKey: RadialAppearance.restingRimWidthDefaultsKey)
+        let appearance = RadialAppearance.current(from: defaults)
+        XCTAssertEqual(appearance.restingRimOpacity, 0.32, accuracy: opacityAccuracy)
+        XCTAssertEqual(appearance.restingRimWidth, 1.5, accuracy: accuracy)
+
+        // Stray out-of-range values clamp into the configured slider bounds.
+        let stray = makeDefaults()
+        stray.set(-1, forKey: RadialAppearance.restingRimOpacityDefaultsKey)
+        stray.set(99, forKey: RadialAppearance.restingRimWidthDefaultsKey)
+        let clamped = RadialAppearance.current(from: stray)
+        XCTAssertEqual(clamped.restingRimOpacity, RadialAppearance.restingRimOpacityRange.lowerBound, accuracy: opacityAccuracy)
+        XCTAssertEqual(clamped.restingRimWidth, RadialAppearance.restingRimWidthRange.upperBound, accuracy: accuracy)
+
+        // Defaults applied when unset — subtle hairline so the wheel reads as glass.
+        let empty = RadialAppearance.current(from: makeDefaults())
+        XCTAssertEqual(empty.restingRimOpacity, RadialAppearance.defaultRestingRimOpacity, accuracy: opacityAccuracy)
+        XCTAssertEqual(empty.restingRimWidth, RadialAppearance.defaultRestingRimWidth, accuracy: accuracy)
+    }
 
     func testShadowOpacitiesRoundTrip() {
         let defaults = makeDefaults()
