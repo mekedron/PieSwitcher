@@ -144,27 +144,12 @@ PieSwitcher v1.0 ships with all of the following — every item below is in the 
 
 Backing out is always safe: Esc, clicking the centre dead zone, clicking outside, or releasing the trigger off any slice all cancel cleanly and restore your windows.
 
-<!-- SCREENSHOT-PLACEHOLDER
-  Filename: docs/screenshots/wheel-app-hover.png
-  What to capture: The wheel open, with the cursor over one app slice. The hovered app
-  should be raised/visible while the rest of the apps are de-emphasised (hide-others
-  applied). Pick an app with multiple windows so the next screenshot (window sub-wheel)
-  has somewhere to go.
-  Caption: "Hovering an app isolates it on screen and arms the windows sub-wheel."
-  Alt text: "PieSwitcher wheel with the cursor over a Chrome slice; non-Chrome apps are hidden"
--->
-
-<!-- SCREENSHOT-PLACEHOLDER
-  Filename: docs/screenshots/wheel-window-hover.png
-  What to capture: The same wheel, now with the inner ring open and the cursor over
-  a single window slice. Only that window should be visible behind the wheel.
-  Caption: "Hovering a window slice leaves only that window on screen — instant visual confirmation before you commit."
-  Alt text: "PieSwitcher inner ring open over Chrome windows, with only the hovered window visible"
--->
-
 <div align="center">
 
-<sub><em>Drill‑down screenshots placeholder — drop <code>docs/screenshots/wheel-app-hover.png</code> and <code>docs/screenshots/wheel-window-hover.png</code> here.</em></sub>
+| App Ring | Multi-Window Drill-Down |
+|----------|------------------------|
+| ![PieSwitcher showing the outer ring of app icons](docs/screenshots/hero-wheel.png) | ![PieSwitcher showing multiple windows of the same app (e.g. Chrome with 2 windows)](docs/screenshots/wheel-app-hover.png) |
+| All running apps on the outer ring, ordered by Dock position. | Hover an app to reveal its windows on a second ring — instantly see which window is which. |
 
 </div>
 
