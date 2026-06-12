@@ -144,6 +144,14 @@ PieSwitcher v1.0 ships with all of the following — every item below is in the 
 
 Backing out is always safe: Esc, clicking the centre dead zone, clicking outside, or releasing the trigger off any slice all cancel cleanly and restore your windows.
 
+<div align="center">
+
+| App Ring | Multi-Window Drill-Down |
+|----------|------------------------|
+| ![PieSwitcher showing the outer ring of app icons](docs/screenshots/hero-wheel.png) | ![PieSwitcher showing multiple windows of the same app](docs/screenshots/wheel-app-hover.png) |
+| All running apps on the outer ring, ordered by Dock position. | Hover an app to reveal its windows on a second ring — instantly see which window is which. |
+
+</div>
 
 > **Window slices show a number and the window title, not a captured thumbnail.** Live previews need Screen Recording permission and are intentional [out‑of‑scope work for v1](#out-of-scope-today).
 
