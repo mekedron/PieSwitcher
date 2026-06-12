@@ -50,9 +50,10 @@
 
 <div align="center">
 
-![PieSwitcher showing the app ring and multi-window drill-down, demonstrating instant visual isolation on hover](docs/screenshots/wheel-app-hover.png)
-
-<sub><em>PieSwitcher in action — hover an app to see its windows on a second ring, with visual isolation showing only your choice.</em></sub>
+| App Ring | Multi-Window Drill-Down |
+|----------|------------------------|
+| ![PieSwitcher showing the outer ring of app icons](docs/screenshots/hero-wheel.png) | ![PieSwitcher showing multiple windows of the same app](docs/screenshots/wheel-app-hover.png) |
+| All running apps on the outer ring, ordered by Dock position. | Hover an app to reveal its windows on a second ring — instantly see which window is which. |
 
 </div>
 
@@ -143,15 +144,6 @@ PieSwitcher v1.0 ships with all of the following — every item below is in the 
 5. **Commit** — release (Hold to select) or click (Click to stay open). That window comes forward, its app activates, focus follows, and every app/window that was pushed aside is restored to exactly where it was.
 
 Backing out is always safe: Esc, clicking the centre dead zone, clicking outside, or releasing the trigger off any slice all cancel cleanly and restore your windows.
-
-<div align="center">
-
-| App Ring | Multi-Window Drill-Down |
-|----------|------------------------|
-| ![PieSwitcher showing the outer ring of app icons](docs/screenshots/hero-wheel.png) | ![PieSwitcher showing multiple windows of the same app](docs/screenshots/wheel-app-hover.png) |
-| All running apps on the outer ring, ordered by Dock position. | Hover an app to reveal its windows on a second ring — instantly see which window is which. |
-
-</div>
 
 > **Window slices show a number and the window title, not a captured thumbnail.** Live previews need Screen Recording permission and are intentional [out‑of‑scope work for v1](#out-of-scope-today).
 
