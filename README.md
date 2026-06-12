@@ -50,8 +50,9 @@
 
 <div align="center">
 
-<!-- replace with hero-wheel.png once captured -->
-<sub><em>Hero screenshot placeholder — drop <code>docs/screenshots/hero-wheel.png</code> here.</em></sub>
+![PieSwitcher radial menu open showing app icons arranged in a circle with the central cursor area](docs/screenshots/hero-wheel.png)
+
+<sub><em>PieSwitcher summoned over a desktop — the apps ring shows running apps with windows; hover any slice to drill into its windows.</em></sub>
 
 </div>
 
