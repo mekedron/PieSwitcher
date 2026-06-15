@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		1A0000000000000000000011 /* PieSwitcherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000010 /* PieSwitcherApp.swift */; };
 		1A0000000000000000000013 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000012 /* AboutView.swift */; };
+		1A0000000000000000000302 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000301 /* Assets.xcassets */; };
 		1A0000000000000000000017 /* PieSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000016 /* PieSwitcherTests.swift */; };
 		1A0000000000000000000022 /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000021 /* PermissionsManager.swift */; };
 		1A0000000000000000000024 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000023 /* AppDelegate.swift */; };
@@ -155,6 +156,7 @@
 		1A0000000000000000000006 /* PieSwitcher.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PieSwitcher.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000000000000000000010 /* PieSwitcherApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieSwitcherApp.swift; sourceTree = "<group>"; };
 		1A0000000000000000000012 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		1A0000000000000000000301 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000000000000000000014 /* PieSwitcherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PieSwitcherTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A0000000000000000000016 /* PieSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieSwitcherTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000021 /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
@@ -404,6 +406,7 @@
 				1A0000000000000000000136 /* OnboardingView.swift */,
 				1A0000000000000000000138 /* OnboardingWindow.swift */,
 				1A0000000000000000000140 /* OnboardingSuggestion.swift */,
+				1A0000000000000000000301 /* Assets.xcassets */,
 			);
 			path = PieSwitcher;
 			sourceTree = "<group>";
@@ -556,6 +559,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A0000000000000000000302 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -852,6 +856,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -882,6 +887,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
