@@ -86,7 +86,6 @@
         <span style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">PieSwitcher</span>
       </a>
       <div style="display: flex; align-items: center; gap: 28px;">
-        <button id="theme-toggle" type="button" aria-label="Switch color theme" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-nav); cursor: pointer; -webkit-appearance: none; appearance: none; transition: color .15s, border-color .15s;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.6"></circle><path d="M12 3.7a8.3 8.3 0 0 0 0 16.6Z" fill="currentColor"></path></svg></button>
         <a href="#how" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">How it works</a>
         <a href="#features" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">Features</a>
         <a href="#privacy" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">Privacy</a>
@@ -95,6 +94,7 @@
           Buy me a coffee
         </a>
         <a href="#download" style="font-size: 14px; font-weight: 500; color: #fff; background: var(--accent); padding: 7px 16px; border-radius: 980px; text-decoration: none;">Download</a>
+        <button id="theme-toggle" type="button" aria-label="Switch color theme" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--text-nav); cursor: pointer; -webkit-appearance: none; appearance: none; transition: color .15s, border-color .15s;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.3" stroke="currentColor" stroke-width="1.6"></circle><path d="M12 3.7a8.3 8.3 0 0 0 0 16.6Z" fill="currentColor"></path></svg></button>
       </div>
     </nav>
   </header>
@@ -427,21 +427,43 @@
     });
   }
 
+  // Theme-aware colors for the glass donut, edges, and window chips.
+  function palette() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return dark ? {
+      discGlass: 'radial-gradient(circle at 34% 28%, rgba(123,150,255,0.22), transparent 55%),radial-gradient(circle at 70% 74%, rgba(255,120,160,0.16), transparent 55%),radial-gradient(circle at 50% 50%, rgba(54,56,78,0.66), rgba(28,30,44,0.60))',
+      discPlain: 'radial-gradient(circle at 50% 50%, rgba(34,36,52,0.95), rgba(26,27,40,0.90))',
+      discShadow: '0 34px 80px -22px rgba(0,0,0,0.65)',
+      rimShadow: 'inset 0 2px 4px rgba(255,255,255,0.16),inset 0 -16px 36px rgba(0,0,0,0.40),inset 0 0 0 1px rgba(255,255,255,0.10)',
+      divider: 'rgba(255,255,255,0.07)', hoverFillA: 0.24, hoverStrokeA: 0.6,
+      edgeHi: 'rgba(255,255,255,0.22)', edgeLo: 'rgba(0,0,0,0.50)', edgeIn: 'rgba(255,255,255,0.09)',
+      winFill: 'rgba(56,58,78,0.85)', winStroke: 'rgba(255,255,255,0.12)', lastFillA: 0.30,
+      num: '#f5f5f7', title: 'rgba(255,255,255,0.55)'
+    } : {
+      discGlass: 'radial-gradient(circle at 34% 28%, rgba(123,150,255,0.24), transparent 55%),radial-gradient(circle at 70% 74%, rgba(255,120,160,0.18), transparent 55%),radial-gradient(circle at 50% 50%, rgba(255,255,255,0.90), rgba(255,255,255,0.66))',
+      discPlain: 'radial-gradient(circle at 50% 50%, rgba(248,248,250,0.97), rgba(248,248,250,0.92))',
+      discShadow: '0 34px 80px -22px rgba(40,40,90,0.45)',
+      rimShadow: 'inset 0 2px 4px rgba(255,255,255,0.95),inset 0 -16px 36px rgba(95,95,150,0.18),inset 0 0 0 1px rgba(255,255,255,0.45)',
+      divider: 'rgba(0,0,0,0.06)', hoverFillA: 0.16, hoverStrokeA: 0.5,
+      edgeHi: 'rgba(255,255,255,0.6)', edgeLo: 'rgba(40,40,90,0.07)', edgeIn: 'rgba(40,40,90,0.08)',
+      winFill: 'rgba(255,255,255,0.74)', winStroke: 'rgba(0,0,0,0.06)', lastFillA: 0.12,
+      num: '#1d1d1f', title: '#6e6e73'
+    };
+  }
+
   function render() {
     while (mount.firstChild) mount.removeChild(mount.firstChild);
-    var active = state.activeApp, hw = state.hoveredWin;
+    var active = state.activeApp, hw = state.hoveredWin, P = palette();
 
     // ---- frosted glass disc + volume rim (HTML, sized to the app ring) ----
     var disc = document.createElement('div');
     disc.style.cssText = 'position:absolute;left:21.33%;top:21.33%;width:57.33%;height:57.33%;border-radius:50%;' +
-      'background:' + (glass
-        ? 'radial-gradient(circle at 34% 28%, rgba(123,150,255,0.24), transparent 55%),radial-gradient(circle at 70% 74%, rgba(255,120,160,0.18), transparent 55%),radial-gradient(circle at 50% 50%, rgba(255,255,255,0.90), rgba(255,255,255,0.66))'
-        : 'radial-gradient(circle at 50% 50%, rgba(248,248,250,0.97), rgba(248,248,250,0.92))') + ';' +
+      'background:' + (glass ? P.discGlass : P.discPlain) + ';' +
       'backdrop-filter:' + (glass ? 'blur(12px) saturate(1.8)' : 'none') + ';-webkit-backdrop-filter:' + (glass ? 'blur(12px) saturate(1.8)' : 'none') + ';' +
-      'box-shadow:0 34px 80px -22px rgba(40,40,90,0.45);-webkit-mask-image:' + discMask + ';mask-image:' + discMask + ';';
+      'box-shadow:' + P.discShadow + ';-webkit-mask-image:' + discMask + ';mask-image:' + discMask + ';';
     var rim = document.createElement('div');
     rim.style.cssText = 'position:absolute;left:21.33%;top:21.33%;width:57.33%;height:57.33%;border-radius:50%;pointer-events:none;' +
-      'box-shadow:inset 0 2px 4px rgba(255,255,255,0.95),inset 0 -16px 36px rgba(95,95,150,0.18),inset 0 0 0 1px rgba(255,255,255,0.45);' +
+      'box-shadow:' + P.rimShadow + ';' +
       '-webkit-mask-image:' + discMask + ';mask-image:' + discMask + ';';
     mount.appendChild(disc);
     mount.appendChild(rim);
@@ -464,7 +486,7 @@
     // app-ring dividers
     apps.forEach(function (a, i) {
       var inP = pt(appIn, i * 45 - 22.5), outP = pt(appOut, i * 45 - 22.5);
-      var ln = el('line', { x1: inP[0], y1: inP[1], x2: outP[0], y2: outP[1], stroke: 'rgba(0,0,0,0.06)', 'stroke-width': 1 });
+      var ln = el('line', { x1: inP[0], y1: inP[1], x2: outP[0], y2: outP[1], stroke: P.divider, 'stroke-width': 1 });
       ln.style.pointerEvents = 'none';
       svg.appendChild(ln);
     });
@@ -474,8 +496,8 @@
       var on = active === i;
       var p = el('path', {
         d: ringSector(appIn, appOut, i * 45 - 22.5, i * 45 + 22.5),
-        fill: on ? hexA(accent, 0.16) : 'rgba(255,255,255,0.001)',
-        stroke: on ? hexA(accent, 0.5) : 'transparent', 'stroke-width': on ? 1.5 : 0
+        fill: on ? hexA(accent, P.hoverFillA) : 'rgba(255,255,255,0.001)',
+        stroke: on ? hexA(accent, P.hoverStrokeA) : 'transparent', 'stroke-width': on ? 1.5 : 0
       });
       p.style.cssText = 'cursor:pointer;transition:fill .14s,stroke .14s;';
       p.addEventListener('mouseenter', function () { state.activeApp = i; state.hoveredWin = null; render(); });
@@ -483,9 +505,9 @@
     });
 
     // crisp band edges so the glass donut separates from the background
-    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appOut, fill: 'none', stroke: 'rgba(255,255,255,0.6)', 'stroke-width': 1.5 })));
-    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appOut + 1.2, fill: 'none', stroke: 'rgba(40,40,90,0.07)', 'stroke-width': 1 })));
-    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appIn, fill: 'none', stroke: 'rgba(40,40,90,0.08)', 'stroke-width': 1 })));
+    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appOut, fill: 'none', stroke: P.edgeHi, 'stroke-width': 1.5 })));
+    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appOut + 1.2, fill: 'none', stroke: P.edgeLo, 'stroke-width': 1 })));
+    svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appIn, fill: 'none', stroke: P.edgeIn, 'stroke-width': 1 })));
 
     // app tiles (fixed size, dim non-active)
     apps.forEach(function (a, i) {
@@ -511,20 +533,20 @@
         var l = pt((winIn + winOut) / 2, slot * 45);
         var wp = el('path', {
           d: ringSector(winIn, winOut, a0, a1),
-          fill: won ? accent : (isLast ? hexA(accent, 0.12) : 'rgba(255,255,255,0.74)'),
-          stroke: won ? accent : (isLast ? accent : 'rgba(0,0,0,0.06)'), 'stroke-width': (won || isLast) ? 2 : 1
+          fill: won ? accent : (isLast ? hexA(accent, P.lastFillA) : P.winFill),
+          stroke: won ? accent : (isLast ? accent : P.winStroke), 'stroke-width': (won || isLast) ? 2 : 1
         });
         wp.style.cssText = 'cursor:pointer;transition:fill .12s,stroke .12s;';
         (function (idx) { wp.addEventListener('mouseenter', function () { state.hoveredWin = idx; render(); }); })(k);
         svg.appendChild(wp);
 
         var num = el('text', { x: l[0], y: l[1] - 4, 'text-anchor': 'middle' });
-        num.style.cssText = 'pointer-events:none;font-family:' + FONT + ';font-size:19px;font-weight:700;fill:' + (won ? '#fff' : '#1d1d1f') + ';';
+        num.style.cssText = 'pointer-events:none;font-family:' + FONT + ';font-size:19px;font-weight:700;fill:' + (won ? '#fff' : P.num) + ';';
         num.textContent = String(k + 1);
         svg.appendChild(num);
 
         var ttl = el('text', { x: l[0], y: l[1] + 14, 'text-anchor': 'middle' });
-        ttl.style.cssText = 'pointer-events:none;font-family:' + FONT + ';font-size:11.5px;font-weight:500;fill:' + (won ? 'rgba(255,255,255,0.92)' : 'var(--text-2)') + ';';
+        ttl.style.cssText = 'pointer-events:none;font-family:' + FONT + ';font-size:11.5px;font-weight:500;fill:' + (won ? 'rgba(255,255,255,0.92)' : P.title) + ';';
         ttl.textContent = trunc(app.titles[k], 16);
         svg.appendChild(ttl);
       }
@@ -536,6 +558,8 @@
   function setNoPtr(node) { node.style.pointerEvents = 'none'; return node; }
 
   render();
+  // Re-render with the matching palette whenever the theme changes.
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 })();
 </script>
 
