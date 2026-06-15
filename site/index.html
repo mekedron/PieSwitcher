@@ -509,12 +509,11 @@
     svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appOut + 1.2, fill: 'none', stroke: P.edgeLo, 'stroke-width': 1 })));
     svg.appendChild(setNoPtr(el('circle', { cx: C, cy: C, r: appIn, fill: 'none', stroke: P.edgeIn, 'stroke-width': 1 })));
 
-    // app tiles (fixed size, dim non-active)
+    // app tiles (fixed size, always fully visible — no dimming on hover)
     apps.forEach(function (a, i) {
       var c = pt(tileR, i * 45);
-      var dim = active != null && active !== i;
-      var g = el('g', { transform: 'translate(' + c[0] + ',' + c[1] + ')', opacity: dim ? 0.45 : 1 });
-      g.style.cssText = 'pointer-events:none;transition:opacity .16s;';
+      var g = el('g', { transform: 'translate(' + c[0] + ',' + c[1] + ')' });
+      g.style.cssText = 'pointer-events:none;';
       g.appendChild(el('rect', { x: -19, y: -19, width: 38, height: 38, rx: 11, fill: 'url(#pg' + i + ')' }));
       var gl = el('g', { transform: 'translate(-10,-10) scale(0.83)' });
       glyphChildren(a.glyph).forEach(function (n) { gl.appendChild(n); });
