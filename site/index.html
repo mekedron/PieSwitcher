@@ -55,11 +55,41 @@
     --tile: linear-gradient(160deg, #20202b, #16161e);
   }
   html, body { background: var(--bg); }
-  #theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+  #theme-toggle:hover, #gh-star:hover { color: var(--accent); border-color: var(--accent); }
   ::selection { background: rgba(123,92,255,0.22); }
   @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto; } }
+
+  /* ---------- Responsive / mobile ---------- */
+  /* Tighten the nav gap on medium widths. */
+  @media (max-width: 980px) {
+    nav > div[style*="gap: 28px"] { gap: 18px !important; }
+  }
+  /* Drop the in-page section links and go 2-up on the card grids. */
+  @media (max-width: 880px) {
+    nav a[href="#how"], nav a[href="#features"], nav a[href="#privacy"] { display: none !important; }
+    div[style*="grid-template-columns: repeat(3, 1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  /* Stack the Liquid Glass two-column block. */
+  @media (max-width: 760px) {
+    div[style*="grid-template-columns: 1.1fr 0.9fr"] { grid-template-columns: 1fr !important; gap: 40px !important; }
+  }
+  /* Phones: single-column cards, compact nav, lighter section padding. */
+  @media (max-width: 620px) {
+    nav a[href*="buymeacoffee"] { display: none !important; }
+    nav > div[style*="gap: 28px"] { gap: 14px !important; }
+    #gh-star span:not(#gh-star-count) { display: none !important; }
+    #gh-star #gh-star-count { border-left: 0 !important; padding-left: 0 !important; margin-left: 0 !important; }
+    div[style*="grid-template-columns: repeat(3, 1fr)"] { grid-template-columns: 1fr !important; }
+    main > section { padding-top: 60px !important; padding-bottom: 60px !important; }
+    div[style*="width: 300px; height: 300px"] { width: min(300px, 74vw) !important; height: min(300px, 74vw) !important; }
+  }
+  /* Small phones: icon-only logo, tighter edge padding. */
+  @media (max-width: 430px) {
+    nav { padding: 0 16px !important; }
+    nav a[href="#top"] span:last-child { display: none !important; }
+  }
 </style>
 <script>
   // Resolve and apply the color theme before first paint to avoid a flash.
@@ -89,6 +119,11 @@
         <a href="#how" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">How it works</a>
         <a href="#features" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">Features</a>
         <a href="#privacy" style="font-size: 14px; color: var(--text-nav); text-decoration: none;">Privacy</a>
+        <a id="gh-star" href="https://github.com/mekedron/PieSwitcher" target="_blank" rel="noopener" aria-label="Star PieSwitcher on GitHub" style="display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; color: var(--text-nav); border: 1px solid var(--border); padding: 6px 13px; border-radius: 980px; text-decoration: none; transition: color .15s, border-color .15s;">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2A8 8 0 0 0 5.47 15.78c.4.07.55-.17.55-.38l-.01-1.49c-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path></svg>
+          <span>Star</span>
+          <span id="gh-star-count" style="display: none; padding-left: 8px; margin-left: 1px; border-left: 1px solid var(--border); color: var(--text); font-variant-numeric: tabular-nums;"></span>
+        </a>
         <a href="https://buymeacoffee.com/mekedron" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: #1d1d1f; background: #ffdd00; padding: 7px 14px; border-radius: 980px; text-decoration: none;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 8 H17 V13 A4 4 0 0 1 13 17 H8 A4 4 0 0 1 4 13 Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path><path d="M17 9 H19.4 A2 2 0 0 1 19.4 13 H17" stroke="currentColor" stroke-width="1.7"></path><path d="M7.5 3.2 V5 M11 3.2 V5 M14.5 3.2 V5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
           Buy me a coffee
@@ -354,6 +389,23 @@
   if (mql.addEventListener) mql.addEventListener('change', function () { if (pref() === 'auto') apply(); });
   else if (mql.addListener) mql.addListener(function () { if (pref() === 'auto') apply(); });
   apply();
+})();
+</script>
+
+<!-- ============ GITHUB STAR COUNT ============ -->
+<script>
+(function () {
+  var el = document.getElementById('gh-star-count');
+  if (!el || !window.fetch) return;
+  fetch('https://api.github.com/repos/mekedron/PieSwitcher', { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || typeof d.stargazers_count !== 'number') return;
+      var n = d.stargazers_count;
+      el.textContent = n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(n);
+      el.style.display = 'inline-block';
+    })
+    .catch(function () {});
 })();
 </script>
 
