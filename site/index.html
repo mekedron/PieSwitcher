@@ -158,7 +158,7 @@
         <div style="position: absolute; top: 8%; width: 70%; height: 70%; background: radial-gradient(circle at 35% 30%, rgba(123,92,255,0.28), transparent 60%), radial-gradient(circle at 70% 72%, rgba(90,169,255,0.22), transparent 62%); filter: blur(46px); pointer-events: none;"></div>
         <div style="position: relative; width: 100%; animation: floatY 7s ease-in-out infinite;"><div id="wheel" style="position: relative; width: 100%; aspect-ratio: 1;"></div></div>
       </div>
-      <p style="position: relative; font-size: 13px; color: var(--text-3); margin: 26px 0 0;">Hover an app to fan out its windows — each shown by number and title</p>
+      <p style="position: relative; font-size: 13px; color: var(--text-3); margin: 26px 0 0;">Hover or tap an app to fan out its windows — each shown by number and title</p>
     </section>
 
     <!-- ============ PROBLEM ============ -->
@@ -423,6 +423,10 @@
   var accent = '#7b5cff';
   var glass = true;
   var state = { activeApp: null, hoveredWin: null };
+  // Hover-capable (desktop) vs. touch: on touch we drill in by tap, since hover never fires.
+  var canHover = !window.matchMedia || window.matchMedia('(hover: hover)').matches;
+  var sliceTapped = false; // a slice tap sets this so the document handler keeps the wheel open
+  mount.style.touchAction = 'manipulation'; // kill the double-tap zoom / tap delay on the wheel
 
   // Geometry (viewBox 0..600). app ring 96→168, window ring 176→248, equal 72px bands.
   var C = 300, appIn = 96, appOut = 168, tileR = 132, winIn = 176, winOut = 248;
@@ -523,7 +527,8 @@
     // ---- SVG layer ----
     var svg = el('svg', { viewBox: '0 0 600 600', width: '100%', height: '100%' });
     svg.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;';
-    svg.addEventListener('mouseleave', function () { state.activeApp = null; state.hoveredWin = null; render(); });
+    // Reset on real mouse-out only; touch closes by tapping outside the wheel (handled below).
+    if (canHover) svg.addEventListener('mouseleave', function () { state.activeApp = null; state.hoveredWin = null; render(); });
 
     // gradient defs (per app tile fill)
     var defs = el('defs');
@@ -552,7 +557,14 @@
         stroke: on ? hexA(accent, P.hoverStrokeA) : 'transparent', 'stroke-width': on ? 1.5 : 0
       });
       p.style.cssText = 'cursor:pointer;transition:fill .14s,stroke .14s;';
-      p.addEventListener('mouseenter', function () { state.activeApp = i; state.hoveredWin = null; render(); });
+      if (canHover) p.addEventListener('mouseenter', function () { state.activeApp = i; state.hoveredWin = null; render(); });
+      // Tap/click also drills in, so the demo works on touch (no hover); on touch a re-tap collapses it.
+      p.addEventListener('click', function () {
+        sliceTapped = true;
+        state.activeApp = (!canHover && state.activeApp === i) ? null : i;
+        state.hoveredWin = null;
+        render();
+      });
       svg.appendChild(p);
     });
 
@@ -588,7 +600,14 @@
           stroke: won ? accent : (isLast ? accent : P.winStroke), 'stroke-width': (won || isLast) ? 2 : 1
         });
         wp.style.cssText = 'cursor:pointer;transition:fill .12s,stroke .12s;';
-        (function (idx) { wp.addEventListener('mouseenter', function () { state.hoveredWin = idx; render(); }); })(k);
+        (function (idx) {
+          if (canHover) wp.addEventListener('mouseenter', function () { state.hoveredWin = idx; render(); });
+          wp.addEventListener('click', function () {
+            sliceTapped = true;
+            state.hoveredWin = (!canHover && state.hoveredWin === idx) ? null : idx;
+            render();
+          });
+        })(k);
         svg.appendChild(wp);
 
         var num = el('text', { x: l[0], y: l[1] - 4, 'text-anchor': 'middle' });
@@ -607,6 +626,12 @@
   }
 
   function setNoPtr(node) { node.style.pointerEvents = 'none'; return node; }
+
+  // Tap outside the wheel collapses it — touch has no mouse-leave to fall back on.
+  document.addEventListener('click', function () {
+    if (sliceTapped) { sliceTapped = false; return; }
+    if (state.activeApp != null) { state.activeApp = null; state.hoveredWin = null; render(); }
+  });
 
   render();
   // Re-render with the matching palette whenever the theme changes.
