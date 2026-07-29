@@ -105,6 +105,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // main thread; the workspace observers keep it warm as apps launch and quit.
         radialMenu?.icons.startObservingWorkspace()
         radialMenu?.icons.prewarm()
+
+        // Then render the wheel once, invisibly, so the first summon also skips the
+        // one-time SwiftUI/Liquid Glass/CoreText build cost. Slightly delayed so the
+        // icon prewarm above has landed and the pass draws real icons, warming the
+        // image path too; a summon arriving earlier just takes the cold first render.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.radialMenu?.prewarmFirstRender()
+        }
     }
 
     /// Install the global mouse-chord tap (US-007). The tap needs Accessibility

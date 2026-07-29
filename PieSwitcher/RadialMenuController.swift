@@ -203,6 +203,40 @@ final class RadialMenuController: ObservableObject {
 
     // MARK: - Side effects
 
+    /// Render the wheel once, invisibly, so the first real summon pays no first-render
+    /// cost. The SwiftUI host, Liquid Glass material, and text caches are all built
+    /// lazily at the window's first on-screen draw — which, without this pass, is the
+    /// first summon's opening frame. Orders the pre-warmed window in at alpha 0,
+    /// off-screen, with a live-resolved tree (which also warms the first window-list
+    /// enumeration), forces a draw, and tears back down on the next run-loop tick.
+    /// Touches no interaction state: no monitors, no state machine, `isVisible` stays
+    /// false, and `navigator.close()` with nothing revealed restores nothing — so a
+    /// summon landing mid-pass simply takes over (the tick's guard skips teardown, and
+    /// `summon` resets the frame and alpha).
+    func prewarmFirstRender() {
+        guard !isVisible, !machine.isOpen else { return }
+        guard let root = registry.makeMenu(for: .mouseChord) else { return }
+        appearance = appearanceProvider()
+        navigator.setBaseGeometry(appearance.geometry)
+        navigator.open(appNodes: root.resolvedChildren())
+        syncFromNavigator()
+        let side = navigator.overallDiameter
+        window.alphaValue = 0
+        window.setFrame(
+            NSRect(x: -side * 2, y: -side * 2, width: side, height: side), display: true
+        )
+        window.orderFrontRegardless()
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isVisible else { return }
+            self.window.orderOut(nil)
+            self.window.alphaValue = 1
+            self.navigator.close()
+            self.syncFromNavigator()
+        }
+    }
+
     /// Show the menu registered for `trigger` centred at `cursor` (the global mouse
     /// location). Resolves the tree fresh so the wheel reflects live state, and
     /// starts tracking the cursor so hover can drill into apps.
@@ -246,6 +280,9 @@ final class RadialMenuController: ObservableObject {
         let size = NSSize(width: side, height: side)
         let origin = RadialMenuPlacement.windowOrigin(forCursor: cursor, windowSize: size)
         window.setFrame(NSRect(origin: origin, size: size), display: false)
+        // The invisible pre-render pass (`prewarmFirstRender`) leaves alpha at 0 until
+        // its teardown tick; a summon landing inside that window must show at full alpha.
+        window.alphaValue = 1
         window.orderFrontRegardless()
         isVisible = true
         startMenuMonitors()
