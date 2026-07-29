@@ -134,13 +134,19 @@ final class WindowEnumerator {
     /// on-screen record must be on a managed Space (the source stamps `isManagedWindow`); a
     /// phantom backing surface is not. This is what stopped "all screens" from listing phantom
     /// windows that don't exist.
+    /// `axTitles` bounds the per-app AX title reads (see `AXTitleScope`): the apps-ring
+    /// read passes `.none` (no slice there shows a window title) and a sub-wheel read
+    /// passes `.app(pid)` for the one expanded app, so a summon never pays AX IPC for
+    /// apps whose titles won't be displayed. `.all` is the default for callers that
+    /// don't scope.
     func enumerate(
         onScreen screenBounds: CGRect? = nil,
         allSpaces: Bool = false,
         includeMinimized: Bool = false,
         includeHidden: Bool = false,
         validatesOnscreen: Bool = false,
-        freshSummon: Bool = false
+        freshSummon: Bool = false,
+        axTitles titleScope: AXTitleScope = .all
     ) -> [AppWindows] {
         let start = DispatchTime.now().uptimeNanoseconds
         // The summon-start read runs first, before any hover, so it marks a new summon: drop the
@@ -167,7 +173,7 @@ final class WindowEnumerator {
             )
         }
         let onScreen = filter(collected, toScreen: screenBounds)
-        let grouped = group(onScreen)
+        let grouped = group(onScreen, titleScope: titleScope)
         let result = sorted(grouped)
         let elapsed = TimeInterval(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
         lastDuration = elapsed
@@ -319,7 +325,7 @@ final class WindowEnumerator {
         }
     }
 
-    private func group(_ windows: [RawWindow]) -> [AppWindows] {
+    private func group(_ windows: [RawWindow], titleScope: AXTitleScope) -> [AppWindows] {
         var pidOrder: [pid_t] = []
         var byPID: [pid_t: [RawWindow]] = [:]
         for window in windows {
@@ -331,9 +337,11 @@ final class WindowEnumerator {
             let raws = byPID[pid] ?? []
             let appID = AppID(pid: pid)
             let ownerName = raws.first?.ownerName ?? ""
-            // Only ask AX for titles when at least one CG title is blank (Bringr-93j.110):
-            // Screen Recording populates every CG title, so the per-app AX read is skipped.
-            let needsAX = raws.contains { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            // Only ask AX for titles when the scope covers this app AND at least one CG
+            // title is blank (Bringr-93j.110): Screen Recording populates every CG title,
+            // and out-of-scope apps' titles are never displayed, so both skip the AX IPC.
+            let needsAX = titleScope.includes(pid)
+                && raws.contains { $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             let axTitles = needsAX ? source.axTitles(forPID: pid) : [:]
             let infos = raws.enumerated().map { index, raw in
                 WindowInfo(

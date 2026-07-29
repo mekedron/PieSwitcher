@@ -191,11 +191,12 @@ struct WindowSwitcherMenu: MenuDefinition {
                 // The apps ring is the first read of a new summon, so it invalidates the
                 // prior summon's broadened raw cache (Bringr-93j.53); the per-app sub-wheels
                 // re-read on hover and share that fresh cache (`freshSummon` defaults off).
+                // No slice on this ring shows a window title, so no AX title reads.
                 enumerator.enumerate(
                     onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces,
                     includeMinimized: appsScope.includeMinimized, includeHidden: appsScope.includeHidden,
                     validatesOnscreen: appsScope.validatesOnscreen,
-                    freshSummon: true
+                    freshSummon: true, axTitles: .none
                 ).map {
                     Self.appNode($0, windowsScope: windowsScope, enumerator: enumerator)
                 }
@@ -221,10 +222,13 @@ struct WindowSwitcherMenu: MenuDefinition {
             representedApp: appID,
             bundleIdentifier: bundleIdentifier,
             children: .dynamic {
+                // Titles are displayed only for this one expanded app, so the AX title
+                // read is scoped to its pid — no IPC to every other running app on hover.
                 let current = enumerator.enumerate(
                     onScreen: windowsScope.screenBounds, allSpaces: windowsScope.allSpaces,
                     includeMinimized: windowsScope.includeMinimized, includeHidden: windowsScope.includeHidden,
-                    validatesOnscreen: windowsScope.validatesOnscreen
+                    validatesOnscreen: windowsScope.validatesOnscreen,
+                    axTitles: .app(appID.pid)
                 ).first { $0.id == appID }
                 return (current?.windows ?? []).map { Self.windowNode($0) }
             }

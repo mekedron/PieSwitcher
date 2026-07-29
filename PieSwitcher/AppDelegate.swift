@@ -99,6 +99,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowControl = WindowController(store: RevealStateStore())
         windowControl.restoreFromSnapshotIfNeeded()
         radialMenu = RadialMenuController(registry: registry, windowControl: windowControl)
+
+        // Warm the icon cache now, on background tasks, so the first summon renders
+        // every slice icon from memory instead of decoding through IconServices on the
+        // main thread; the workspace observers keep it warm as apps launch and quit.
+        radialMenu?.icons.startObservingWorkspace()
+        radialMenu?.icons.prewarm()
     }
 
     /// Install the global mouse-chord tap (US-007). The tap needs Accessibility

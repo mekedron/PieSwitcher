@@ -21,6 +21,30 @@ struct AppWindows: Equatable, Sendable {
     let windows: [WindowInfo]
 }
 
+/// Which apps get real AX-resolved window titles when the CG list leaves a title
+/// blank (the normal case under Accessibility-only permission). The AX read is one
+/// synchronous IPC round-trip per app, and a busy or unresponsive app can stall it
+/// for hundreds of milliseconds — so each `WindowEnumerator.enumerate` read should
+/// ask for titles only where a title is actually displayed: nowhere on the apps
+/// ring (its slices show app names), and for exactly one app on a windows sub-wheel.
+enum AXTitleScope: Equatable, Sendable {
+    /// No AX title reads; blank titles fall back to "<App> — Window <N>".
+    case none
+    /// AX titles for this one app only — the expanded windows sub-wheel.
+    case app(pid_t)
+    /// AX titles for every app with a blank-titled window.
+    case all
+
+    /// Whether this scope wants AX titles for `pid`.
+    func includes(_ pid: pid_t) -> Bool {
+        switch self {
+        case .none: return false
+        case .app(let scoped): return scoped == pid
+        case .all: return true
+        }
+    }
+}
+
 /// A raw window record straight from the system window list, before any filtering or
 /// grouping. Plain values so `WindowEnumerator`'s logic can be exercised with fixtures and
 /// never touches the live window server in tests.

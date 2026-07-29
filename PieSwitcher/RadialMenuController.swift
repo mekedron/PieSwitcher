@@ -44,6 +44,9 @@ final class RadialMenuController: ObservableObject {
     /// Keyboard-navigation settings resolved at summon time, read by the +Keyboard extension (Bringr-93j.71).
     var keyboardConfig: KeyboardNavigationConfig = .disabled
 
+    /// Pre-rasterized slice icons for the pre-built `RadialMenuView`: a summon renders
+    /// from this cache, never decoding an icon on the main thread. Pre-warmed at launch.
+    let icons = AppIconStore()
     private let registry: MenuRegistry
     let navigator: RadialNavigator
     /// Internal (not private) so the cursor → offset helpers can live in

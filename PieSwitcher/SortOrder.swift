@@ -135,20 +135,36 @@ enum DockOrder {
         return [finderBundleID] + pinnedIDs
     }
 
+    /// Resolved `CuratedApp` entries keyed by bundle id, so `currentApps()` pays the
+    /// Launch Services URL lookup and on-disk display-name read once per app per run
+    /// rather than on every summon. Safe to keep for the process lifetime: bundle ids
+    /// are stable, and a renamed/moved app is at worst labelled with its previous name
+    /// until relaunch — the same staleness the Dock itself tolerates.
+    /// `nonisolated(unsafe)`: only ever touched from the main thread — `currentApps()`
+    /// is called from `MyAppsMenu`'s summon path and `AppIconStore.prewarm()`, both
+    /// `@MainActor` — but the enum's callers reach it through nonisolated default
+    /// arguments, which cannot carry the isolation annotation.
+    nonisolated(unsafe) private static var resolvedEntries: [String: CuratedApp] = [:]
+
     /// The Dock's apps as `CuratedApp` entries — bundle id from `current()` plus the on-disk
     /// display name (Bringr-93j.98). The shape `MyAppsMenu` already understands, so the
     /// "include all Dock apps" option reuses the same launch/expand logic the curated list
     /// rides on. Apps whose bundle id no longer resolves on disk (uninstalled but still
-    /// pinned) are skipped — a launchable entry needs a real on-disk URL. The untestable
-    /// live shell of `current()` plus a Launch Services lookup; tests inject fixed
-    /// `[CuratedApp]` via `MyAppsMenu`'s `dockApps` closure.
+    /// pinned) are skipped — a launchable entry needs a real on-disk URL. The pinned list
+    /// itself is read live each call (a Dock edit applies on the next summon); only the
+    /// per-app disk resolution is cached. The untestable live shell of `current()` plus a
+    /// Launch Services lookup; tests inject fixed `[CuratedApp]` via `MyAppsMenu`'s
+    /// `dockApps` closure.
     static func currentApps() -> [CuratedApp] {
         current().compactMap { bundleID in
+            if let cached = resolvedEntries[bundleID] { return cached }
             guard let url = CuratedApp.bundleURL(forBundleIdentifier: bundleID) else { return nil }
-            return CuratedApp(
+            let entry = CuratedApp(
                 bundleIdentifier: bundleID,
                 name: CuratedApp.displayName(forBundleAt: url)
             )
+            resolvedEntries[bundleID] = entry
+            return entry
         }
     }
 

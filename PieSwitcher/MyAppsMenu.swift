@@ -157,12 +157,13 @@ struct MyAppsMenu: MenuDefinition {
             children: .dynamic {
                 // The first read of a new summon, so it invalidates the prior summon's
                 // broadened raw cache (Bringr-93j.53); the per-app sub-wheels re-read on
-                // hover and share that fresh cache.
+                // hover and share that fresh cache. No slice on this ring shows a window
+                // title, so no AX title reads.
                 let live = enumerator.enumerate(
                     onScreen: appsScope.screenBounds, allSpaces: appsScope.allSpaces,
                     includeMinimized: appsScope.includeMinimized, includeHidden: appsScope.includeHidden,
                     validatesOnscreen: appsScope.validatesOnscreen,
-                    freshSummon: true
+                    freshSummon: true, axTitles: .none
                 )
                 // Keep the manual order (the default), or let the active Apps sort order
                 // reorder the curated block when the user turned that off (Bringr-93j.43).

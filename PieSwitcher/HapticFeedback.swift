@@ -73,6 +73,13 @@ final class HapticController {
     private var active = false
     /// The strength resolved for the current summon.
     private var intensity: HapticIntensity = .default
+    /// Last probed external-mouse presence, `nil` until the first probe. The IOKit
+    /// device scan behind the probe is too costly for the summon hot path, so each
+    /// summon uses this cached value and schedules a refresh for the next one —
+    /// plugging a mouse in or out applies one summon late.
+    private var externalMousePresent: Bool?
+    /// Guards against stacking refresh tasks when summons come faster than probes.
+    private var probeRefreshScheduled = false
 
     init(
         enabledProvider: @escaping () -> Bool = { TrackpadHaptics.isEnabled() },
@@ -87,11 +94,32 @@ final class HapticController {
     }
 
     /// Read the setting fresh for a new summon (mirroring the controller's other per-summon
-    /// reads) so a Preferences change applies on the next open. The external mouse is checked
-    /// once here, not per hover, because the IOKit scan is too costly for the hover hot path.
+    /// reads) so a Preferences change applies on the next open. The external-mouse probe is
+    /// synchronous only on the very first summon; afterwards the cached value answers and a
+    /// deferred task (next run-loop tick, after the wheel is already up) re-probes, keeping
+    /// the IOKit scan off both the hover hot path and the open hot path.
     func resolveForSummon() {
-        active = enabledProvider() && !externalMouseProvider()
         intensity = intensityProvider()
+        guard enabledProvider() else {
+            active = false
+            return
+        }
+        let present = externalMousePresent ?? externalMouseProvider()
+        externalMousePresent = present
+        active = !present
+        scheduleProbeRefresh()
+    }
+
+    /// Re-probe for an external mouse after the current summon has finished opening, so
+    /// the next summon reads fresh state without paying the scan while opening.
+    private func scheduleProbeRefresh() {
+        guard !probeRefreshScheduled else { return }
+        probeRefreshScheduled = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.externalMousePresent = self.externalMouseProvider()
+            self.probeRefreshScheduled = false
+        }
     }
 
     /// Fire a tick if the hover advanced to a new slice this move and haptics are active for

@@ -82,6 +82,7 @@ struct RadialMenuView: View {
             ForEach(controller.rings) { ring in
                 RadialRingContent(
                     ring: ring,
+                    icons: controller.icons,
                     showsAppLabels: controller.appearance.showsAppLabels,
                     showsWindowLabels: controller.appearance.showsWindowLabels,
                     shadowOpacity: controller.appearance.contentShadowOpacity
@@ -274,6 +275,7 @@ struct RadialRingEmphasis: View {
 /// on whether it represents an app.
 struct RadialRingContent: View {
     let ring: RadialRing
+    let icons: AppIconStore
     let showsAppLabels: Bool
     let showsWindowLabels: Bool
     let shadowOpacity: Double
@@ -283,6 +285,7 @@ struct RadialRingContent: View {
             ForEach(Array(ring.nodes.enumerated()), id: \.element.id) { index, node in
                 RadialSliceLabel(
                     node: node,
+                    icons: icons,
                     index: index,
                     showsAppLabels: showsAppLabels,
                     showsWindowLabels: showsWindowLabels,
@@ -350,6 +353,9 @@ struct RadialWedge: Shape {
 /// and text stay sharp and legible over the translucent ring on any background.
 struct RadialSliceLabel: View {
     let node: MenuNode
+    /// Pre-rasterized icon cache; observed so a slice whose icon was still loading
+    /// when the wheel appeared fills in the moment the load lands.
+    @ObservedObject var icons: AppIconStore
     let index: Int
     /// Whether app slices on the apps ring show their application name (Bringr-93j.110).
     /// When false, only the app icon shows. Window slices ignore this flag.
@@ -395,9 +401,9 @@ struct RadialSliceLabel: View {
         .shadow(color: .black.opacity(shadowOpacity), radius: 2, y: 0.5)
     }
 
-    @ViewBuilder
+    @MainActor @ViewBuilder
     private var appIcon: some View {
-        if let icon = node.appSliceIcon {
+        if let icon = icons.icon(forPID: node.representedApp?.pid, bundleID: node.bundleIdentifier) {
             Image(nsImage: icon)
                 .resizable()
                 .interpolation(.high)
@@ -412,20 +418,14 @@ struct RadialSliceLabel: View {
 }
 
 extension MenuNode {
-    /// The icon for an app slice: the running app's live icon, looked up by pid — the
-    /// pre-My-Apps behavior, unchanged — falling back to the on-disk bundle icon by
-    /// bundle id for a curated app that isn't running (Bringr-93j.38). `nil` when neither
-    /// resolves, so the view shows a generic placeholder. Pure system lookups, so the
-    /// fallback is exercised in tests against an always-installed app.
+    /// The icon for an app slice, resolved synchronously and uncached: the running
+    /// app's live icon by pid, falling back to the on-disk bundle icon by bundle id
+    /// for a curated app that isn't running (Bringr-93j.38). `nil` when neither
+    /// resolves, so the view shows a generic placeholder. The wheel itself renders
+    /// through `AppIconStore`'s cache — this direct path shares the store's resolver
+    /// so the two cannot drift, and is exercised in tests against an
+    /// always-installed app.
     var appSliceIcon: NSImage? {
-        if let pid = representedApp?.pid,
-           let icon = NSRunningApplication(processIdentifier: pid)?.icon {
-            return icon
-        }
-        if let bundleIdentifier,
-           let url = CuratedApp.bundleURL(forBundleIdentifier: bundleIdentifier) {
-            return NSWorkspace.shared.icon(forFile: url.path)
-        }
-        return nil
+        AppIconStore.resolveIcon(pid: representedApp?.pid, bundleID: bundleIdentifier)
     }
 }
