@@ -6,15 +6,15 @@
     <description>PieSwitcher updates</description>
     <language>en</language>
     <item>
-      <title>Version 1.1.4</title>
-      <sparkle:version>12</sparkle:version>
-      <sparkle:shortVersionString>1.1.4</sparkle:shortVersionString>
+      <title>Version 1.1.5</title>
+      <sparkle:version>13</sparkle:version>
+      <sparkle:shortVersionString>1.1.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Wed, 29 Jul 2026 15:57:21 +0000</pubDate>
+      <pubDate>Wed, 29 Jul 2026 16:22:27 +0000</pubDate>
       <enclosure
-        url="https://github.com/mekedron/PieSwitcher/releases/download/v1.1.4/PieSwitcher-1.1.4-macOS.dmg"
-        sparkle:edSignature="2wpR9vk9CFFubchGOO3eGLWX+mI8a48g0BNV+H0mTd5G1lUSvHdAq3ksXDIXbZmNr2bCNc4BimGAiZQYBnZqBA=="
-        length="3019917"
+        url="https://github.com/mekedron/PieSwitcher/releases/download/v1.1.5/PieSwitcher-1.1.5-macOS.dmg"
+        sparkle:edSignature="ZKxGCfvYuFvLWhqSOvjzTGLNRhPW7kUsn9qa2guUq5ElwWJY5d1stdJ7zlqBc1kCwoSdvaiVseX8cBvjYTkLBg=="
+        length="3038562"
         type="application/octet-stream"/>
     </item>
   </channel>
