@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SwiftUI
 
 /// Owns the pre-warmed overlay window and drives the menu for each summon.
@@ -215,11 +216,23 @@ final class RadialMenuController: ObservableObject {
     /// `summon` resets the frame and alpha).
     func prewarmFirstRender() {
         guard !isVisible, !machine.isOpen else { return }
-        guard let root = registry.makeMenu(for: .mouseChord) else { return }
+        let clock = PhaseClock()
+        // Resolve the same collection scopes a real summon would (at the current cursor's
+        // display), so the pass warms the exact enumeration path the first summon takes —
+        // including the broadened scan's cold AX probes, which land here, invisibly at
+        // launch, instead of inside the first real open (Bringr-3qp).
+        let display = ScreenLocator.displayBounds(forCursor: NSEvent.mouseLocation)
+        let collection = collectionProvider()
+        guard let root = registry.makeMenu(
+            for: .mouseChord,
+            appsScope: collection.appsScope(forDisplay: display),
+            windowsScope: collection.windowsScope(forDisplay: display)
+        ) else { return }
         appearance = appearanceProvider()
         navigator.setBaseGeometry(appearance.geometry)
         navigator.open(appNodes: root.resolvedChildren())
         syncFromNavigator()
+        clock.lap("resolve+open")
         let side = navigator.overallDiameter
         window.alphaValue = 0
         window.setFrame(
@@ -228,6 +241,8 @@ final class RadialMenuController: ObservableObject {
         window.orderFrontRegardless()
         window.contentView?.layoutSubtreeIfNeeded()
         window.displayIfNeeded()
+        clock.lap("first-draw")
+        clock.report(to: Self.perfLog, label: "prewarm-render")
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.isVisible else { return }
             self.window.orderOut(nil)
@@ -241,6 +256,7 @@ final class RadialMenuController: ObservableObject {
     /// location). Resolves the tree fresh so the wheel reflects live state, and
     /// starts tracking the cursor so hover can drill into apps.
     private func summon(trigger: MenuTrigger, at cursor: CGPoint) {
+        let clock = PhaseClock()
         // Resolve the persisted apps/windows collection scope (Bringr-93j.48) against the
         // display under the cursor; each level scopes screens/Spaces independently, and a
         // `nil` display (headless host) reduces to "all displays" rather than hiding all.
@@ -251,6 +267,7 @@ final class RadialMenuController: ObservableObject {
         guard let root = registry.makeMenu(
             for: trigger, appsScope: appsScope, windowsScope: windowsScope
         ) else { return }
+        clock.lap("scope+menu")
         // Apply the persisted appearance before resolving the tree: the size feeds
         // both the rendered rings and the navigator's hit-testing through one shared
         // geometry, so they stay in lock-step at any size (US-014 AC3).
@@ -274,8 +291,12 @@ final class RadialMenuController: ObservableObject {
         // settings, so the per-hover dwell logic reads frozen state.
         dwellConfig = dwellConfigProvider()
         highlightSource = .mouse
-        navigator.open(appNodes: root.resolvedChildren())
+        clock.lap("settings")
+        let appNodes = root.resolvedChildren()
+        clock.lap("resolve-tree")
+        navigator.open(appNodes: appNodes)
         syncFromNavigator()
+        clock.lap("navigator-open")
         let side = navigator.overallDiameter
         let size = NSSize(width: side, height: side)
         let origin = RadialMenuPlacement.windowOrigin(forCursor: cursor, windowSize: size)
@@ -286,7 +307,23 @@ final class RadialMenuController: ObservableObject {
         window.orderFrontRegardless()
         isVisible = true
         startMenuMonitors()
+        clock.lap("order-front")
+        clock.report(to: Self.perfLog, label: "summon (\(appNodes.count) apps)")
+        // The published rings render, and the frame reaches the screen, on the run
+        // loop's next passes — so these two marks bracket the SwiftUI body + layout
+        // and the first frame commit that the laps above cannot see.
+        DispatchQueue.main.async {
+            clock.lap("swiftui-render")
+            CATransaction.setCompletionBlock {
+                clock.lap("frame-commit")
+                clock.report(to: Self.perfLog, label: "summon to first frame")
+            }
+        }
     }
+
+    /// Timing log for the summon hot path, at `.info` so it persists in the unified
+    /// log: `log show --info --predicate 'subsystem == "com.mekedron.PieSwitcher"'`.
+    static let perfLog = Logger(subsystem: "com.mekedron.PieSwitcher", category: "summon-perf")
 
     /// Commit the slice under `region`: app slices activate the app, window slices
     /// raise and focus the chosen window, and both restore everything else to its

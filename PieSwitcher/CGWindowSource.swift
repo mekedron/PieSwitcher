@@ -14,6 +14,9 @@ final class CGWindowSource: WindowEnumerationSource {
     /// and — via `runningApps()` — which owning apps are ordinary Dock apps (Bringr-93j.51).
     /// Window control mutates its own separate instance.
     private let stateProbe = LiveWindowSystem()
+    /// Background-refreshed AX window state for `classify` (Bringr-3qp), so the
+    /// broadened path's per-app AX IPC stays off the summon hot path.
+    private let axState = AXWindowStateCache()
 
     /// AX-reported window titles for `pid`, used by `WindowEnumerator` when the CG window
     /// list left a window title blank — the common case under Accessibility-only permission
@@ -100,43 +103,39 @@ final class CGWindowSource: WindowEnumerationSource {
     /// managed set but not the AX set is a genuine other-Space window AX can't see. Hidden via
     /// `isHidden`. The Dock-app stamp is set earlier by `rawWindow(from:...)` and carried through.
     ///
-    /// Only apps that actually surfaced an OFF-screen record are AX-probed (Bringr-93j.53): an
+    /// Only apps that actually surfaced an OFF-screen record matter (Bringr-93j.53): an
     /// on-screen record is kept by `WindowEnumerator.shouldCollect`'s onscreen short-circuit
-    /// before it ever consults minimized/hidden/AX-backed, so probing an app whose windows are
-    /// all on-screen is pure wasted IPC — and that IPC (one `copyWindows` per app, one
-    /// `isMinimized` per window) is what made the broadened path lag. The per-window minimized
-    /// read is likewise limited to off-screen window numbers, since on-screen windows are never
-    /// minimized. The managed-Space probe is limited to off-screen Dock-app records — non-Dock
-    /// records are dropped before the managed check matters. On-screen records are returned
-    /// untouched (their defaults already match what the old probe computed for them).
+    /// before it ever consults minimized/hidden/AX-backed. Their AX state answers from
+    /// `AXWindowStateCache` — the per-app AX IPC is the entire cost of the broadened path
+    /// and runs on background refreshes, never on the summon hot path (Bringr-3qp); only a
+    /// pid the cache has never seen is probed synchronously. Hidden state is read live:
+    /// `NSRunningApplication.isHidden` involves no IPC to the target app. The managed-Space
+    /// probe (cheap, window-server) is limited to off-screen Dock-app records. On-screen
+    /// records are returned untouched.
     private func classify(_ raws: [RawWindow]) -> [RawWindow] {
         let offscreen = raws.filter { !$0.isOnscreen }
         guard !offscreen.isEmpty else { return raws }
         let offscreenPIDs = Set(offscreen.map(\.ownerPID))
-        let offscreenNumbers = Set(offscreen.map(\.windowNumber))
         let managedNumbers = CGWindowSpaces.managedWindowNumbers(
             among: offscreen.filter(\.isDockApp).map(\.windowNumber)
         )
 
-        var minimizedNumbers: Set<Int> = []
         var hiddenPIDs: Set<pid_t> = []
-        var axNumbers: Set<Int> = []
+        var states: [pid_t: AXWindowStateCache.AppState] = [:]
         for pid in offscreenPIDs {
-            let app = AppID(pid: pid)
-            if stateProbe.isHidden(app) { hiddenPIDs.insert(pid) }
-            for window in stateProbe.windows(of: app) {
-                axNumbers.insert(window.token)
-                if offscreenNumbers.contains(window.token), stateProbe.isMinimized(window) {
-                    minimizedNumbers.insert(window.token)
-                }
-            }
+            if stateProbe.isHidden(AppID(pid: pid)) { hiddenPIDs.insert(pid) }
+            states[pid] = axState.state(forPID: pid) ?? axState.probeAndStore(pid)
         }
+        // Freshen the snapshot off the hot path so the NEXT broadened read (the next
+        // summon, typically) classifies against current minimized/AX state.
+        axState.refreshSoon(Array(offscreenPIDs))
         return raws.map { raw in
             guard !raw.isOnscreen else { return raw }
+            let state = states[raw.ownerPID]
             return raw.classified(
-                isMinimized: minimizedNumbers.contains(raw.windowNumber),
+                isMinimized: state?.minimizedNumbers.contains(raw.windowNumber) ?? false,
                 isHidden: hiddenPIDs.contains(raw.ownerPID),
-                isAXBacked: axNumbers.contains(raw.windowNumber),
+                isAXBacked: state?.axNumbers.contains(raw.windowNumber) ?? false,
                 isManagedWindow: managedNumbers.contains(raw.windowNumber)
             )
         }
