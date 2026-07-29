@@ -23,93 +23,62 @@ struct ActivationExclusionEditor: View {
     private var listBox: some View {
         List(selection: $selection) {
             ForEach(apps) { app in
-                ExclusionAppRow(app: app)
+                AppListRow(icon: icon(for: app), title: app.name, subtitle: app.bundleIdentifier)
             }
             .onMove { indices, destination in
                 apps.move(fromOffsets: indices, toOffset: destination)
                 persist()
             }
         }
-        .listStyle(.bordered(alternatesRowBackgrounds: true))
-        .frame(height: 200)
-        .overlay {
-            if apps.isEmpty {
-                Text("Add an app to disable the pie menu while that app is active.")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.accentColor, lineWidth: isDropTargeted ? 2 : 0)
-        }
+        .appListBox(height: 200, isDropTargeted: isDropTargeted)
+        .appListEmptyState(
+            "Add an app to disable the pie menu while that app is active.",
+            isVisible: apps.isEmpty
+        )
         .dropDestination(for: URL.self) { urls, _ in
             addBundles(at: urls)
             return true
         } isTargeted: { isDropTargeted = $0 }
     }
 
-    private var controls: some View {
-        HStack(spacing: 8) {
-            addMenu
-
-            Button {
-                removeSelected()
-            } label: {
-                Image(systemName: "minus").frame(width: 18)
-            }
-            .buttonStyle(.bordered)
-            .disabled(selection == nil)
-            .help("Remove the selected app from the exclusion list")
-
-            Spacer()
-        }
-        .controlSize(.small)
+    /// The bundle's Finder icon, or a generic application icon when the app is no longer
+    /// installed (a stale entry still shows, so the user can choose to remove it — the spec
+    /// calls this out as an explicit edge case).
+    private func icon(for app: CuratedApp) -> NSImage {
+        guard let url = app.bundleURL else { return NSWorkspace.shared.icon(for: .application) }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
-    /// Plus button as a menu: the Open panel plus a direct list of running apps. The panel
-    /// alone is not enough — the apps this list exists for (games, 3D suites) often live
-    /// outside /Applications, in a Steam or launcher library the user would have to hunt
-    /// through. Picking the app they are already running is the shortest path there is.
-    private var addMenu: some View {
-        Menu {
-            Button("Choose Application…") { addViaPanel() }
-            let running = runningApps()
-            if !running.isEmpty {
-                Divider()
-                ForEach(running) { app in
-                    Button {
-                        add(app.curated)
-                    } label: {
-                        Label { Text(app.curated.name) } icon: { Image(nsImage: app.icon) }
+    private var controls: some View {
+        AppListControls(
+            removeHelp: "Remove the selected app from the exclusion list",
+            isRemoveEnabled: selection != nil,
+            onRemove: removeSelected
+        ) {
+            AppListAddMenu(help: "Add a running or installed app to the exclusion list") {
+                Button("Choose Application…") { addViaPanel() }
+
+                let running = RunningAppCandidate.current()
+                if !running.isEmpty {
+                    Divider()
+                    ForEach(running) { app in
+                        Button {
+                            add(app.curated)
+                        } label: {
+                            Label { Text(app.name) } icon: { Image(nsImage: app.icon) }
+                        }
                     }
                 }
             }
-        } label: {
-            Image(systemName: "plus").frame(width: 18)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("Add a running or installed app to the exclusion list")
     }
 
-    /// Open panel scoped to applications, defaulting to /Applications, so the user can
-    /// exclude any installed app — game, drawing app, CAD app — even when it isn't
-    /// running. Picks merge through `ActivationExclusionList.adding`, which dedupes by
-    /// bundle id.
+    /// Picks merge through `ActivationExclusionList.adding`, which dedupes by bundle id.
     private func addViaPanel() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "Exclude"
-        panel.message = "Choose apps that should disable the pie menu when they're active"
-        guard panel.runModal() == .OK else { return }
-        addBundles(at: panel.urls)
+        addBundles(at: AppBundlePanel.pick(
+            prompt: "Exclude",
+            message: "Choose apps that should disable the pie menu when they're active"
+        ))
     }
 
     private func addBundles(at urls: [URL]) {
@@ -127,27 +96,6 @@ struct ActivationExclusionEditor: View {
         persist()
     }
 
-    /// Currently-running ordinary (Dock) apps — the ones that can own focus and therefore
-    /// trigger the exclusion — sorted by display name. PieSwitcher itself and apps with no
-    /// bundle id are skipped; duplicate instances of one bundle id collapse to a single entry.
-    /// Mirrors `IgnoreListSettings.runningApps`.
-    private func runningApps() -> [RunningExclusionCandidate] {
-        let selfID = Bundle.main.bundleIdentifier
-        var seen = Set<String>()
-        return NSWorkspace.shared.runningApplications
-            .filter { $0.activationPolicy == .regular }
-            .compactMap { app -> RunningExclusionCandidate? in
-                guard let id = app.bundleIdentifier, id != selfID, seen.insert(id).inserted else {
-                    return nil
-                }
-                return RunningExclusionCandidate(
-                    curated: CuratedApp(bundleIdentifier: id, name: app.localizedName ?? id),
-                    icon: app.icon ?? NSWorkspace.shared.icon(for: .application)
-                )
-            }
-            .sorted { $0.curated.name.localizedCaseInsensitiveCompare($1.curated.name) == .orderedAscending }
-    }
-
     private func removeSelected() {
         guard let id = selection else { return }
         apps.removeAll { $0.id == id }
@@ -157,41 +105,6 @@ struct ActivationExclusionEditor: View {
 
     private func persist() {
         ActivationExclusionList.save(apps)
-    }
-}
-
-/// One running app offered by the quick-add menu: the entry that would be stored, plus the
-/// live icon for the menu label. Identified by the curated entry's bundle id.
-private struct RunningExclusionCandidate: Identifiable {
-    let curated: CuratedApp
-    let icon: NSImage
-
-    var id: String { curated.id }
-}
-
-/// One row in the exclusion-list editor: the app's Finder icon and display name.
-/// Mirrors `MyAppsEditor`'s row so the two list-style editors look identical.
-private struct ExclusionAppRow: View {
-    let app: CuratedApp
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: icon)
-                .resizable()
-                .frame(width: 18, height: 18)
-            Text(app.name)
-                .lineLimit(1)
-        }
-    }
-
-    /// The bundle's Finder icon, or a generic application icon when the app is no
-    /// longer installed (a stale entry still shows, so the user can choose to remove
-    /// it — the spec calls this out as an explicit edge case).
-    private var icon: NSImage {
-        if let url = app.bundleURL {
-            return NSWorkspace.shared.icon(forFile: url.path)
-        }
-        return NSWorkspace.shared.icon(for: .application)
     }
 }
 

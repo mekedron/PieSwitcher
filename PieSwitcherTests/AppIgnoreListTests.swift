@@ -86,6 +86,45 @@ final class AppIgnoreListTests: XCTestCase {
         XCTAssertEqual(AppIgnoreList.appending("com.b", to: "com.a,"), "com.a, com.b")
     }
 
+    // MARK: - rawEntries (AC: the editor lists entries as typed, not case-folded)
+
+    func testRawEntriesPreserveCasingAndOrder() {
+        XCTAssertEqual(AppIgnoreList.rawEntries(" DDPM , org.blenderfoundation.blender "),
+                       ["DDPM", "org.blenderfoundation.blender"],
+                       "rows show what the user typed — parse's lowercasing is for matching only")
+    }
+
+    func testRawEntriesDropBlanks() {
+        XCTAssertEqual(AppIgnoreList.rawEntries("DDPM, , "), ["DDPM"])
+        XCTAssertEqual(AppIgnoreList.rawEntries("   ,  , "), [])
+    }
+
+    // MARK: - removing (AC: the editor's minus button drops exactly one row)
+
+    func testRemovingDropsTheEntryAndRejoinsTheRest() {
+        XCTAssertEqual(AppIgnoreList.removing("com.b", from: "com.a, com.b, com.c"),
+                       "com.a, com.c")
+    }
+
+    func testRemovingMatchesCaseInsensitively() {
+        XCTAssertEqual(AppIgnoreList.removing("ddpm", from: "DDPM, com.a"), "com.a",
+                       "a row listed as typed still removes when matched case-folded")
+    }
+
+    func testRemovingAnAbsentEntryLeavesTheListIntactAndNormalized() {
+        XCTAssertEqual(AppIgnoreList.removing("com.z", from: "com.a,com.b"), "com.a, com.b")
+    }
+
+    func testRemovingTheLastEntryYieldsEmptyText() {
+        XCTAssertEqual(AppIgnoreList.removing("com.a", from: "com.a"), "")
+    }
+
+    func testRemovingRoundTripsThroughParse() {
+        let text = AppIgnoreList.removing("DDPM", from: "DDPM, org.blenderfoundation.blender")
+        XCTAssertEqual(AppIgnoreList(text: text).entries, ["org.blenderfoundation.blender"],
+                       "what the editor writes back is still a list the wheel can match against")
+    }
+
     // MARK: - persistence
 
     func testCurrentIsEmptyWhenUnset() {

@@ -54,3 +54,6 @@ fastlane/test_output
 
 # Sparkle Ed25519 private key (paste into GitHub secret SPARKLE_PRIVATE_KEY; never commit)
 sparkle_private_key
+
+# Local validation screenshots — never committed
+.validation/

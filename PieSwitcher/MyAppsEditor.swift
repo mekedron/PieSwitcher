@@ -24,68 +24,40 @@ struct MyAppsEditor: View {
     private var listBox: some View {
         List(selection: $selection) {
             ForEach(apps) { app in
-                MyAppRow(app: app)
+                AppListRow(icon: icon(for: app), title: app.name)
             }
             .onMove { indices, destination in
                 apps.move(fromOffsets: indices, toOffset: destination)
                 persist()
             }
         }
-        .listStyle(.bordered(alternatesRowBackgrounds: true))
-        .frame(height: 160)
-        .overlay {
-            if apps.isEmpty {
-                Text("No apps yet")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.accentColor, lineWidth: isDropTargeted ? 2 : 0)
-        }
+        .appListBox(height: 160, isDropTargeted: isDropTargeted)
+        .appListEmptyState("No apps yet", isVisible: apps.isEmpty)
         .dropDestination(for: URL.self) { urls, _ in
             addBundles(at: urls)
             return true
         } isTargeted: { isDropTargeted = $0 }
     }
 
-    private var controls: some View {
-        HStack(spacing: 8) {
-            Button {
-                addViaPanel()
-            } label: {
-                Image(systemName: "plus").frame(width: 18)
-            }
-            .help("Add an app…")
-
-            Button {
-                removeSelected()
-            } label: {
-                Image(systemName: "minus").frame(width: 18)
-            }
-            .disabled(selection == nil)
-            .help("Remove the selected app")
-
-            Spacer()
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+    /// The bundle's Finder icon, or a generic application icon when the app is no
+    /// longer installed (a stale entry still shows, so the user can remove it).
+    private func icon(for app: CuratedApp) -> NSImage {
+        guard let url = app.bundleURL else { return NSWorkspace.shared.icon(for: .application) }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
-    /// Native Open panel scoped to applications, defaulting to /Applications, so the
-    /// user can pick one or more apps to pin even when they aren't running.
+    private var controls: some View {
+        AppListControls(
+            removeHelp: "Remove the selected app",
+            isRemoveEnabled: selection != nil,
+            onRemove: removeSelected
+        ) {
+            AppListAddButton(help: "Add an app…", action: addViaPanel)
+        }
+    }
+
     private func addViaPanel() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "Add"
-        panel.message = "Choose apps to pin to the wheel"
-        guard panel.runModal() == .OK else { return }
-        addBundles(at: panel.urls)
+        addBundles(at: AppBundlePanel.pick(prompt: "Add", message: "Choose apps to pin to the wheel"))
     }
 
     private func addBundles(at urls: [URL]) {
@@ -104,30 +76,6 @@ struct MyAppsEditor: View {
 
     private func persist() {
         CuratedApps.save(apps)
-    }
-}
-
-/// One row in the My Apps editor: the app's Finder icon and display name.
-private struct MyAppRow: View {
-    let app: CuratedApp
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(nsImage: icon)
-                .resizable()
-                .frame(width: 18, height: 18)
-            Text(app.name)
-                .lineLimit(1)
-        }
-    }
-
-    /// The bundle's Finder icon, or a generic application icon when the app is no
-    /// longer installed (a stale entry still shows, so the user can remove it).
-    private var icon: NSImage {
-        if let url = app.bundleURL {
-            return NSWorkspace.shared.icon(forFile: url.path)
-        }
-        return NSWorkspace.shared.icon(for: .application)
     }
 }
 

@@ -315,22 +315,21 @@ private struct MyAppsPane: View {
     }
 }
 
-/// The "Hidden" pane: thin wrapper that drops the existing `IgnoreListSettings`
-/// into the standard `PreferencesPane` Form so the section styling matches the
-/// rest of the window. The footer names the other pane outright, because this
-/// one filters the wheel's contents and Activation → Excluded Apps stops the
-/// wheel from opening — the two are easy to reach for interchangeably.
+/// The "Hidden" pane: thin wrapper that drops `HiddenAppsEditor` into the
+/// standard `PreferencesPane` Form so the section styling matches the rest of
+/// the window. The footer names the other pane outright, because this one
+/// filters the wheel's contents and Activation → Excluded Apps stops the wheel
+/// from opening — the two are easy to reach for interchangeably.
 private struct HiddenAppsPane: View {
     var body: some View {
         PreferencesPane {
             Section {
-                IgnoreListSettings()
+                HiddenAppsEditor()
             } header: {
                 Text("Hidden apps")
             } footer: {
                 Text("Apps listed here never appear in the wheel, even if they have open "
-                     + "windows. Separate entries with commas — each a bundle identifier "
-                     + "(com.apple.Safari) or an app name (Safari).\n\n"
+                     + "windows.\n\n"
                      + "This only filters what the wheel shows — a hidden app can still "
                      + "summon it. To stop the wheel from opening at all while an app is "
                      + "active, add it under Activation → Excluded Apps.")

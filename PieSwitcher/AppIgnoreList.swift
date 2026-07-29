@@ -45,8 +45,16 @@ struct AppIgnoreList: Equatable, Sendable {
     /// harmless). App names containing commas aren't supported — an accepted v1 limitation,
     /// since the comma is the separator and reverse-DNS bundle ids never contain one.
     static func parse(_ text: String) -> [String] {
+        rawEntries(text).map { $0.lowercased() }
+    }
+
+    /// The entries in stored order with their original casing — what the editor lists and
+    /// what removal matches against. `parse` lowercases for matching, which is right for
+    /// comparisons and wrong for display: it would show "ddpm" for what the user typed as
+    /// "DDPM".
+    static func rawEntries(_ text: String) -> [String] {
         text.split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
 
@@ -71,5 +79,15 @@ struct AppIgnoreList: Equatable, Sendable {
         let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ","))
         let base = text.trimmingCharacters(in: separators)
         return base.isEmpty ? trimmed : "\(base), \(trimmed)"
+    }
+
+    /// Drop `entry` (matched case-insensitively) from the comma-separated `text`, rebuilding
+    /// the remaining entries in stored order with the canonical ", " separator. Returns the
+    /// new text; the caller persists it to `defaultsKey`.
+    static func removing(_ entry: String, from text: String) -> String {
+        let target = entry.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return rawEntries(text)
+            .filter { $0.lowercased() != target }
+            .joined(separator: ", ")
     }
 }
