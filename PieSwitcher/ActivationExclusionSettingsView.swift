@@ -127,7 +127,7 @@ struct ActivationExclusionSettings: View {
                      + "to the app normally — with no hold delay. Use it for games, 3D, and "
                      + "drawing apps that need the same mouse buttons the wheel summons on.\n\n"
                      + "This does not change what the wheel contains. To keep an app out of "
-                     + "the wheel's list, add it under Apps → Hidden.")
+                     + "the wheel's list, add it under Contents → Hidden.")
             }
         }
     }

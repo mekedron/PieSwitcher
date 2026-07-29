@@ -1,12 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// The "Appearance" Preferences pane (US-014): the wheel's size, slice style, the Liquid
-/// Glass variant + tint (Bringr-93j.117), label visibility, and the skip-single-window
-/// shortcut. Bringr-93j.106 reorganised this into a `PreferencesPane`-backed `Form` so
-/// the controls align in a clean two-column layout matching Logic Pro's Preferences
-/// screens. Every key is read fresh by `RadialAppearance.current` at each summon, so a
-/// change applies on the next open without a relaunch.
+/// The Appearance tab (US-014): the wheel's size, slice style, the Liquid Glass variant
+/// + tint (Bringr-93j.117), label visibility, and the skip-single-window shortcut — the
+/// tab holds only visual settings, so it carries no sub-tab strip and this view is its
+/// whole body. A `PreferencesPane`-backed `Form` aligns the controls in the two-column
+/// layout the rest of the window uses. Every key is read fresh by
+/// `RadialAppearance.current` at each summon, so a change applies on the next open
+/// without a relaunch.
 struct AppearanceSettings: View {
     @AppStorage(RadialAppearance.radiusDefaultsKey)
     private var outerRadius = Double(RadialAppearance.defaultOuterRadius)

@@ -1,11 +1,12 @@
 import SwiftUI
 
 /// The reveal-strategy picker (US-013) and the optional "leave only my selection on
-/// screen" toggle (Bringr-93j.27). The Wheel tab's Behavior sub-tab uses this pane
-/// after the Bringr-93j.106 redesign — both controls live inside a `PreferencesPane`-
-/// backed `Form` so the row alignment matches the rest of the window. Every key is
-/// read fresh at each summon by `RadialMenuController`, so a change here applies on
-/// the next open without a relaunch.
+/// screen" toggle (Bringr-93j.27). The Selection tab's "Windows" sub-tab uses this
+/// pane: both controls decide what happens to the user's *windows* while they hover
+/// the wheel and once they commit, which is a selection concern, not a visual one.
+/// They live inside a `PreferencesPane`-backed `Form` so the row alignment matches
+/// the rest of the window. Every key is read fresh at each summon by
+/// `RadialMenuController`, so a change here applies on the next open without a relaunch.
 ///
 /// The "leave only my selection on screen" toggle is gated to `.raiseToFront`
 /// (Bringr-93j.89): `.hideOthers` already hides everything else at hover time, so

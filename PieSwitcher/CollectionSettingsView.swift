@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Collection pane of the Apps tab after the Bringr-93j.106 redesign (Bringr-93j.48).
+/// The Scope pane of the Contents tab (Bringr-93j.48).
 /// Folds the per-level "all screens" toggles, the minimized/hidden inclusion toggles,
 /// and the Dock-app inclusion toggle (Bringr-93j.98) into a single `PreferencesPane`-
 /// backed `Form` so the rows align with the rest of the window. Keys are read fresh at

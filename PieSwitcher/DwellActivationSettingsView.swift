@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Dwell pane of the Controls tab after the Bringr-93j.106 redesign (Bringr-93j.105
+/// The Dwell pane of the Selection tab (Bringr-93j.105
 /// + Bringr-93j.107): the on/off toggle, the dwell duration slider, and the
 /// drag-and-drop-only gate, with in-pane blurbs so a reader understands what each
 /// option does before flipping it. Backed by a `PreferencesPane` `Form` so the rows

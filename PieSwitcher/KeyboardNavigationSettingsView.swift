@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The keyboard-navigation Preferences group (Bringr-93j.71). The Controls tab's
-/// "Keyboard" sub-tab uses this pane (Bringr-93j.106), backed by a `PreferencesPane`
-/// `Form` so the rows align with the rest of the window. All keys are read fresh at
+/// The keyboard-navigation Preferences group (Bringr-93j.71). The Selection tab's
+/// "Keyboard" sub-tab uses this pane — the keys that drive an already-open wheel, as
+/// against Activation's Keyboard pane, which is the key that opens one. Backed by a
+/// `PreferencesPane` `Form` so the rows align with the rest of the window. All keys are read fresh at
 /// each summon by `RadialMenuController`, so a change applies on the next open
 /// without a relaunch. Arrow and number navigation are independent toggles that can
 /// be on together; the confirm and multi-window-commit toggles only appear with

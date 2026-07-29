@@ -1,9 +1,15 @@
 import SwiftUI
 
-/// The Preferences window's top-level tabs after the Bringr-93j.106 redesign. The
-/// 8 narrow tabs in Bringr-93j.97 were regrouped into 6 broader ones; tabs heavy
-/// enough to need it get a sub-tab strip (Activation, Wheel, Apps, Controls).
-/// Each tab carries an SF Symbol shown above its label in the icon toolbar.
+/// The Preferences window's top-level tabs. Each tab carries an SF Symbol shown
+/// above its label in the icon toolbar.
+///
+/// The tabs are cut along the **stage of a summon** — open the wheel, decide
+/// what is in it, pick from it, decide how it looks — not along the object being
+/// configured. Every setting in this app is about the wheel, so a tab named for
+/// the wheel would cover everything and separate nothing; the stage is what
+/// actually tells the user which tab to open. It is also what keeps the two
+/// keyboard panes apart: Activation → Keyboard is the key that summons,
+/// Selection → Keyboard is the keys that navigate an open wheel.
 ///
 /// The selected tab is persisted under `defaultsKey` so the window reopens where
 /// the user left it, and the menu bar's "About PieSwitcher" item writes
@@ -12,9 +18,9 @@ import SwiftUI
 enum PreferencesTab: String, CaseIterable {
     case general
     case activation
-    case wheel
-    case apps
-    case controls
+    case contents
+    case selection
+    case appearance
     case about
 
     static let defaultsKey = "preferences.selectedTab"
@@ -24,9 +30,9 @@ enum PreferencesTab: String, CaseIterable {
         switch self {
         case .general: return "General"
         case .activation: return "Activation"
-        case .wheel: return "Wheel"
-        case .apps: return "Apps"
-        case .controls: return "Controls"
+        case .contents: return "Contents"
+        case .selection: return "Selection"
+        case .appearance: return "Appearance"
         case .about: return "About"
         }
     }
@@ -35,9 +41,9 @@ enum PreferencesTab: String, CaseIterable {
         switch self {
         case .general: return "gearshape"
         case .activation: return "cursorarrow.click.2"
-        case .wheel: return "circle.dashed.inset.filled"
-        case .apps: return "square.grid.3x3.fill"
-        case .controls: return "keyboard"
+        case .contents: return "list.bullet.rectangle"
+        case .selection: return "hand.point.up.left"
+        case .appearance: return "paintbrush"
         case .about: return "info.circle"
         }
     }
@@ -69,9 +75,9 @@ struct PreferencesView: View {
                 switch selection.wrappedValue {
                 case .general: GeneralTab()
                 case .activation: ActivationTab()
-                case .wheel: WheelTab()
-                case .apps: AppsTab()
-                case .controls: ControlsTab()
+                case .contents: ContentsTab()
+                case .selection: SelectionTab()
+                case .appearance: AppearanceSettings()
                 case .about: AboutTab()
                 }
             }
@@ -188,97 +194,54 @@ private struct ActivationTab: View {
     }
 }
 
-// MARK: - Wheel
+// MARK: - Contents
 
-/// Sub-tab selector for the Wheel tab (Behavior / Appearance). Behaviour is the
-/// reveal strategy + hide-on-commit; Appearance is everything visual (size,
-/// opacity, glass). Both pull from the same wheel domain so they share a tab,
-/// but the two sets of controls are unrelated to each other so they get
-/// separate panes.
-enum WheelSubTab: String, PreferencesSubTab {
-    case behavior
-    case appearance
-
-    static let defaultsKey = "preferences.wheelSubTab"
-    static let `default`: WheelSubTab = .behavior
-
-    var title: String {
-        switch self {
-        case .behavior: return "Behavior"
-        case .appearance: return "Appearance"
-        }
-    }
-}
-
-private struct WheelTab: View {
-    @AppStorage(WheelSubTab.defaultsKey)
-    private var subTabRaw = WheelSubTab.default.rawValue
-
-    var body: some View {
-        let selection = Binding(
-            get: { WheelSubTab(rawValue: subTabRaw) ?? .default },
-            set: { subTabRaw = $0.rawValue }
-        )
-        VStack(spacing: 0) {
-            PreferencesSubTabs(selection: selection)
-
-            switch selection.wrappedValue {
-            case .behavior: RevealSettings()
-            case .appearance: AppearanceSettings()
-            }
-        }
-    }
-}
-
-// MARK: - Apps
-
-/// Sub-tab selector for the Apps tab. "My Apps" is the curated pinned list and
-/// the show-other-running-apps toggle; "Hidden" is the ignore list; "Sorting"
-/// is the ordering rules; "Collection" is the screen/space/minimized/hidden
-/// filters that decide which apps and windows the wheel can even see. Putting
-/// these four under one top-level tab keeps the toolbar lean (vs. the
-/// Bringr-93j.97 design where each was its own tab).
+/// Sub-tab selector for the Contents tab — everything that decides what the
+/// wheel lists. "Apps" is the curated pinned list and the show-other-running-apps
+/// toggle; "Hidden" is the ignore list; "Sorting" is the ordering rules; "Scope"
+/// is the screen/space/minimized/hidden filters that decide which apps and
+/// windows the wheel can even see.
 ///
 /// "Hidden" — not "Excluded" — because Activation owns a pane named "Excluded
 /// Apps" that suppresses the wheel's *activation*. Two panes named the same
 /// thing read as one setting, so a user who wants the wheel to stay shut inside
 /// Blender types the bundle id here and gets a list filter instead.
-enum AppsSubTab: String, PreferencesSubTab {
-    case pinned
+enum ContentsSubTab: String, PreferencesSubTab {
+    case apps
     case hidden
     case sorting
-    case collection
+    case scope
 
-    static let defaultsKey = "preferences.appsSubTab"
-    static let `default`: AppsSubTab = .pinned
+    static let defaultsKey = "preferences.contentsSubTab"
+    static let `default`: ContentsSubTab = .apps
 
     var title: String {
         switch self {
-        case .pinned: return "My Apps"
+        case .apps: return "Apps"
         case .hidden: return "Hidden"
         case .sorting: return "Sorting"
-        case .collection: return "Collection"
+        case .scope: return "Scope"
         }
     }
 }
 
-private struct AppsTab: View {
-    @AppStorage(AppsSubTab.defaultsKey)
-    private var subTabRaw = AppsSubTab.default.rawValue
+private struct ContentsTab: View {
+    @AppStorage(ContentsSubTab.defaultsKey)
+    private var subTabRaw = ContentsSubTab.default.rawValue
 
     var body: some View {
         let selection = Binding(
-            get: { AppsSubTab(rawValue: subTabRaw) ?? .default },
+            get: { ContentsSubTab(rawValue: subTabRaw) ?? .default },
             set: { subTabRaw = $0.rawValue }
         )
         VStack(spacing: 0) {
             PreferencesSubTabs(selection: selection)
 
             switch selection.wrappedValue {
-            case .pinned: MyAppsPane()
+            case .apps: MyAppsPane()
             case .hidden: HiddenAppsPane()
             case .sorting: SortingSettings()
-            case .collection: CollectionSettings()
+            case .scope: CollectionSettings()
             }
         }
     }
@@ -338,37 +301,42 @@ private struct HiddenAppsPane: View {
     }
 }
 
-// MARK: - Controls
+// MARK: - Selection
 
-/// Sub-tab selector for the Controls tab (Keyboard / Trackpad / Dwell).
-/// "Controls" is everything that happens once the wheel is already open —
-/// distinct from Activation, which is about getting the wheel up in the first
-/// place. Bundles the keyboard navigation, trackpad haptics, and dwell-to-
-/// commit timer under one top-level tab.
-enum ControlsSubTab: String, PreferencesSubTab {
+/// Sub-tab selector for the Selection tab — everything that happens once the
+/// wheel is already open, from moving between slices to what the desktop looks
+/// like after a commit. "Keyboard" is arrow/number navigation, "Trackpad" the
+/// hover haptics, "Dwell" the rest-to-commit timer, "Windows" what happens to
+/// the windows themselves as you hover and once you pick.
+///
+/// Its Keyboard pane and Activation's are distinct: this one is the keys that
+/// drive an open wheel, Activation's is the key that opens it.
+enum SelectionSubTab: String, PreferencesSubTab {
     case keyboard
     case trackpad
     case dwell
+    case windows
 
-    static let defaultsKey = "preferences.controlsSubTab"
-    static let `default`: ControlsSubTab = .keyboard
+    static let defaultsKey = "preferences.selectionSubTab"
+    static let `default`: SelectionSubTab = .keyboard
 
     var title: String {
         switch self {
         case .keyboard: return "Keyboard"
         case .trackpad: return "Trackpad"
         case .dwell: return "Dwell"
+        case .windows: return "Windows"
         }
     }
 }
 
-private struct ControlsTab: View {
-    @AppStorage(ControlsSubTab.defaultsKey)
-    private var subTabRaw = ControlsSubTab.default.rawValue
+private struct SelectionTab: View {
+    @AppStorage(SelectionSubTab.defaultsKey)
+    private var subTabRaw = SelectionSubTab.default.rawValue
 
     var body: some View {
         let selection = Binding(
-            get: { ControlsSubTab(rawValue: subTabRaw) ?? .default },
+            get: { SelectionSubTab(rawValue: subTabRaw) ?? .default },
             set: { subTabRaw = $0.rawValue }
         )
         VStack(spacing: 0) {
@@ -378,6 +346,7 @@ private struct ControlsTab: View {
             case .keyboard: KeyboardNavigationSettings()
             case .trackpad: TrackpadHapticsSettings()
             case .dwell: DwellActivationSettings()
+            case .windows: RevealSettings()
             }
         }
     }

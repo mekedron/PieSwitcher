@@ -120,8 +120,8 @@ PieSwitcher v1.0 ships with all of the following — every item below is in the 
 - **My Apps (pinned)** — pin a custom set of apps that lead the wheel in your chosen order. Drag bundles from Finder or the Dock onto the list, or use the `+` button.
 - **Show other running apps** — toggle whether non‑pinned running apps trail your pinned ones, or hide them entirely.
 - **Sorting** — pinned apps keep their curated order; running apps either follow Dock left‑to‑right (default, "Keep Finder last" optional) or sort alphabetically.
-- **Excluded apps** — a separate ignore list that hides apps from the wheel even when running, by bundle id or app name.
-- **Collection scope** — choose per level whether the wheel collects apps/windows from the current display only or all displays, the current Space only or all Spaces, and whether to include minimised or hidden windows.
+- **Hidden apps** — a separate list that keeps apps out of the wheel even when running, by bundle id or app name. Distinct from *Activation → Excluded Apps*, which stops the wheel from opening at all while an app is frontmost.
+- **Scope** — choose per level whether the wheel collects apps/windows from the current display only or all displays, the current Space only or all Spaces, and whether to include minimised or hidden windows.
 
 **App‑level conveniences**
 - **Launch from pinned** — a pinned app that isn't running gets launched (and reopened, not just activated) when you commit it from the wheel.
@@ -237,16 +237,18 @@ Open **Preferences…** from the menu‑bar icon (⌘,). Every setting is persis
 | **Activation** | **Mouse** | Which button(s) summon the wheel; hold delay; *blocking* (suppress the buttons' normal action while you hold); *lock* (fully drop those button events). |
 | | **Keyboard** | Two shortcut slots with a recorder; hold delay; left/right modifier distinction. |
 | | **Excluded Apps** | Apps where activation triggers stay inert while they're frontmost. |
-| **Wheel** | **Behavior** | [Reveal strategy](#reveal-strategy); *Hide on commit* (leave only the picked app on screen after commit). |
-| | **Appearance** | Outer radius, slice fill opacity, inner radius padding, label visibility (apps / windows), Liquid Glass on/off, glass shadow opacity, content shadow opacity, skip single‑window sub‑wheel. |
-| **Apps** | **My Apps** | Pinned apps in your chosen order; toggle *Show all other running apps*. |
-| | **Excluded** | Hide specific apps from the wheel by bundle id or name. |
+| **Contents** | **Apps** | Pinned apps in your chosen order; toggle *Show all other running apps*. |
+| | **Hidden** | Keep specific apps out of the wheel, by bundle id or name. |
 | | **Sorting** | Pinned order is fixed; running apps follow Dock left‑to‑right (default) or alphabetical. *Keep Finder last* moves Finder from its Dock‑first slot to the end. |
-| | **Collection** | Per level: current display vs all; current Space vs all; include minimised windows; include hidden apps. |
-| **Controls** | **Keyboard** | Inside‑the‑wheel navigation: enable, arrows, number keys, require Return to confirm, *Close on unsupported key*, *Commit app without window choice*. |
+| | **Scope** | Per level: current display vs all; current Space vs all; include minimised windows; include hidden apps. |
+| **Selection** | **Keyboard** | Inside‑the‑wheel navigation: enable, arrows, number keys, require Return to confirm, *Close on unsupported key*, *Commit app without window choice*. |
 | | **Trackpad** | Haptic feedback on slice crossings (off / light / medium / strong). |
 | | **Dwell** | Auto‑commit after the cursor rests on a slice; configurable duration (1–10 s); optional *only during drag*. |
+| | **Windows** | [Reveal strategy](#reveal-strategy); *Leave only my selection on screen* after commit. |
+| **Appearance** | — | Outer radius, slice fill opacity, inner radius padding, label visibility (apps / windows), Liquid Glass on/off, glass shadow opacity, content shadow opacity, skip single‑window sub‑wheel. |
 | **About** | — | Version, repo link, *Check for Updates…*. |
+
+The tabs follow the stages of a summon — open the wheel, decide what's in it, pick from it, decide how it looks. That's also what keeps the two **Keyboard** panes apart: *Activation → Keyboard* is the key that opens the wheel, *Selection → Keyboard* is the keys that drive one that's already open.
 
 ### Reveal strategy
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Sorting pane of the Apps tab after the Bringr-93j.106 redesign. The apps
+/// The Sorting pane of the Contents tab. The apps
 /// sort-order picker, the "don't sort my pinned apps" toggle (Bringr-93j.34), and the
 /// "Keep Finder last" toggle for the Dock-position order (Bringr-93j.55), all inside a
 /// `PreferencesPane`-backed `Form` so the rows align with the rest of the window. Keys
