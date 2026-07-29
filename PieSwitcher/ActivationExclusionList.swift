@@ -66,14 +66,22 @@ struct ActivationExclusionList: Equatable, Sendable {
     /// to an app bundle are skipped, as are duplicates within one drop. Mirrors
     /// `CuratedApps.adding`.
     static func adding(bundlesAt urls: [URL], to existing: [CuratedApp]) -> [CuratedApp] {
-        var result = existing
-        var seen = Set(existing.map(\.bundleIdentifier))
-        for url in urls {
-            guard let app = CuratedApp(bundleAt: url),
-                  seen.insert(app.bundleIdentifier).inserted else { continue }
-            result.append(app)
+        urls.reduce(into: existing) { result, url in
+            guard let app = CuratedApp(bundleAt: url) else { return }
+            result = adding(app, to: result)
         }
-        return result
+    }
+
+    /// Append one app unless its bundle id is already listed, matched case-insensitively so
+    /// an entry added from a running instance can't duplicate one added from disk. Shared by
+    /// the Open-panel/drop path above and the running-apps quick-add menu, so both dedupe
+    /// identically.
+    static func adding(_ app: CuratedApp, to existing: [CuratedApp]) -> [CuratedApp] {
+        let lower = app.bundleIdentifier.lowercased()
+        guard !existing.contains(where: { $0.bundleIdentifier.lowercased() == lower }) else {
+            return existing
+        }
+        return existing + [app]
     }
 }
 

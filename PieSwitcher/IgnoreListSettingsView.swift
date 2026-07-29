@@ -2,12 +2,15 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The "Excluded Apps" settings group (Bringr-93j.59): a free-text field for the
+/// The "Hidden Apps" settings group (Bringr-93j.59): a free-text field for the
 /// comma-separated ignore list and an Add menu for picking a running or installed
-/// app. The Apps tab's "Excluded" sub-tab (Bringr-93j.106) wraps this view in a
+/// app. The Apps tab's "Hidden" sub-tab (Bringr-93j.106) wraps this view in a
 /// `PreferencesPane` Section so the heading and footer styling match the rest of
 /// the window. The same key is read fresh at each summon via `AppIgnoreList.current`,
 /// so an edit applies on the next open without a relaunch.
+///
+/// Hiding an app only filters the wheel's contents. `ActivationExclusionList` is the
+/// list that stops the wheel from opening while an app is frontmost.
 struct IgnoreListSettings: View {
     @AppStorage(AppIgnoreList.defaultsKey) private var text = ""
 
@@ -41,7 +44,7 @@ struct IgnoreListSettings: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("Add a running or installed app to the exclusion list")
+        .help("Add a running or installed app to the hidden list")
     }
 
     private func append(_ entry: String) {
@@ -49,7 +52,7 @@ struct IgnoreListSettings: View {
     }
 
     /// Open panel scoped to applications, mirroring `MyAppsEditor`, so any installed app can be
-    /// excluded even when it isn't running. Each picked bundle's id is appended.
+    /// hidden even when it isn't running. Each picked bundle's id is appended.
     private func addViaPanel() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -57,7 +60,7 @@ struct IgnoreListSettings: View {
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = [.application]
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "Exclude"
+        panel.prompt = "Hide"
         panel.message = "Choose apps to keep out of the wheel"
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {

@@ -115,6 +115,32 @@ final class ActivationExclusionListTests: XCTestCase {
                        "the same bundle picked twice in one panel run is added once")
     }
 
+    // MARK: - Adding one app (AC: running-apps quick-add dedupes like the panel path)
+
+    func testAddingRunningAppAppendsAfterExistingOnes() {
+        let existing = [CuratedApp(bundleIdentifier: "com.example.a", name: "A")]
+
+        let merged = ActivationExclusionList.adding(
+            CuratedApp(bundleIdentifier: "org.blenderfoundation.blender", name: "Blender"),
+            to: existing
+        )
+
+        XCTAssertEqual(merged.map(\.bundleIdentifier), ["com.example.a", "org.blenderfoundation.blender"],
+                       "an app picked from the running-apps menu appends after existing entries")
+    }
+
+    func testAddingRunningAppAlreadyListedIsANoOpRegardlessOfCase() {
+        let existing = [CuratedApp(bundleIdentifier: "org.blenderfoundation.blender", name: "Blender")]
+
+        let merged = ActivationExclusionList.adding(
+            CuratedApp(bundleIdentifier: "ORG.BlenderFoundation.Blender", name: "Blender"),
+            to: existing
+        )
+
+        XCTAssertEqual(merged, existing,
+                       "the quick-add menu can't duplicate an entry added from disk under different casing")
+    }
+
     func testAddingSkipsUnresolvableURLs() {
         let existing = [CuratedApp(bundleIdentifier: "com.example.a", name: "A")]
 

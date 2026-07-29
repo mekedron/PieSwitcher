@@ -233,14 +233,19 @@ private struct WheelTab: View {
 // MARK: - Apps
 
 /// Sub-tab selector for the Apps tab. "My Apps" is the curated pinned list and
-/// the show-other-running-apps toggle; "Excluded" is the ignore list; "Sorting"
+/// the show-other-running-apps toggle; "Hidden" is the ignore list; "Sorting"
 /// is the ordering rules; "Collection" is the screen/space/minimized/hidden
 /// filters that decide which apps and windows the wheel can even see. Putting
 /// these four under one top-level tab keeps the toolbar lean (vs. the
 /// Bringr-93j.97 design where each was its own tab).
+///
+/// "Hidden" — not "Excluded" — because Activation owns a pane named "Excluded
+/// Apps" that suppresses the wheel's *activation*. Two panes named the same
+/// thing read as one setting, so a user who wants the wheel to stay shut inside
+/// Blender types the bundle id here and gets a list filter instead.
 enum AppsSubTab: String, PreferencesSubTab {
     case pinned
-    case excluded
+    case hidden
     case sorting
     case collection
 
@@ -250,7 +255,7 @@ enum AppsSubTab: String, PreferencesSubTab {
     var title: String {
         switch self {
         case .pinned: return "My Apps"
-        case .excluded: return "Excluded"
+        case .hidden: return "Hidden"
         case .sorting: return "Sorting"
         case .collection: return "Collection"
         }
@@ -271,7 +276,7 @@ private struct AppsTab: View {
 
             switch selection.wrappedValue {
             case .pinned: MyAppsPane()
-            case .excluded: ExcludedAppsPane()
+            case .hidden: HiddenAppsPane()
             case .sorting: SortingSettings()
             case .collection: CollectionSettings()
             }
@@ -310,20 +315,25 @@ private struct MyAppsPane: View {
     }
 }
 
-/// The "Excluded" pane: thin wrapper that drops the existing
-/// `IgnoreListSettings` into the standard `PreferencesPane` Form so the section
-/// styling matches the rest of the window.
-private struct ExcludedAppsPane: View {
+/// The "Hidden" pane: thin wrapper that drops the existing `IgnoreListSettings`
+/// into the standard `PreferencesPane` Form so the section styling matches the
+/// rest of the window. The footer names the other pane outright, because this
+/// one filters the wheel's contents and Activation → Excluded Apps stops the
+/// wheel from opening — the two are easy to reach for interchangeably.
+private struct HiddenAppsPane: View {
     var body: some View {
         PreferencesPane {
             Section {
                 IgnoreListSettings()
             } header: {
-                Text("Excluded apps")
+                Text("Hidden apps")
             } footer: {
                 Text("Apps listed here never appear in the wheel, even if they have open "
                      + "windows. Separate entries with commas — each a bundle identifier "
-                     + "(com.apple.Safari) or an app name (Safari).")
+                     + "(com.apple.Safari) or an app name (Safari).\n\n"
+                     + "This only filters what the wheel shows — a hidden app can still "
+                     + "summon it. To stop the wheel from opening at all while an app is "
+                     + "active, add it under Activation → Excluded Apps.")
             }
         }
     }
