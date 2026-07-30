@@ -59,7 +59,8 @@ struct MouseActivationSettings: View {
                 Text("Timing")
             } footer: {
                 Text("Hold the chosen buttons at least this long before the wheel opens; a "
-                     + "progress ring fills around the cursor while you wait. Cursor drift "
+                     + "progress ring fills around the cursor while you wait (switch it off "
+                     + "in Appearance › Display). Cursor drift "
                      + "beyond the threshold counts as a drag and the wheel doesn't open — "
                      + "raise it if a steady hold keeps getting cancelled by tiny jitter.")
             }

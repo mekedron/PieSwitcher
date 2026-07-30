@@ -45,6 +45,8 @@ struct AppearanceSettings: View {
     private var sliceFillColorHex = RadialAppearance.defaultSliceFillColor.hex
     @AppStorage(RadialAppearance.offMaterialThicknessDefaultsKey)
     private var offMaterialThickness = RadialAppearance.defaultOffMaterialThickness
+    @AppStorage(HoldProgressVisibility.defaultsKey)
+    private var showsHoldProgress = HoldProgressVisibility.defaultShowsHoldProgress
 
     var body: some View {
         PreferencesPane {
@@ -201,12 +203,15 @@ struct AppearanceSettings: View {
     private var displaySection: some View {
         Section {
             Toggle("Skip the windows ring for single-window apps", isOn: $skipSingleWindowLevel)
+            Toggle("Show the hold progress ring around the cursor", isOn: $showsHoldProgress)
         } header: {
             Text("Display")
         } footer: {
             Text("Skip the windows ring jumps straight to a single-window app's window "
-                 + "instead of opening a second ring. Changes apply the next time you "
-                 + "summon the wheel.")
+                 + "instead of opening a second ring. The hold progress ring is the small "
+                 + "circle that fills around the cursor while a hold delay counts down — "
+                 + "turn it off for a quieter summon; the delay itself is unchanged. "
+                 + "Changes apply the next time you summon the wheel.")
         }
     }
 

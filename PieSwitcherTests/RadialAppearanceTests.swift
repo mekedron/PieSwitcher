@@ -311,6 +311,21 @@ final class RadialAppearanceTests: XCTestCase {
         return RadialAppearance.current(from: defaults).contentShadowOpacity
     }
 
+    // MARK: - Hold progress ring visibility (Bringr-dp3)
+
+    func testHoldProgressRingIsShownWhenNothingPersisted() {
+        XCTAssertTrue(HoldProgressVisibility.isEnabled(from: makeDefaults()))
+    }
+
+    func testHoldProgressRingVisibilityRoundTrips() {
+        let defaults = makeDefaults()
+        defaults.set(false, forKey: HoldProgressVisibility.defaultsKey)
+        XCTAssertFalse(HoldProgressVisibility.isEnabled(from: defaults))
+
+        defaults.set(true, forKey: HoldProgressVisibility.defaultsKey)
+        XCTAssertTrue(HoldProgressVisibility.isEnabled(from: defaults))
+    }
+
     /// An isolated `UserDefaults` suite so persistence tests never touch the real
     /// domain; torn down by suite name to stay Sendable-clean.
     private func makeDefaults() -> UserDefaults {

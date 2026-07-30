@@ -1,6 +1,32 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Visibility setting
+
+/// Whether the hold-delay progress ring is drawn at all (Bringr-dp3). The ring is
+/// pure feedback — the hold still works with it off — so users who find it noisy on
+/// top of the UI under the cursor can switch it off without touching their delays.
+///
+/// Read fresh each time a hold arms, like the other settings, so a Preferences change
+/// applies on the next press without a relaunch.
+enum HoldProgressVisibility {
+    /// `UserDefaults` key backing the toggle. Single source of truth shared by the
+    /// Preferences `@AppStorage` and the reader so they cannot drift.
+    static let defaultsKey = "appearance.showsHoldProgress"
+
+    /// Shown by default: the ring is the only cue that a hold is being counted, so a
+    /// fresh install explains its own delay.
+    static let defaultShowsHoldProgress = true
+
+    /// Whether the ring should be shown. An absent key yields the default —
+    /// `bool(forKey:)` alone returns `false` for a missing key, which would hide the
+    /// ring for everyone who never opened Preferences.
+    static func isEnabled(from defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: defaultsKey) != nil else { return defaultShowsHoldProgress }
+        return defaults.bool(forKey: defaultsKey)
+    }
+}
+
 // MARK: - Window
 
 /// Tiny transparent overlay that hosts the hold-delay progress circle
@@ -96,9 +122,10 @@ final class HoldProgressController: ObservableObject {
 
     /// Show the ring centred on the current cursor and animate it from empty
     /// to full over `duration`. A zero or negative duration is a no-op — the
-    /// indicator only makes sense when the user actually has to wait.
+    /// indicator only makes sense when the user actually has to wait — and so is
+    /// a hold when the ring is switched off in Preferences (Bringr-dp3).
     func start(duration: TimeInterval) {
-        guard duration > 0 else { return }
+        guard duration > 0, HoldProgressVisibility.isEnabled() else { return }
         // Snap to empty immediately, without animation, so a quick re-trigger
         // (release + re-press) doesn't show a half-filled stale state for the
         // first frame.
