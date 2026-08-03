@@ -259,7 +259,67 @@ final class RadialMenuController: ObservableObject {
     /// location). Resolves the tree fresh so the wheel reflects live state, and
     /// starts tracking the cursor so hover can drill into apps.
     private func summon(trigger: MenuTrigger, at cursor: CGPoint) {
+        RadialNavigator.trace.info("summon from \(String(describing: trigger), privacy: .public)")
         SlowStep.measure("summon") { performSummon(trigger: trigger, at: cursor) }
+    }
+
+    /// A wheel resolved before the summon that will show it, during the activation hold
+    /// (Bringr-jud). Carries what the resolve produced plus the conditions it assumed, so a
+    /// summon can tell whether the work still applies to it.
+    private struct PreparedWheel {
+        let trigger: MenuTrigger
+        let display: CGRect?
+        let appNodes: [MenuNode]
+        let resolvedAt: CFAbsoluteTime
+    }
+
+    private var preparedWheel: PreparedWheel?
+
+    /// A prepared wheel older than this is discarded and re-resolved: it is long enough to
+    /// cover any hold delay the user can configure, short enough that the ring can't show a
+    /// window arrangement from a different moment in the session.
+    private static let preparedWheelLifetime: TimeInterval = 2
+
+    /// Resolve the wheel now, while the user is still holding the activation button.
+    ///
+    /// The hold delay is dead time the app otherwise spends idle, and the summon that follows
+    /// it is ~40 ms of window-list work on the main thread — landing exactly when the progress
+    /// ring completes and the user is watching for the wheel, and blocking the activation tap
+    /// (and with it the pointer) while it runs. Doing the resolve during the hold moves that
+    /// cost to a moment where nothing is expected yet, so the ring completing and the wheel
+    /// appearing become the same instant.
+    ///
+    /// A no-op while the wheel is open, and harmless when the hold is abandoned — the result
+    /// is simply never claimed.
+    func prepareSummon(for trigger: MenuTrigger, at cursor: CGPoint) {
+        guard !isVisible, !machine.isOpen else { return }
+        let clock = PhaseClock()
+        let display = ScreenLocator.displayBounds(forCursor: cursor)
+        let collection = collectionProvider()
+        guard let root = registry.makeMenu(
+            for: trigger,
+            appsScope: collection.appsScope(forDisplay: display),
+            windowsScope: collection.windowsScope(forDisplay: display)
+        ) else { return }
+        let appNodes = root.resolvedChildren()
+        preparedWheel = PreparedWheel(
+            trigger: trigger, display: display, appNodes: appNodes,
+            resolvedAt: CFAbsoluteTimeGetCurrent()
+        )
+        clock.lap("resolve")
+        clock.report(to: Self.perfLog, label: "prepared wheel (\(appNodes.count) apps)")
+    }
+
+    /// The app ring resolved during the hold, if it was resolved for this trigger, on this
+    /// display, recently enough to still describe the desktop. Claimed once: a second summon
+    /// resolves afresh rather than reusing a ring the first one already showed.
+    private func claimPreparedWheel(for trigger: MenuTrigger, display: CGRect?) -> [MenuNode]? {
+        guard let prepared = preparedWheel else { return nil }
+        preparedWheel = nil
+        guard prepared.trigger == trigger, prepared.display == display,
+              CFAbsoluteTimeGetCurrent() - prepared.resolvedAt < Self.preparedWheelLifetime
+        else { return nil }
+        return prepared.appNodes
     }
 
     private func performSummon(trigger: MenuTrigger, at cursor: CGPoint) {
@@ -268,12 +328,18 @@ final class RadialMenuController: ObservableObject {
         // display under the cursor; each level scopes screens/Spaces independently, and a
         // `nil` display (headless host) reduces to "all displays" rather than hiding all.
         let display = ScreenLocator.displayBounds(forCursor: cursor)
+        // The hold that triggered this summon has usually already resolved the ring
+        // (Bringr-jud); fall back to resolving here when it hasn't — a trigger with no hold
+        // delay, a cursor that crossed to another display mid-hold, the menu-bar entry point.
+        let readyNodes = claimPreparedWheel(for: trigger, display: display)
         let collection = collectionProvider()
         let appsScope = collection.appsScope(forDisplay: display)
         let windowsScope = collection.windowsScope(forDisplay: display)
-        guard let root = registry.makeMenu(
-            for: trigger, appsScope: appsScope, windowsScope: windowsScope
-        ) else { return }
+        var root: MenuNode?
+        if readyNodes == nil {
+            root = registry.makeMenu(for: trigger, appsScope: appsScope, windowsScope: windowsScope)
+            guard root != nil else { return }
+        }
         clock.lap("scope+menu")
         // Apply the persisted appearance before resolving the tree: the size feeds
         // both the rendered rings and the navigator's hit-testing through one shared
@@ -299,8 +365,8 @@ final class RadialMenuController: ObservableObject {
         dwellConfig = dwellConfigProvider()
         highlightSource = .mouse
         clock.lap("settings")
-        let appNodes = root.resolvedChildren()
-        clock.lap("resolve-tree")
+        guard let appNodes = readyNodes ?? root?.resolvedChildren() else { return }
+        clock.lap(readyNodes == nil ? "resolve-tree" : "prepared-tree")
         navigator.open(appNodes: appNodes)
         syncFromNavigator()
         clock.lap("navigator-open")
@@ -363,6 +429,7 @@ final class RadialMenuController: ObservableObject {
     /// touching window state — used after a commit, where the navigator has already
     /// restored and focused.
     func hideOverlay() {
+        RadialNavigator.trace.info("wheel closed")
         stopMenuMonitors()
         syncFromNavigator()
         window.orderOut(nil)

@@ -147,10 +147,11 @@ final class MouseChordMonitor {
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<MouseChordMonitor>.fromOpaque(userInfo).takeUnretainedValue()
             return MainActor.assumeIsolated {
+                monitor.noteEventArrival(type: type)
                 // The window server holds this event until the callback returns, so whatever
                 // runs in here is time the user's pointer is frozen — the one measurement
                 // that maps directly onto felt input lag (Bringr-jud).
-                SlowStep.measure("mouse tap \(type.rawValue)") {
+                return SlowStep.measure("mouse tap \(type.rawValue)") {
                     monitor.handle(type: type, event: event)
                 }
             }
@@ -193,6 +194,42 @@ final class MouseChordMonitor {
         physicallyDown.removeAll()
         pendingMatch = nil
         detector.reset()
+    }
+
+    // MARK: - Input-stream gap detection
+
+    /// When the tap last saw an event, for `noteEventArrival`.
+    private var lastEventArrival: CFAbsoluteTime = 0
+
+    /// Log a long silence in the mouse event stream (Bringr-jud).
+    ///
+    /// This is what separates a stall of ours from one upstream of us. A blocked main thread
+    /// shows up in `HangWatchdog`; a gap logged here with *no* matching hang means the events
+    /// never arrived — the window server or the app being activated is what stopped, and the
+    /// wheel is only where the user noticed it. Drags are the useful signal: they arrive
+    /// continuously while the user moves, so a gap between them is a real interruption.
+    func noteEventArrival(type: CGEventType) {
+        let now = CFAbsoluteTimeGetCurrent()
+        defer { lastEventArrival = now }
+        guard lastEventArrival != 0 else { return }
+        let gap = now - lastEventArrival
+        // Only a gap between events of one continuous gesture means anything: outside a
+        // gesture the stream is silent simply because the hand is still, and reporting that
+        // would bury the real interruptions.
+        guard gap > Self.inputGapThreshold, Self.isGestureEvent(type) else { return }
+        let milliseconds = String(format: "%.0f", gap * 1000)
+        log.info("input gap: \(milliseconds, privacy: .public)ms of no mouse events before type \(type.rawValue)")
+    }
+
+    /// A silence longer than this is worth a line: well past any hand movement's natural pause
+    /// mid-gesture, short enough to catch a hitch the user would call a freeze.
+    private static let inputGapThreshold: TimeInterval = 0.25
+
+    /// Whether an event belongs to a movement in progress — the events that arrive
+    /// continuously while the hand is moving, so a gap between them is an interruption rather
+    /// than a pause.
+    private static func isGestureEvent(_ type: CGEventType) -> Bool {
+        type == .leftMouseDragged || type == .rightMouseDragged || type == .otherMouseDragged
     }
 
     // MARK: - Tap callback handling

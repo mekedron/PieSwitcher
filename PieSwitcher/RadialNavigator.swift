@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 
 /// Where the cursor currently sits on the (possibly multi-ring) wheel: a slice at
 /// a given concentric `level` and `index`, or nothing — the central dead zone or
@@ -198,8 +199,13 @@ final class RadialNavigator {
     /// Both paths restore every app/window moved out of the way before the final
     /// activation/focus, then clear the wheel. Returns `nil` only when nothing
     /// selectable was committed, so the caller can cancel-restore instead.
+    /// Timeline of what the wheel did, at `.info`, so a reported freeze can be matched against
+    /// the actions around it: `log show --info --predicate 'category == "interaction"'`.
+    static let trace = Logger(subsystem: "com.mekedron.PieSwitcher", category: "interaction")
+
     @discardableResult
     func commit(_ region: HoverRegion) -> RadialCommitResult? {
+        Self.trace.info("commit \(String(describing: region), privacy: .public)")
         switch region {
         case .slice(level: 0, let index):
             return commitApp(at: index)
@@ -265,6 +271,11 @@ final class RadialNavigator {
               let appsRing = rings.first, index >= 0, index < appsRing.nodes.count else { return }
         let appNode = appsRing.nodes[index]
         if let appID = appNode.representedApp {
+            // Traced unconditionally, not only when slow: a freeze the user reports has to be
+            // lined up against what the wheel asked the system to do at that instant, and
+            // raising another app is the one action here whose cost lands outside this process
+            // (Bringr-jud).
+            Self.trace.info("reveal app \(appNode.title, privacy: .public) pid \(appID.pid)")
             SlowStep.measure("reveal app \(appNode.title) pid \(appID.pid)") {
                 windowControl.revealApp(appID)
             }

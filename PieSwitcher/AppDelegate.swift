@@ -90,6 +90,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Resolve the wheel while the activation hold is running (Bringr-jud), so the summon that
+    /// follows only has to show it. Dispatched rather than run inline: this is called from
+    /// inside the event tap callback, which the window server is waiting on, so the resolve
+    /// must land in the next run-loop pass instead of holding the press that started the hold.
+    private func prepareWheelDuringHold(for trigger: MenuTrigger) {
+        let cursor = NSEvent.mouseLocation
+        DispatchQueue.main.async { [weak self] in
+            self?.radialMenu?.prepareSummon(for: trigger, at: cursor)
+        }
+    }
+
     /// Block the main thread once, deliberately, when `debug.hangSelfTest` is set, so the
     /// watchdog's detection, breadcrumb, and stack capture can be proven end to end on a
     /// stall whose cause is already known — before trusting them to explain one that isn't.
@@ -147,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onProgressStart: { [weak self] duration in
                 self?.holdProgress?.start(duration: duration)
+                self?.prepareWheelDuringHold(for: .mouseChord)
             },
             onProgressEnd: { [weak self] in
                 self?.holdProgress?.cancel()
@@ -181,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onProgressStart: { [weak self] duration in
                 self?.holdProgress?.start(duration: duration)
+                self?.prepareWheelDuringHold(for: .modifierHold)
             },
             onProgressEnd: { [weak self] in
                 self?.holdProgress?.cancel()

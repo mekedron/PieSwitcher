@@ -17,6 +17,10 @@ final class CGWindowSource: WindowEnumerationSource {
     /// Background-refreshed AX window state for `classify` (Bringr-3qp), so the
     /// broadened path's per-app AX IPC stays off the summon hot path.
     private let axState = AXWindowStateCache()
+    /// The running-app scan behind `dockPIDs` and `ignoredPIDs`, held across summons
+    /// (Bringr-jud): building that array costs ~10 ms, every read of one summon wants the same
+    /// answer, and it only changes when an app launches or quits.
+    private let runningApps = RunningAppsCache()
 
     /// AX-reported window titles for `pid`, used by `WindowEnumerator` when the CG window
     /// list left a window title blank — the common case under Accessibility-only permission
@@ -39,11 +43,13 @@ final class CGWindowSource: WindowEnumerationSource {
         // minimized or hidden; dropping it (an all-windows query) is the only public way to
         // reach all three groups (Bringr-93j.48 / Bringr-93j.50). The narrow form is left
         // exactly as before, so the unbroadened default is unchanged.
+        let clock = PhaseClock()
         let options: CGWindowListOption = includingOffscreen
             ? [.excludeDesktopElements]
             : [.optionOnScreenOnly, .excludeDesktopElements]
         guard let infoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID)
             as? [[String: Any]] else { return [] }
+        clock.lap("cg-list(\(infoList.count))")
         // The Dock apps (regular activation policy) currently running — the only apps the
         // wheel shows. Stamped onto every record so the enumerator can drop the rest, on the
         // narrow path too, so "all screens" alone is filtered even though it doesn't broaden
@@ -51,22 +57,29 @@ final class CGWindowSource: WindowEnumerationSource {
         // control path's `runningApps()` this keeps PieSwitcher itself: while a Dock-worthy
         // window (Preferences/About) is open its policy is `.regular` (Bringr-93j.45), so that
         // window appears in the pie like any other app's (Bringr-93j.82).
-        let dockPIDs = Set(
-            NSWorkspace.shared.runningApplications
-                .filter { $0.activationPolicy == .regular }
-                .map(\.processIdentifier)
-        )
+        let dockPIDs = runningApps.dockPIDs()
+        clock.lap("dock-pids")
         let ignoredPIDs = ignoredPIDs()
+        clock.lap("ignored-pids")
         let raws = infoList.compactMap {
             rawWindow(
                 from: $0, assumeOnscreen: !includingOffscreen,
                 dockPIDs: dockPIDs, ignoredPIDs: ignoredPIDs
             )
         }
+        clock.lap("parse")
         let classified = includingOffscreen ? classify(raws) : raws
+        clock.lap("classify")
         // All-screens has no screen filter to cull off-display phantoms, so stamp each on-screen
         // record's managed-Space membership and let the enumerator drop the phantoms (Bringr-93j.60).
-        return validatingOnscreen ? validateOnscreen(classified) : classified
+        let result = validatingOnscreen ? validateOnscreen(classified) : classified
+        clock.lap("validate-onscreen")
+        // The window-list read is the summon's single largest step, so it reports its own
+        // breakdown every time rather than only when it overruns: the shape of the split is
+        // what says whether the cost is the system's list, the window-server Space probes, or
+        // our own filtering (Bringr-jud).
+        clock.report(to: RadialMenuController.perfLog, label: "window-list")
+        return result
     }
 
     /// Stamp every on-screen Dock-app record with whether it lives on a managed Space, the cheap
@@ -97,7 +110,7 @@ final class CGWindowSource: WindowEnumerationSource {
         let ignore = AppIgnoreList.current()
         guard !ignore.isEmpty else { return [] }
         return Set(
-            NSWorkspace.shared.runningApplications
+            runningApps.all()
                 .filter { ignore.excludes(bundleID: $0.bundleIdentifier, name: $0.localizedName ?? "") }
                 .map(\.processIdentifier)
         )
@@ -178,6 +191,53 @@ final class CGWindowSource: WindowEnumerationSource {
             isDockApp: dockPIDs.contains(ownerPID),
             isIgnored: ignoredPIDs.contains(ownerPID)
         )
+    }
+}
+
+/// The list of running applications, rebuilt only when that list changes.
+///
+/// `NSWorkspace.runningApplications` builds a fresh array of proxies on every access — ~10 ms
+/// with a normal set of apps, and the window scan asks for it twice per read. Since the answer
+/// only changes when an app launches or quits, both of which the workspace announces, the scan
+/// is cached and invalidated on those notifications. The cached objects stay live: mutable
+/// state read through them (`isHidden`, `activationPolicy`) is current at the moment it is
+/// read, so only membership is cached, never per-app state.
+@MainActor
+final class RunningAppsCache {
+    private var apps: [NSRunningApplication]?
+    private var observers: [any NSObjectProtocol] = []
+
+    init() {
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [
+            NSWorkspace.didLaunchApplicationNotification,
+            NSWorkspace.didTerminateApplicationNotification
+        ] {
+            observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.apps = nil }
+            })
+        }
+    }
+
+    deinit {
+        let center = NSWorkspace.shared.notificationCenter
+        for observer in observers { center.removeObserver(observer) }
+    }
+
+    /// Every running application.
+    func all() -> [NSRunningApplication] {
+        if let apps { return apps }
+        let fresh = NSWorkspace.shared.runningApplications
+        apps = fresh
+        return fresh
+    }
+
+    /// The pids of ordinary Dock apps — the only apps the wheel shows. Activation policy is
+    /// read live from the cached proxies, so an app that promotes itself to `.regular` after
+    /// launch (PieSwitcher itself does, while Preferences is open) is picked up without
+    /// waiting for the list to be invalidated.
+    func dockPIDs() -> Set<pid_t> {
+        Set(all().filter { $0.activationPolicy == .regular }.map(\.processIdentifier))
     }
 }
 
