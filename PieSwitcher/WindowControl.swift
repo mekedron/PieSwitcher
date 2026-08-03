@@ -174,7 +174,7 @@ final class WindowController {
     private func raiseAppToFront(_ target: AppID) {
         captureAppBaselineIfNeeded()
         if system.isHidden(target) { system.setHidden(target, false) }
-        system.activate(target)
+        system.activateForPreview(target)
     }
 
     /// Raise `target` window to the front within its app, leaving the app's others put.

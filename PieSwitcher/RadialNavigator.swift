@@ -292,6 +292,26 @@ final class RadialNavigator {
         prehighlighted = prehighlightRegion(forAppNamed: appNode.title, windowNodes: windowNodes)
     }
 
+    /// Rebuild the open windows sub-wheel from its app's children, keeping the expansion,
+    /// isolation, and fisheye focus exactly as they are. The hook for state that resolves
+    /// after the ring was drawn — window titles arriving from a background Accessibility
+    /// probe (Bringr-jud) — so the sub-wheel corrects itself in place instead of showing
+    /// "<App> — Window <N>" until the next summon. A no-op when nothing is expanded, or when
+    /// the re-resolve comes back empty (the post-reveal scan race, Bringr-93j.31, which the
+    /// hover retry already handles).
+    func refreshExpandedSubWheel() {
+        guard let index = expandedAppIndex, rings.count > 1,
+              let appsRing = rings.first, index < appsRing.nodes.count else { return }
+        let windowNodes = appsRing.nodes[index].resolvedChildren()
+        guard !windowNodes.isEmpty else { return }
+        let focus = focusedWindowIndex.map { min($0, windowNodes.count - 1) }
+        focusedWindowIndex = focus
+        rings[1] = makeWindowRing(windowNodes: windowNodes, parentIndex: index, focus: focus)
+        prehighlighted = prehighlightRegion(
+            forAppNamed: appsRing.nodes[index].title, windowNodes: windowNodes
+        )
+    }
+
     /// Build the level-1 windows ring for `windowNodes`, fanning out clockwise from
     /// the parent app at `parentIndex` with the US-016 app-aligned / fisheye layout.
     private func makeWindowRing(windowNodes: [MenuNode], parentIndex: Int, focus: Int?) -> RadialRing {

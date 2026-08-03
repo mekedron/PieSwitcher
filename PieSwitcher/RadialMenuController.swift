@@ -91,6 +91,9 @@ final class RadialMenuController: ObservableObject {
     /// Observes active-Space changes while open so a Space switch mid-reveal cancels
     /// cleanly rather than stranding hidden windows (US-015 trigger-loss).
     private var spaceObserver: (any NSObjectProtocol)?
+    /// Observes background Accessibility probes while open, so an open windows sub-wheel
+    /// picks up real titles the moment they resolve (Bringr-jud).
+    private var axStateObserver: (any NSObjectProtocol)?
     /// Windows-sub-wheel retry state (Bringr-93j.31): see `scheduleSubWheelRetry`.
     private var subWheelRetry: DispatchWorkItem?
     private var subWheelRetriesLeft = 0
@@ -330,6 +333,10 @@ final class RadialMenuController: ObservableObject {
     /// pre-summon state (US-012). If `region` is not selectable, fall back to a
     /// cancel-restore. Either way the overlay goes away.
     private func commitSelection(region: HoverRegion) {
+        SlowStep.measure("commit \(region)") { performCommit(region: region) }
+    }
+
+    private func performCommit(region: HoverRegion) {
         if navigator.commit(region) == nil {
             dismiss() // not selectable — restore like a cancel
         } else {
@@ -344,7 +351,7 @@ final class RadialMenuController: ObservableObject {
 
     /// Restore every app/window the hover moved out of the way, then hide the overlay.
     private func dismiss() {
-        navigator.close()
+        SlowStep.measure("dismiss-restore") { navigator.close() }
         hideOverlay()
     }
 
@@ -413,6 +420,25 @@ final class RadialMenuController: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.triggerLost() }
         }
+        // The sub-wheel draws from the last Accessibility snapshot rather than blocking a hover
+        // on IPC (Bringr-jud), so a first-ever hover onto an app can show fallback titles for a
+        // frame or two. When the probe behind them lands, rebuild that ring in place.
+        axStateObserver = NotificationCenter.default.addObserver(
+            forName: AXWindowStateCache.didUpdateNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                guard let pid = note.userInfo?[AXWindowStateCache.pidUserInfoKey] as? pid_t else { return }
+                self?.refreshSubWheel(forPID: pid)
+            }
+        }
+    }
+
+    /// Rebuild the open windows sub-wheel if it belongs to `pid`, so freshly probed titles
+    /// replace the fallback labels without disturbing the hover, the reveal, or the fisheye.
+    private func refreshSubWheel(forPID pid: pid_t) {
+        guard isVisible, navigator.expandedAppID?.pid == pid else { return }
+        navigator.refreshExpandedSubWheel()
+        syncFromNavigator()
     }
 
     private func stopMenuMonitors() {
@@ -427,6 +453,10 @@ final class RadialMenuController: ObservableObject {
             NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
         }
         spaceObserver = nil
+        if let axStateObserver {
+            NotificationCenter.default.removeObserver(axStateObserver)
+        }
+        axStateObserver = nil
     }
 
     /// Route a global key/mouse-down that bypassed the overlay to a cancel: Esc in
@@ -448,7 +478,12 @@ final class RadialMenuController: ObservableObject {
         let layoutOffset = offset(forGlobalCursor: cursor)
         let previousHover = navigator.hovered
         highlightSource = .mouse
-        navigator.updateHover(navigator.region(forOffset: layoutOffset))
+        // Hover runs on the main thread while the activation tap is also served there, so an
+        // overrun here is felt as the pointer sticking, not merely as a slow wheel — worth
+        // naming in the log when it happens (Bringr-jud).
+        SlowStep.measure("hover \(navigator.region(forOffset: layoutOffset))") {
+            navigator.updateHover(navigator.region(forOffset: layoutOffset))
+        }
         haptics.hoverChanged(from: previousHover, to: navigator.hovered)
         syncFromNavigator()
         scheduleSubWheelRetry(isRetry: isRetry)

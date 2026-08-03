@@ -20,10 +20,18 @@ final class CGWindowSource: WindowEnumerationSource {
 
     /// AX-reported window titles for `pid`, used by `WindowEnumerator` when the CG window
     /// list left a window title blank — the common case under Accessibility-only permission
-    /// (Bringr-93j.110). Defers to `stateProbe`, which holds the AX path the rest of the
-    /// classifier already uses, so the per-app traversal logic stays in one place.
+    /// (Bringr-93j.110). Served from `AXWindowStateCache`, so a hover that opens a sub-wheel
+    /// never blocks on the target app: titles come from the last probe and the ring rebuilds
+    /// when a fresher one lands (Bringr-jud).
     func axTitles(forPID pid: pid_t) -> [Int: String] {
-        stateProbe.windowTitles(of: AppID(pid: pid))
+        axState.titles(forPID: pid)
+    }
+
+    /// Warm the AX snapshot for every app the wheel is about to show, so the first hover onto
+    /// any of them draws real titles from cache instead of the "<App> — Window <N>" fallback.
+    /// Background work only (Bringr-jud).
+    func prefetchAXState(forPIDs pids: [pid_t]) {
+        axState.refresh(pids)
     }
 
     func rawWindows(includingOffscreen: Bool, validatingOnscreen: Bool) -> [RawWindow] {
@@ -106,12 +114,13 @@ final class CGWindowSource: WindowEnumerationSource {
     /// Only apps that actually surfaced an OFF-screen record matter (Bringr-93j.53): an
     /// on-screen record is kept by `WindowEnumerator.shouldCollect`'s onscreen short-circuit
     /// before it ever consults minimized/hidden/AX-backed. Their AX state answers from
-    /// `AXWindowStateCache` — the per-app AX IPC is the entire cost of the broadened path
-    /// and runs on background refreshes, never on the summon hot path (Bringr-3qp); only a
-    /// pid the cache has never seen is probed synchronously. Hidden state is read live:
-    /// `NSRunningApplication.isHidden` involves no IPC to the target app. The managed-Space
-    /// probe (cheap, window-server) is limited to off-screen Dock-app records. On-screen
-    /// records are returned untouched.
+    /// `AXWindowStateCache`, which never issues IPC on this thread (Bringr-jud): a pid the
+    /// snapshot has never seen classifies optimistically — AX-backed and not minimized, so a
+    /// freshly launched app's windows show rather than being culled as phantoms — and the
+    /// background probe corrects it, typically before the wheel is even released. Hidden
+    /// state is read live: `NSRunningApplication.isHidden` involves no IPC to the target app.
+    /// The managed-Space probe (cheap, window-server) is limited to off-screen Dock-app
+    /// records. On-screen records are returned untouched.
     private func classify(_ raws: [RawWindow]) -> [RawWindow] {
         let offscreen = raws.filter { !$0.isOnscreen }
         guard !offscreen.isEmpty else { return raws }
@@ -124,18 +133,19 @@ final class CGWindowSource: WindowEnumerationSource {
         var states: [pid_t: AXWindowStateCache.AppState] = [:]
         for pid in offscreenPIDs {
             if stateProbe.isHidden(AppID(pid: pid)) { hiddenPIDs.insert(pid) }
-            states[pid] = axState.state(forPID: pid) ?? axState.probeAndStore(pid)
+            states[pid] = axState.state(forPID: pid)
         }
-        // Freshen the snapshot off the hot path so the NEXT broadened read (the next
-        // summon, typically) classifies against current minimized/AX state.
-        axState.refreshSoon(Array(offscreenPIDs))
+        // Freshen the snapshot off this thread, so the next broadened read classifies against
+        // current minimized/AX state — and so a pid seen here for the first time is known by
+        // then rather than staying optimistic.
+        axState.refresh(Array(offscreenPIDs))
         return raws.map { raw in
             guard !raw.isOnscreen else { return raw }
             let state = states[raw.ownerPID]
             return raw.classified(
                 isMinimized: state?.minimizedNumbers.contains(raw.windowNumber) ?? false,
                 isHidden: hiddenPIDs.contains(raw.ownerPID),
-                isAXBacked: state?.axNumbers.contains(raw.windowNumber) ?? false,
+                isAXBacked: state?.axNumbers.contains(raw.windowNumber) ?? true,
                 isManagedWindow: managedNumbers.contains(raw.windowNumber)
             )
         }

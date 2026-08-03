@@ -58,6 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !AppDelegate.isRunningTests else { return }
 
         permissions.startMonitoring()
+        // Cap every Accessibility round-trip before anything can issue one: the activation tap
+        // runs its callback on this run loop, so an app that answers slowly would otherwise
+        // hold up system-wide input for as long as it likes (Bringr-jud).
+        AXMessaging.installProcessTimeout()
         // Bringr-93j.111: migrate the legacy `activation.keyboard.modifiers` bitmask into
         // the new two-slot shortcut model before any monitor reads from defaults, so the
         // first event tap callback already sees the migrated configuration.

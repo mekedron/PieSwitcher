@@ -30,6 +30,11 @@ protocol WindowControlling {
     func isHidden(_ app: AppID) -> Bool
     func setHidden(_ app: AppID, _ hidden: Bool)
     func activate(_ app: AppID)
+    /// Bring `app` forward for a hover preview. Same visible outcome as `activate`, but it
+    /// must not block the caller (Bringr-jud): it runs on every hover, where the main thread
+    /// is also servicing the activation event tap. Conformers with nothing to defer inherit
+    /// the default, which is plain `activate`.
+    func activateForPreview(_ app: AppID)
     /// Reopen `app` like a Dock click: a windowless app opens a fresh window, a windowed
     /// one just comes forward (Bringr-93j.61). Distinct from `activate`, which only raises
     /// an app and must never spawn a window — it runs on restore paths. Used by `commit(_:)`
@@ -48,4 +53,8 @@ protocol WindowControlling {
     /// commit-time fallback for a window absent from its app's AX window list, so the proven
     /// AX path for same-Space windows is untouched.
     func raiseAcrossSpaces(_ window: WindowID)
+}
+
+extension WindowControlling {
+    func activateForPreview(_ app: AppID) { activate(app) }
 }

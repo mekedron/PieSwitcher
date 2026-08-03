@@ -31,11 +31,17 @@ protocol WindowEnumerationSource {
     /// Recording (a v1 non-goal), so Accessibility is everyday life's only path to a real
     /// title. Empty when AX can't resolve them (denied, app has none listed).
     func axTitles(forPID pid: pid_t) -> [Int: String]
+    /// Warm whatever per-app Accessibility state the source serves reads from, for the apps
+    /// a summon is about to show (Bringr-jud). Background work: the caller must be able to
+    /// carry on immediately.
+    func prefetchAXState(forPIDs pids: [pid_t])
 }
 
 extension WindowEnumerationSource {
     /// Default: no AX titles. Test sources that don't care inherit this; live sources override.
     func axTitles(forPID pid: pid_t) -> [Int: String] { [:] }
+    /// Default: nothing to warm. Only the live source has an AX snapshot behind it.
+    func prefetchAXState(forPIDs pids: [pid_t]) {}
 }
 
 /// Reports which apps currently have on-screen windows and the windows each
@@ -48,6 +54,15 @@ final class WindowEnumerator {
     /// Smallest width/height a window may have and still count as "normal";
     /// drops the 1×1 / off-size helper surfaces some apps keep on screen.
     static let minimumWindowSize: CGFloat = 40
+
+    /// `UserDefaults` key for the per-window collection report (Bringr-93j.60). Off unless
+    /// explicitly enabled, so ordinary summons don't walk and render every window on the
+    /// system just to produce diagnostics nobody is reading.
+    static let logsCollectionKey = "debug.logCollection"
+
+    /// Whether the per-window collection report is enabled, read once per run — a diagnostic
+    /// switch, flipped with a relaunch, not something a summon re-reads.
+    static let logsCollection = UserDefaults.standard.bool(forKey: logsCollectionKey)
 
     private let source: WindowEnumerationSource
     /// The app/window sort orders to apply (Bringr-93j.34), read through closures so
@@ -157,10 +172,14 @@ final class WindowEnumerator {
         // off-Space / minimized / hidden windows); with none set, the cheap current-Space
         // query suffices and every record is already on-screen.
         let includingOffscreen = allSpaces || includeMinimized || includeHidden
-        let normal = normalWindows(includingOffscreen: includingOffscreen, validatingOnscreen: validatesOnscreen)
-        // In the broadening / on-screen-validating modes the phantom report (Bringr-93j.60) is
-        // worth the per-window detail; the hot default path never logs.
-        if includingOffscreen || validatesOnscreen {
+        let normal = SlowStep.measure("window-list read (broadened: \(includingOffscreen))") {
+            normalWindows(includingOffscreen: includingOffscreen, validatingOnscreen: validatesOnscreen)
+        }
+        // The phantom report (Bringr-93j.60) walks every window on the system and renders a
+        // line per record, so it is opt-in (`defaults write com.mekedron.PieSwitcher
+        // debug.logCollection -bool YES`): its per-window detail is what makes a phantom-window
+        // recurrence diagnosable, and its cost is one a summon must not carry by default.
+        if Self.logsCollection, includingOffscreen || validatesOnscreen {
             logCollection(
                 normal, allSpaces: allSpaces, includeMinimized: includeMinimized,
                 includeHidden: includeHidden, validatesOnscreen: validatesOnscreen
@@ -175,6 +194,13 @@ final class WindowEnumerator {
         let onScreen = filter(collected, toScreen: screenBounds)
         let grouped = group(onScreen, titleScope: titleScope)
         let result = sorted(grouped)
+        // The apps-ring read (`.none` — no titles displayed there) knows the exact set of apps
+        // this summon can drill into, so it is the moment to warm their AX snapshots in the
+        // background: by the time the cursor reaches a slice, its sub-wheel has real titles
+        // without any hover paying for IPC (Bringr-jud).
+        if titleScope == .none {
+            source.prefetchAXState(forPIDs: result.map(\.id.pid))
+        }
         let elapsed = TimeInterval(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000_000
         lastDuration = elapsed
         log.debug("Enumerated \(result.count) app(s) in \(Int((elapsed * 1000).rounded())) ms")

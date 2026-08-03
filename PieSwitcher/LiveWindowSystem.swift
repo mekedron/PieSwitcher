@@ -32,8 +32,11 @@ final class LiveWindowSystem: WindowControlling {
     }
 
     func windows(of app: AppID) -> [WindowID] {
+        drainPreviewWrites()
         let appElement = AXUIElementCreateApplication(app.pid)
-        guard let axWindows = copyWindows(appElement) else { return [] }
+        guard let axWindows = SlowStep.measure("AX windows(of:) pid \(app.pid)", {
+            copyWindows(appElement)
+        }) else { return [] }
 
         var ids: [WindowID] = []
         for (index, axWindow) in axWindows.enumerated() {
@@ -42,28 +45,6 @@ final class LiveWindowSystem: WindowControlling {
             ids.append(id)
         }
         return ids
-    }
-
-    /// Real window titles for `app` from AX, keyed by `kCGWindowNumber` (Bringr-93j.110).
-    /// CG's `kCGWindowName` requires Screen Recording — a v1 non-goal — so AX's
-    /// `kAXTitleAttribute` is the only way to learn the window title (document name,
-    /// browser tab, email subject) the user expects to see in the sub-wheel. Skips
-    /// windows AX can't tag with a CG number (rare) and those without a title attribute
-    /// (the empty/missing-title case the enumerator falls back from); the result is
-    /// empty when AX can't enumerate the app (denied, terminating, etc.). Sibling of
-    /// `windows(of:)`, sharing the same AX traversal — separate so a caller that only
-    /// needs titles can ask for them without populating `elementCache`.
-    func windowTitles(of app: AppID) -> [Int: String] {
-        let appElement = AXUIElementCreateApplication(app.pid)
-        guard let axWindows = copyWindows(appElement) else { return [:] }
-
-        var titles: [Int: String] = [:]
-        for axWindow in axWindows {
-            guard let number = windowNumber(of: axWindow),
-                  let title = stringAttribute(axWindow, kAXTitleAttribute) else { continue }
-            titles[number] = title
-        }
-        return titles
     }
 
     func frontmostApp() -> AppID? {
@@ -86,6 +67,7 @@ final class LiveWindowSystem: WindowControlling {
     }
 
     func activate(_ app: AppID) {
+        drainPreviewWrites()
         let appElement = AXUIElementCreateApplication(app.pid)
         setBool(appElement, kAXFrontmostAttribute, true, app: app)
         guard let running = runningApplication(app) else {
@@ -98,6 +80,30 @@ final class LiveWindowSystem: WindowControlling {
         setBool(appElement, kAXFrontmostAttribute, true, app: app)
     }
 
+    /// Bring `app` forward for a hover preview, without blocking the caller (Bringr-jud).
+    ///
+    /// `activate(_:)` brackets the workspace activation with two `kAXFrontmostAttribute`
+    /// writes, each a synchronous round-trip the target app answers on its own main thread —
+    /// affordable once, at commit, but not on every hover: a busy app stalls the wheel and,
+    /// through the activation tap on the main run loop, the pointer with it. Here the
+    /// workspace activation (which merely posts to the target) runs inline and the AX write
+    /// that reinforces it is queued, so ordering against later reveals and the eventual
+    /// commit is preserved — every other primitive drains the queue first — while the hover
+    /// itself returns immediately.
+    func activateForPreview(_ app: AppID) {
+        drainPreviewWrites()
+        guard let running = runningApplication(app) else { return }
+        if running.activate(options: []) != true {
+            log.error("NSRunningApplication.activate failed for pid \(app.pid)")
+        }
+        let appElement = AXUIElementCreateApplication(app.pid)
+        Self.previewWriteQueue.async {
+            AXUIElementSetAttributeValue(
+                appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue
+            )
+        }
+    }
+
     func reopen(_ app: AppID) {
         // Post the Dock's reopen event so a windowless app opens a new window, then activate
         // so it comes forward whether or not it made one (Bringr-93j.61).
@@ -106,22 +112,28 @@ final class LiveWindowSystem: WindowControlling {
     }
 
     func isMinimized(_ window: WindowID) -> Bool {
+        drainPreviewWrites()
         guard let element = elementCache[window] else { return false }
         return boolAttribute(element, kAXMinimizedAttribute)
     }
 
     func setMinimized(_ window: WindowID, _ minimized: Bool) {
+        drainPreviewWrites()
         guard let element = cachedElement(for: window, operation: "set minimized") else { return }
         setBool(element, kAXMinimizedAttribute, minimized, window: window)
     }
 
     func raise(_ window: WindowID) {
+        drainPreviewWrites()
         guard let element = cachedElement(for: window, operation: "raise") else { return }
-        let result = AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+        let result = SlowStep.measure("AX raise pid \(window.app.pid)") {
+            AXUIElementPerformAction(element, kAXRaiseAction as CFString)
+        }
         logAXFailure(result, operation: "raise", window: window)
     }
 
     func focusWindow(_ window: WindowID) {
+        drainPreviewWrites()
         guard let element = cachedElement(for: window, operation: "focus") else { return }
         let appElement = AXUIElementCreateApplication(window.app.pid)
         setElement(appElement, kAXMainWindowAttribute, element, window: window)
@@ -139,6 +151,21 @@ final class LiveWindowSystem: WindowControlling {
 
     private func runningApplication(_ app: AppID) -> NSRunningApplication? {
         NSRunningApplication(processIdentifier: app.pid)
+    }
+
+    /// Serial queue carrying the AX writes a hover preview issues off the main thread. Serial
+    /// so those writes keep the order the reveal issued them in.
+    private static let previewWriteQueue = DispatchQueue(
+        label: "com.mekedron.PieSwitcher.ax-preview-writes", qos: .userInteractive
+    )
+
+    /// Wait for every queued preview write to land. Called at the top of each primitive that
+    /// must observe or overrule earlier reveal state — a commit's raise/focus, a restore's
+    /// un-hide, any window read — so moving the preview writes off the main thread cannot
+    /// reorder them against the operations that follow. Costs a queue hop when nothing is
+    /// pending.
+    private func drainPreviewWrites() {
+        Self.previewWriteQueue.sync {}
     }
 
     private func windowNumber(of element: AXUIElement) -> Int? {
@@ -161,19 +188,11 @@ final class LiveWindowSystem: WindowControlling {
 
     private func boolAttribute(_ element: AXUIElement, _ attribute: String) -> Bool {
         var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        let result = SlowStep.measure("AX read \(attribute)") {
+            AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+        }
         guard result == .success, let boolValue = value as? Bool else { return false }
         return boolValue
-    }
-
-    /// Generic AX string-attribute read. Returns `nil` for the absent/wrong-type cases —
-    /// the title attribute is missing on background windows, panels, and other surfaces
-    /// AX still lists, so a missing read is normal, not an error.
-    private func stringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
-        guard result == .success else { return nil }
-        return value as? String
     }
 
     private func cachedElement(for window: WindowID, operation: String) -> AXUIElement? {
@@ -193,7 +212,10 @@ final class LiveWindowSystem: WindowControlling {
         window: WindowID? = nil
     ) -> Bool {
         let cfValue: CFBoolean = value ? kCFBooleanTrue : kCFBooleanFalse
-        let result = AXUIElementSetAttributeValue(element, attribute as CFString, cfValue)
+        let pid = app?.pid ?? window?.app.pid ?? 0
+        let result = SlowStep.measure("AX set \(attribute) pid \(pid)") {
+            AXUIElementSetAttributeValue(element, attribute as CFString, cfValue)
+        }
         logAXFailure(result, operation: "set \(attribute)", app: app, window: window)
         return result == .success
     }
@@ -205,7 +227,9 @@ final class LiveWindowSystem: WindowControlling {
         _ value: AXUIElement,
         window: WindowID
     ) -> Bool {
-        let result = AXUIElementSetAttributeValue(element, attribute as CFString, value)
+        let result = SlowStep.measure("AX set \(attribute) pid \(window.app.pid)") {
+            AXUIElementSetAttributeValue(element, attribute as CFString, value)
+        }
         logAXFailure(result, operation: "set \(attribute)", window: window)
         return result == .success
     }

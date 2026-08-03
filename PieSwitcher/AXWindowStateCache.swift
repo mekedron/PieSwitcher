@@ -11,82 +11,104 @@ private func axCacheGetWindow(
     _ windowID: UnsafeMutablePointer<CGWindowID>
 ) -> AXError
 
-/// Snapshot of the AX-derived, per-app window state the broadened collection scan
-/// classifies with: which window numbers the app lists via AX, and which of those
-/// are minimized.
+/// Snapshot of the per-app state the wheel reads over the Accessibility API: which
+/// window numbers the app lists, which of those are minimized, and each window's title.
 ///
-/// The AX reads behind it are one blocking IPC round-trip per app plus one per
-/// window — far too slow for the summon hot path, where a busy app (a compiling
-/// IDE, an Electron app in GC) can hold the main thread for hundreds of
-/// milliseconds. So `CGWindowSource.classify` answers synchronously from the last
-/// snapshot and re-probes on a background task after each use: a summon pays AX
-/// IPC only for a pid the snapshot has never seen. The price is one summon of
-/// staleness — a window minimized after the last refresh classifies as off-Space
-/// until the next refresh (typically landing within a second) — accepted as the
-/// trade for an instant open. App hidden-state is NOT cached: it comes from
-/// `NSRunningApplication`, a local read with no IPC to the target app, so the
-/// classifier reads it live.
+/// Every one of those reads is a blocking IPC round-trip — one per app plus two per
+/// window — and a busy app (a compiling IDE, an Electron app in GC) can hold its answer
+/// for hundreds of milliseconds. On the main thread that stalls the wheel *and*, through
+/// the activation tap on the main run loop, the pointer itself (see `AXMessaging`). So
+/// nothing on the interaction path probes inline: readers get the last snapshot, and a
+/// background probe on `AXMessaging.probeQueue` refreshes it.
+///
+/// The price is staleness bounded by one probe round-trip: a window minimized or
+/// retitled since the last probe reads at its previous value until the refresh lands.
+/// Readers that show the stale value — the windows sub-wheel — rebuild on
+/// `didUpdateNotification`, so the correction appears in place rather than waiting for
+/// the next summon. App hidden-state is deliberately absent: `NSRunningApplication`
+/// answers it locally with no IPC to the target app, so the classifier reads it live.
 @MainActor
 final class AXWindowStateCache {
-    struct AppState: Sendable {
-        /// Window numbers the app currently lists via `kAXWindowsAttribute`.
+    struct AppState: Sendable, Equatable {
+        /// Window numbers the app lists via `kAXWindowsAttribute`.
         let axNumbers: Set<Int>
         /// The subset of `axNumbers` whose `kAXMinimizedAttribute` reads true.
         let minimizedNumbers: Set<Int>
+        /// `kAXTitleAttribute` per window number — the only source of a real window title
+        /// under Accessibility-only permission, where CG leaves every title blank.
+        let titles: [Int: String]
+
+        static let empty = AppState(axNumbers: [], minimizedNumbers: [], titles: [:])
     }
 
-    private var byPID: [pid_t: AppState] = [:]
-    private var refreshInFlight = false
+    /// Posted on the main thread when a probe changed an app's snapshot, carrying that
+    /// app's pid under `pidUserInfoKey`, so on-screen UI built from the previous snapshot
+    /// can rebuild itself.
+    static let didUpdateNotification =
+        Notification.Name("com.mekedron.PieSwitcher.axWindowStateDidUpdate")
+    static let pidUserInfoKey = "pid"
 
-    /// The cached state for `pid`, or `nil` when it has never been probed.
+    private var byPID: [pid_t: AppState] = [:]
+    /// Pids with a probe in flight, so a hover burst over one app queues one probe rather
+    /// than one per event. Per-pid rather than a single global flag, so a probe for one app
+    /// never swallows the request for another.
+    private var probing: Set<pid_t> = []
+
+    /// The cached state for `pid`, or `nil` when it has never been probed. Refreshing is the
+    /// caller's move — `classify` refreshes its whole scanned set in one call.
     func state(forPID pid: pid_t) -> AppState? {
         byPID[pid]
     }
 
-    /// Probe `pid` now, blocking, and cache the result — the cold-cache fallback for
-    /// a pid the snapshot has never seen (first broadened read after launch covers
-    /// most of these during the invisible pre-render pass; a freshly launched app
-    /// costs one probe on its first appearance).
-    func probeAndStore(_ pid: pid_t) -> AppState {
-        let state = Self.probe(pid)
-        byPID[pid] = state
-        return state
+    /// Cached window titles for `pid`, empty until its first probe lands. Requests a refresh,
+    /// so a sub-wheel opened on stale titles corrects itself when that probe returns.
+    func titles(forPID pid: pid_t) -> [Int: String] {
+        refresh([pid])
+        return byPID[pid]?.titles ?? [:]
     }
 
-    /// Re-probe `pids` on a background task and merge the fresh states in, so the
-    /// next broadened read answers from up-to-date state without paying IPC. One
-    /// refresh at a time; a request arriving mid-refresh is dropped — the caller
-    /// re-requests on its next read, so state converges anyway.
-    func refreshSoon(_ pids: [pid_t]) {
-        guard !refreshInFlight, !pids.isEmpty else { return }
-        refreshInFlight = true
-        Task.detached(priority: .utility) {
-            var fresh: [pid_t: AppState] = [:]
-            for pid in pids {
-                fresh[pid] = Self.probe(pid)
-            }
-            let snapshot = fresh
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.byPID.merge(snapshot) { _, new in new }
-                self.refreshInFlight = false
+    /// Probe each of `pids` in the background and merge the results in. A pid already being
+    /// probed is skipped; its requester re-asks on the next read, so state converges either
+    /// way. Never blocks the caller.
+    func refresh(_ pids: [pid_t]) {
+        let pending = pids.filter { probing.insert($0).inserted }
+        guard !pending.isEmpty else { return }
+        AXMessaging.probeQueue.async { [weak self] in
+            for pid in pending {
+                let state = Self.probe(pid)
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self?.store(state, forPID: pid) }
+                }
             }
         }
     }
 
-    /// One app's AX window list and per-window minimized state. `nonisolated`
-    /// because the background refresh calls it off the main thread — the AX API is
-    /// thread-safe; a slow target app blocks only the probing task.
+    /// Merge one probe result in and announce it when it changed something the UI may be
+    /// showing.
+    private func store(_ state: AppState, forPID pid: pid_t) {
+        probing.remove(pid)
+        guard byPID[pid] != state else { return }
+        byPID[pid] = state
+        NotificationCenter.default.post(
+            name: Self.didUpdateNotification, object: nil, userInfo: [Self.pidUserInfoKey: pid]
+        )
+    }
+
+    /// One app's AX window list, minimized set, and titles — the whole per-app probe in a
+    /// single traversal, so the collection classifier and the sub-wheel share one round-trip
+    /// instead of paying two. `nonisolated` because it runs on `AXMessaging.probeQueue`: the
+    /// AX API is safe to call there, and a wedged target app blocks only that queue.
     nonisolated static func probe(_ pid: pid_t) -> AppState {
         let appElement = AXUIElementCreateApplication(pid)
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
             appElement, kAXWindowsAttribute as CFString, &value
         ) == .success, let windows = value as? [AXUIElement] else {
-            return AppState(axNumbers: [], minimizedNumbers: [])
+            return .empty
         }
         var axNumbers: Set<Int> = []
         var minimized: Set<Int> = []
+        var titles: [Int: String] = [:]
         for window in windows {
             var windowID: CGWindowID = 0
             guard axCacheGetWindow(window, &windowID) == .success else { continue }
@@ -98,7 +120,13 @@ final class AXWindowStateCache {
             ) == .success, (minValue as? Bool) == true {
                 minimized.insert(number)
             }
+            var titleValue: CFTypeRef?
+            if AXUIElementCopyAttributeValue(
+                window, kAXTitleAttribute as CFString, &titleValue
+            ) == .success, let title = titleValue as? String, !title.isEmpty {
+                titles[number] = title
+            }
         }
-        return AppState(axNumbers: axNumbers, minimizedNumbers: minimized)
+        return AppState(axNumbers: axNumbers, minimizedNumbers: minimized, titles: titles)
     }
 }
