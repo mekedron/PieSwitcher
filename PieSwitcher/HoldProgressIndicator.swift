@@ -149,8 +149,8 @@ final class HoldProgressController: ObservableObject {
         window.orderFrontRegardless()
 
         // Begin on the next pass, once the window is on screen, and start from however much
-        // of the hold has already gone by — so whatever the show cost, the fill still reaches
-        // the rim exactly as the hold completes.
+        // of the hold has already gone by — so whatever the show cost, the fill still tracks
+        // the hold rather than lagging behind it by that cost.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             let remaining = deadline - CFAbsoluteTimeGetCurrent()
@@ -158,14 +158,39 @@ final class HoldProgressController: ObservableObject {
                 self.progress = 1
                 return
             }
-            self.progress = 1 - remaining / duration
+            // The snap must not be swept into the fill: assigned plainly, SwiftUI merges both
+            // changes into one transaction and animates from where the ring was, which is the
+            // very lag being corrected for.
+            var immediate = Transaction()
+            immediate.disablesAnimations = true
+            withTransaction(immediate) { self.progress = 1 - remaining / duration }
+            // Close the ring a moment before the hold completes. Filling to the rim at exactly
+            // the deadline means the closed circle is drawn in the same instant it is taken
+            // away, so the user only ever sees an arc that stopped short — which reads as the
+            // ring failing to keep up. Arriving early leaves the completed ring on screen long
+            // enough to be seen, and "full, therefore firing" is what the cue is for.
+            let margin = min(Self.completionMargin, remaining * 0.2)
             // SwiftUI's implicit animation runtime fills the ring smoothly over the time that
             // is left, without us managing a display link or per-frame timer.
-            withAnimation(.linear(duration: remaining)) {
+            withAnimation(.linear(duration: remaining - margin)) {
                 self.progress = 1.0
             }
+            // What the ring was actually asked to do, so "it never reaches the rim" can be
+            // checked against the numbers of a real hold rather than re-guessed.
+            let startedAt = String(format: "%.2f", 1 - remaining / duration)
+            let fill = String(format: "%.0f", (remaining - margin) * 1000)
+            let full = String(format: "%.0f", margin * 1000)
+            RadialMenuController.perfLog.info("""
+                hold ring: starts at \(startedAt, privacy: .public), fills over \
+                \(fill, privacy: .public)ms, stands full \(full, privacy: .public)ms
+                """)
         }
     }
+
+    /// How long the ring stands full before the hold fires. Long enough to register as a
+    /// completed circle, short enough that it still reads as the end of the hold rather than
+    /// as a pause.
+    private static let completionMargin: TimeInterval = 0.08
 
     /// Draw the ring once, invisibly, so the first real hold doesn't spend its budget building
     /// the SwiftUI host. Mirrors the wheel's launch pre-render: order in off-screen and fully
