@@ -126,6 +126,12 @@ final class HoldProgressController: ObservableObject {
     /// a hold when the ring is switched off in Preferences (Bringr-dp3).
     func start(duration: TimeInterval) {
         guard duration > 0, HoldProgressVisibility.isEnabled() else { return }
+        // The ring must read as "this much of your hold is left", so it is anchored to when
+        // the hold actually began, not to when the animation gets to run. Showing the window
+        // and committing the first frame costs real time; at a 100 ms delay that is a large
+        // share of the whole fill, and an animation started with the full duration from there
+        // would still be short of the rim when the summon fires (Bringr-jud).
+        let deadline = CFAbsoluteTimeGetCurrent() + duration
         // Snap to empty immediately, without animation, so a quick re-trigger
         // (release + re-press) doesn't show a half-filled stale state for the
         // first frame.
@@ -142,10 +148,42 @@ final class HoldProgressController: ObservableObject {
         window.setFrame(frame, display: false)
         window.orderFrontRegardless()
 
-        // SwiftUI's implicit animation runtime fills the ring smoothly over
-        // `duration` without us managing a Display Link or per-frame timer.
-        withAnimation(.linear(duration: duration)) {
-            progress = 1.0
+        // Begin on the next pass, once the window is on screen, and start from however much
+        // of the hold has already gone by — so whatever the show cost, the fill still reaches
+        // the rim exactly as the hold completes.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let remaining = deadline - CFAbsoluteTimeGetCurrent()
+            guard remaining > 0 else {
+                self.progress = 1
+                return
+            }
+            self.progress = 1 - remaining / duration
+            // SwiftUI's implicit animation runtime fills the ring smoothly over the time that
+            // is left, without us managing a display link or per-frame timer.
+            withAnimation(.linear(duration: remaining)) {
+                self.progress = 1.0
+            }
+        }
+    }
+
+    /// Draw the ring once, invisibly, so the first real hold doesn't spend its budget building
+    /// the SwiftUI host. Mirrors the wheel's launch pre-render: order in off-screen and fully
+    /// transparent, force a draw, tear back down on the next tick.
+    func prewarm() {
+        window.alphaValue = 0
+        window.setFrame(
+            NSRect(x: -Self.diameter * 4, y: -Self.diameter * 4,
+                   width: Self.diameter, height: Self.diameter),
+            display: true
+        )
+        window.orderFrontRegardless()
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.window.orderOut(nil)
+            self.window.alphaValue = 1
         }
     }
 

@@ -141,6 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // image path too; a summon arriving earlier just takes the cold first render.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             self?.radialMenu?.prewarmFirstRender()
+            // The hold ring has the same one-time SwiftUI build cost, and far less budget to
+            // absorb it — a 100 ms hold is over before a cold first draw finishes (Bringr-jud).
+            self?.holdProgress?.prewarm()
         }
     }
 
