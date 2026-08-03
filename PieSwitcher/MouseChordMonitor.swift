@@ -147,7 +147,12 @@ final class MouseChordMonitor {
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<MouseChordMonitor>.fromOpaque(userInfo).takeUnretainedValue()
             return MainActor.assumeIsolated {
-                monitor.handle(type: type, event: event)
+                // The window server holds this event until the callback returns, so whatever
+                // runs in here is time the user's pointer is frozen — the one measurement
+                // that maps directly onto felt input lag (Bringr-jud).
+                SlowStep.measure("mouse tap \(type.rawValue)") {
+                    monitor.handle(type: type, event: event)
+                }
             }
         }
 

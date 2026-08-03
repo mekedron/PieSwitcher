@@ -259,6 +259,10 @@ final class RadialMenuController: ObservableObject {
     /// location). Resolves the tree fresh so the wheel reflects live state, and
     /// starts tracking the cursor so hover can drill into apps.
     private func summon(trigger: MenuTrigger, at cursor: CGPoint) {
+        SlowStep.measure("summon") { performSummon(trigger: trigger, at: cursor) }
+    }
+
+    private func performSummon(trigger: MenuTrigger, at cursor: CGPoint) {
         let clock = PhaseClock()
         // Resolve the persisted apps/windows collection scope (Bringr-93j.48) against the
         // display under the cursor; each level scopes screens/Spaces independently, and a
@@ -366,11 +370,13 @@ final class RadialMenuController: ObservableObject {
     }
 
     func syncFromNavigator() {
-        rings = navigator.rings
-        hovered = navigator.hovered
-        prehighlighted = navigator.prehighlighted
-        // Dwell rides every hover change (mouse hover, keyboard nav) — Bringr-93j.105.
-        applyDwell(for: navigator.hovered)
+        SlowStep.measure("publish rings (\(navigator.rings.count))") {
+            rings = navigator.rings
+            hovered = navigator.hovered
+            prehighlighted = navigator.prehighlighted
+            // Dwell rides every hover change (mouse hover, keyboard nav) — Bringr-93j.105.
+            applyDwell(for: navigator.hovered)
+        }
     }
 
     // MARK: - While-open monitors (hover + cancel paths)

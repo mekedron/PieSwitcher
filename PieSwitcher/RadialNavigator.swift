@@ -265,9 +265,13 @@ final class RadialNavigator {
               let appsRing = rings.first, index >= 0, index < appsRing.nodes.count else { return }
         let appNode = appsRing.nodes[index]
         if let appID = appNode.representedApp {
-            windowControl.revealApp(appID)
+            SlowStep.measure("reveal app \(appNode.title) pid \(appID.pid)") {
+                windowControl.revealApp(appID)
+            }
         }
-        let windowNodes = appNode.resolvedChildren()
+        let windowNodes = SlowStep.measure("resolve sub-wheel \(appNode.title)") {
+            appNode.resolvedChildren()
+        }
         // Skip the windows sub-wheel for a single-window app when the option is on
         // (Bringr-93j.75): there is nothing to choose between, so the app stays revealed and
         // committing it acts on its one window directly. Exactly one window is settled state,
@@ -359,7 +363,9 @@ final class RadialNavigator {
         let windowsRing = rings[1]
         guard index >= 0, index < windowsRing.nodes.count,
               case .focusWindow(let windowID) = windowsRing.nodes[index].action else { return }
-        windowControl.revealWindow(windowID)
+        SlowStep.measure("reveal window pid \(windowID.app.pid) #\(windowID.token)") {
+            windowControl.revealWindow(windowID)
+        }
         expandedWindowIndex = index
     }
 

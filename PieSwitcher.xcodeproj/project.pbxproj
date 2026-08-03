@@ -13,6 +13,7 @@
 		1A0000000000000000000017 /* PieSwitcherTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000016 /* PieSwitcherTests.swift */; };
 		1A0000000000000000000022 /* PermissionsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000021 /* PermissionsManager.swift */; };
 		1A0000000000000000000024 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000023 /* AppDelegate.swift */; };
+		1A0000000000000000000319 /* HangWatchdog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000318 /* HangWatchdog.swift */; };
 		1A0000000000000000000317 /* AXMessaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000316 /* AXMessaging.swift */; };
 		1A0000000000000000000315 /* AXWindowStateCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000314 /* AXWindowStateCache.swift */; };
 		1A0000000000000000000313 /* PhaseClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000312 /* PhaseClock.swift */; };
@@ -165,6 +166,7 @@
 		1A0000000000000000000016 /* PieSwitcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PieSwitcherTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000021 /* PermissionsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsManager.swift; sourceTree = "<group>"; };
 		1A0000000000000000000023 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		1A0000000000000000000318 /* HangWatchdog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HangWatchdog.swift; sourceTree = "<group>"; };
 		1A0000000000000000000316 /* AXMessaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXMessaging.swift; sourceTree = "<group>"; };
 		1A0000000000000000000314 /* AXWindowStateCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowStateCache.swift; sourceTree = "<group>"; };
 		1A0000000000000000000312 /* PhaseClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseClock.swift; sourceTree = "<group>"; };
@@ -339,6 +341,7 @@
 			children = (
 				1A0000000000000000000010 /* PieSwitcherApp.swift */,
 				1A0000000000000000000023 /* AppDelegate.swift */,
+				1A0000000000000000000318 /* HangWatchdog.swift */,
 				1A0000000000000000000316 /* AXMessaging.swift */,
 				1A0000000000000000000314 /* AXWindowStateCache.swift */,
 				1A0000000000000000000312 /* PhaseClock.swift */,
@@ -591,6 +594,7 @@
 			files = (
 				1A0000000000000000000011 /* PieSwitcherApp.swift in Sources */,
 				1A0000000000000000000024 /* AppDelegate.swift in Sources */,
+				1A0000000000000000000319 /* HangWatchdog.swift in Sources */,
 				1A0000000000000000000317 /* AXMessaging.swift in Sources */,
 				1A0000000000000000000315 /* AXWindowStateCache.swift in Sources */,
 				1A0000000000000000000313 /* PhaseClock.swift in Sources */,

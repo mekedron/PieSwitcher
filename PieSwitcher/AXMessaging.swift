@@ -41,30 +41,63 @@ enum AXMessaging {
     }
 }
 
-/// Reports main-thread steps that overrun a frame budget, so a user-felt stutter is
-/// attributable to a named step after the fact rather than guessed at:
-/// `log show --info --predicate 'subsystem == "com.mekedron.PieSwitcher"'`.
+/// Names the main-thread work in flight, so a stall is attributable to a step rather than
+/// guessed at: overruns are logged as they finish, and `HangWatchdog` reads `breadcrumb`
+/// to say what a *still-blocked* main thread is inside of.
 ///
-/// Only overruns are logged, so the instrumentation is silent in ordinary use; the two
-/// clock reads it costs are noise next to any step worth naming.
+/// `log show --info --predicate 'subsystem == "com.mekedron.PieSwitcher"'`
+///
+/// Only overruns are logged, so the instrumentation is quiet in ordinary use; the two clock
+/// reads and the breadcrumb push cost nanoseconds next to any step worth naming.
 enum SlowStep {
     private static let log = Logger(subsystem: "com.mekedron.PieSwitcher", category: "summon-perf")
 
-    /// Steps at or under this take less than a display frame and are never reported.
-    static let threshold: TimeInterval = 0.008
+    /// Steps at or under this fit inside a display frame and are never reported.
+    static let threshold: TimeInterval = 0.005
 
-    /// Run `body`, logging its duration when it overruns `threshold`. `name` is an
-    /// autoclosure so building the label costs nothing on the (overwhelmingly common)
-    /// fast path.
+    /// The nested steps currently running on the main thread, outermost first. Guarded
+    /// because the watchdog thread reads it; the main thread only ever holds the lock for
+    /// an append or a removal, so a reader is never left waiting on blocked work.
+    private static let breadcrumbLock = NSLock()
+    nonisolated(unsafe) private static var activeSteps: [String] = []
+
+    /// The main thread's current step path, e.g. `hover slice(0, 3) › AX raise pid 704`, or
+    /// `nothing named` when the block is somewhere no step covers — itself a useful answer.
+    static var breadcrumb: String {
+        breadcrumbLock.lock()
+        let steps = activeSteps
+        breadcrumbLock.unlock()
+        return steps.isEmpty ? "nothing named" : steps.joined(separator: " › ")
+    }
+
+    /// Run `body`, logging its duration when it overruns `threshold` and publishing its name
+    /// as a breadcrumb while it runs. `name` is an autoclosure, so building the label costs
+    /// nothing when the step is not on the main thread — the only place breadcrumbs mean
+    /// anything, since that is the thread the watchdog and the event tap share.
     @discardableResult
     static func measure<T>(_ name: @autoclosure () -> String, _ body: () -> T) -> T {
+        guard Thread.isMainThread else { return body() }
+        let label = name()
+        push(label)
         let start = CFAbsoluteTimeGetCurrent()
         let result = body()
         let elapsed = CFAbsoluteTimeGetCurrent() - start
+        pop()
         guard elapsed > threshold else { return result }
-        let label = name()
         let milliseconds = String(format: "%.1f", elapsed * 1000)
         log.info("slow step: \(label, privacy: .public) took \(milliseconds, privacy: .public)ms")
         return result
+    }
+
+    private static func push(_ label: String) {
+        breadcrumbLock.lock()
+        activeSteps.append(label)
+        breadcrumbLock.unlock()
+    }
+
+    private static func pop() {
+        breadcrumbLock.lock()
+        if !activeSteps.isEmpty { activeSteps.removeLast() }
+        breadcrumbLock.unlock()
     }
 }

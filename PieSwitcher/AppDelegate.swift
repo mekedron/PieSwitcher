@@ -62,6 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // runs its callback on this run loop, so an app that answers slowly would otherwise
         // hold up system-wide input for as long as it likes (Bringr-jud).
         AXMessaging.installProcessTimeout()
+        // Watch the run loop the taps are served on, so a stall that still gets through is
+        // recorded with the step and the call stack that caused it (Bringr-jud).
+        HangWatchdog.shared.start()
+        startHangSelfTestIfRequested()
         // Bringr-93j.111: migrate the legacy `activation.keyboard.modifiers` bitmask into
         // the new two-slot shortcut model before any monitor reads from defaults, so the
         // first event tap callback already sees the migrated configuration.
@@ -83,6 +87,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let suppressed = UserDefaults.standard.bool(forKey: PermissionAlertWindow.suppressDefaultsKey)
         if AppDelegate.shouldPresentPermissionAlert(isTrusted: permissions.isTrusted, suppressed: suppressed) {
             showPermissionAlert()
+        }
+    }
+
+    /// Block the main thread once, deliberately, when `debug.hangSelfTest` is set, so the
+    /// watchdog's detection, breadcrumb, and stack capture can be proven end to end on a
+    /// stall whose cause is already known — before trusting them to explain one that isn't.
+    private func startHangSelfTestIfRequested() {
+        guard UserDefaults.standard.bool(forKey: "debug.hangSelfTest") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            SlowStep.measure("hang self-test") { Thread.sleep(forTimeInterval: 0.6) }
         }
     }
 

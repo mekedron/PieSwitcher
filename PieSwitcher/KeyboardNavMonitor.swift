@@ -45,7 +45,11 @@ final class KeyboardNavMonitor {
         let callback: CGEventTapCallBack = { _, type, event, userInfo in
             guard let userInfo else { return Unmanaged.passUnretained(event) }
             let monitor = Unmanaged<KeyboardNavMonitor>.fromOpaque(userInfo).takeUnretainedValue()
-            return MainActor.assumeIsolated { monitor.handle(type: type, event: event) }
+            return MainActor.assumeIsolated {
+                SlowStep.measure("keyboard tap \(type.rawValue)") {
+                    monitor.handle(type: type, event: event)
+                }
+            }
         }
 
         guard let tap = CGEvent.tapCreate(
