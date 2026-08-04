@@ -74,6 +74,9 @@
 		1A0000000000000000000325 /* PositionShortcutMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000324 /* PositionShortcutMonitor.swift */; };
 		1A0000000000000000000327 /* PositionShortcutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000326 /* PositionShortcutSettingsView.swift */; };
 		1A0000000000000000000329 /* PositionShortcutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000328 /* PositionShortcutTests.swift */; };
+		1A0000000000000000000331 /* PositionShortcutPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000330 /* PositionShortcutPreset.swift */; };
+		1A0000000000000000000333 /* OnboardingPositionsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000332 /* OnboardingPositionsScreen.swift */; };
+		1A0000000000000000000335 /* PositionShortcutPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000334 /* PositionShortcutPresetTests.swift */; };
 		1A0000000000000000000086 /* MyAppsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000085 /* MyAppsMenu.swift */; };
 		1A0000000000000000000088 /* MyAppsMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000087 /* MyAppsMenuTests.swift */; };
 		1A000000000000000000008A /* MyAppsMenuSortingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */; };
@@ -232,6 +235,9 @@
 		1A0000000000000000000324 /* PositionShortcutMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionShortcutMonitor.swift; sourceTree = "<group>"; };
 		1A0000000000000000000326 /* PositionShortcutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionShortcutSettingsView.swift; sourceTree = "<group>"; };
 		1A0000000000000000000328 /* PositionShortcutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionShortcutTests.swift; sourceTree = "<group>"; };
+		1A0000000000000000000330 /* PositionShortcutPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionShortcutPreset.swift; sourceTree = "<group>"; };
+		1A0000000000000000000332 /* OnboardingPositionsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingPositionsScreen.swift; sourceTree = "<group>"; };
+		1A0000000000000000000334 /* PositionShortcutPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionShortcutPresetTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000085 /* MyAppsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenu.swift; sourceTree = "<group>"; };
 		1A0000000000000000000087 /* MyAppsMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuSortingTests.swift; sourceTree = "<group>"; };
@@ -403,6 +409,8 @@
 				1A000000000000000000007F /* MyAppsEditor.swift */,
 				1A0000000000000000000081 /* AppLauncher.swift */,
 				1A0000000000000000000085 /* MyAppsMenu.swift */,
+				1A0000000000000000000330 /* PositionShortcutPreset.swift */,
+				1A0000000000000000000332 /* OnboardingPositionsScreen.swift */,
 				1A0000000000000000000320 /* PositionShortcuts.swift */,
 				1A0000000000000000000322 /* PositionActivation.swift */,
 				1A0000000000000000000324 /* PositionShortcutMonitor.swift */,
@@ -476,6 +484,7 @@
 				1A00000000000000000000C8 /* TrackpadHapticsTests.swift */,
 				1A0000000000000000000083 /* RadialNavigatorLaunchTests.swift */,
 				1A0000000000000000000087 /* MyAppsMenuTests.swift */,
+				1A0000000000000000000334 /* PositionShortcutPresetTests.swift */,
 				1A0000000000000000000328 /* PositionShortcutTests.swift */,
 				1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */,
 				1A00000000000000000000FF /* MyAppsMenuDockSourceTests.swift */,
@@ -661,6 +670,8 @@
 				1A0000000000000000000080 /* MyAppsEditor.swift in Sources */,
 				1A0000000000000000000082 /* AppLauncher.swift in Sources */,
 				1A0000000000000000000086 /* MyAppsMenu.swift in Sources */,
+				1A0000000000000000000331 /* PositionShortcutPreset.swift in Sources */,
+				1A0000000000000000000333 /* OnboardingPositionsScreen.swift in Sources */,
 				1A0000000000000000000321 /* PositionShortcuts.swift in Sources */,
 				1A0000000000000000000323 /* PositionActivation.swift in Sources */,
 				1A0000000000000000000325 /* PositionShortcutMonitor.swift in Sources */,
@@ -733,6 +744,7 @@
 				1A00000000000000000000C7 /* TrackpadHapticsTests.swift in Sources */,
 				1A0000000000000000000084 /* RadialNavigatorLaunchTests.swift in Sources */,
 				1A0000000000000000000088 /* MyAppsMenuTests.swift in Sources */,
+				1A0000000000000000000335 /* PositionShortcutPresetTests.swift in Sources */,
 				1A0000000000000000000329 /* PositionShortcutTests.swift in Sources */,
 				1A000000000000000000008A /* MyAppsMenuSortingTests.swift in Sources */,
 				1A0000000000000000000100 /* MyAppsMenuDockSourceTests.swift in Sources */,

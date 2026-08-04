@@ -3,14 +3,19 @@ import SwiftUI
 
 // MARK: - Screen identifier
 
-/// The two screens of the onboarding flow (Bringr-93j.112). Screen 1 is the
-/// activation-shortcut setup and "try it" confirmation; screen 2 is the
-/// mouse-button hint tailored to the user's hardware. `back`/`next` navigation
-/// is part of the parent view's state, not a navigation stack — the flow is
-/// strictly linear and there are only two screens, so a switch is simpler.
-enum OnboardingScreen: Hashable {
+/// The screens of the onboarding flow, in order (Bringr-93j.112). Screen 1 is
+/// the activation-shortcut setup and "try it" confirmation; screen 2 offers the
+/// position shortcuts (Bringr-dk3); screen 3 is the mouse-button hint tailored
+/// to the user's hardware. `back`/`next` navigation is part of the parent view's
+/// state, not a navigation stack — the flow is strictly linear, so stepping
+/// through the raw values is simpler and adding a screen costs one case.
+enum OnboardingScreen: Int, Hashable, CaseIterable {
     case shortcut
+    case positions
     case mouseHint
+
+    var previous: OnboardingScreen? { OnboardingScreen(rawValue: rawValue - 1) }
+    var next: OnboardingScreen? { OnboardingScreen(rawValue: rawValue + 1) }
 }
 
 // MARK: - Root
@@ -52,6 +57,8 @@ struct OnboardingRootView: View {
         switch screen {
         case .shortcut:
             OnboardingShortcutScreen(permissions: permissions)
+        case .positions:
+            OnboardingPositionsScreen()
         case .mouseHint:
             OnboardingMouseHintScreen(variant: mouseVariant ?? .generic)
                 .onAppear {
@@ -65,9 +72,9 @@ struct OnboardingRootView: View {
     @ViewBuilder
     private var footer: some View {
         HStack {
-            if screen == .mouseHint {
+            if let previous = screen.previous {
                 Button {
-                    screen = .shortcut
+                    screen = previous
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                 }
@@ -76,14 +83,13 @@ struct OnboardingRootView: View {
 
             Spacer()
 
-            switch screen {
-            case .shortcut:
+            if let next = screen.next {
                 Button("Next") {
-                    screen = .mouseHint
+                    screen = next
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-            case .mouseHint:
+            } else {
                 Button("Done") {
                     onFinish()
                 }

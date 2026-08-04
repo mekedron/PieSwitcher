@@ -75,6 +75,14 @@ struct PositionShortcutSettings: View {
             }
 
             Section {
+                presetRow
+            } header: {
+                Text("Quick start")
+            } footer: {
+                Text(presetFooter)
+            }
+
+            Section {
                 if bindings.isEmpty {
                     Text(emptyState)
                         .font(.callout)
@@ -98,10 +106,52 @@ struct PositionShortcutSettings: View {
                 Text(footer)
             }
         }
-        .onAppear { bindings = PositionShortcutStore.bindings(list) }
+        .onAppear { reload() }
     }
 
     // MARK: - Rows
+
+    /// The one-click starter set. Offered rather than applied: these shortcuts consume
+    /// their keys system-wide, so nothing binds until the user asks.
+    @ViewBuilder
+    private var presetRow: some View {
+        if isPresetInstalled {
+            HStack(spacing: 12) {
+                Label("\(PositionShortcutPreset.summary(for: list)) are set up",
+                      systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.tint)
+                Spacer(minLength: 0)
+                Button("Remove") {
+                    PositionShortcutPreset.remove(list)
+                    reload()
+                }
+            }
+        } else {
+            HStack {
+                Button("Add \(PositionShortcutPreset.summary(for: list))") {
+                    PositionShortcutPreset.install(list)
+                    reload()
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var presetFooter: String {
+        "Adds \(PositionShortcutPreset.summary(for: list)) for the first "
+            + "\(PositionShortcutPreset.positionCount) positions, on the left Option only so "
+            + "the right one keeps typing what it always did. Rows you set up yourself are "
+            + "left alone."
+    }
+
+    private var isPresetInstalled: Bool {
+        // Derived from `bindings` rather than re-read, so the row flips the instant an edit
+        // lands instead of a redraw later.
+        let bound = Set(bindings.compactMap(\.shortcut))
+        return PositionShortcutPreset.recommended(for: list).allSatisfy { binding in
+            binding.shortcut.map(bound.contains) ?? false
+        }
+    }
 
     private var columnHeadings: some View {
         HStack(spacing: 12) {
@@ -189,6 +239,12 @@ struct PositionShortcutSettings: View {
         guard let index = updated.firstIndex(where: { $0.id == id }) else { return }
         mutate(&updated[index])
         write(updated)
+    }
+
+    /// Re-read the persisted rows, for edits made outside this view's own `write` — the
+    /// preset buttons, and the onboarding screen that may have installed the same set.
+    private func reload() {
+        bindings = PositionShortcutStore.bindings(list)
     }
 
     private func write(_ updated: [PositionShortcutBinding]) {
