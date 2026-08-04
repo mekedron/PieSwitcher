@@ -114,3 +114,105 @@ struct KeyboardInteractionMode: View {
         }
     }
 }
+
+// MARK: - Two-slot block
+
+/// The shortcut block shown in the Keyboard Activation pane. Owns the two
+/// `@AppStorage` Data slots, applies migration on appear (defence in depth so an
+/// upgrader who heads straight to Preferences still gets the new defaults), and
+/// surfaces the one-time migration notice (AC: "a one-time in-app notice").
+struct KeyboardShortcutPicker: View {
+    @AppStorage(KeyboardShortcutStore.slot1Key)
+    private var slot1Data: Data?
+    @AppStorage(KeyboardShortcutStore.slot2Key)
+    private var slot2Data: Data?
+    @AppStorage(KeyboardShortcutStore.initialisedKey)
+    private var initialised = false
+    @State private var showsAddSecond = false
+    @State private var migrationNotice: String?
+
+    private var slot1: KeyboardShortcut? { decode(slot1Data) }
+    private var slot2: KeyboardShortcut? { decode(slot2Data) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            KeyboardShortcutSlotView(
+                label: "Shortcut 1",
+                shortcut: slot1,
+                placeholder: "Not set",
+                onCommit: { write(.slot1, $0) },
+                onClear: slot1 == nil ? nil : { write(.slot1, nil) },
+                onReset: { write(.slot1, KeyboardShortcutStore.freshInstallSlot1) }
+            )
+
+            if slot2 != nil || showsAddSecond {
+                KeyboardShortcutSlotView(
+                    label: "Shortcut 2",
+                    shortcut: slot2,
+                    placeholder: "Not set",
+                    onCommit: { write(.slot2, $0) },
+                    onClear: {
+                        write(.slot2, nil)
+                        showsAddSecond = false
+                    },
+                    onReset: nil
+                )
+            } else {
+                Button {
+                    showsAddSecond = true
+                } label: {
+                    Label("Add second shortcut", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+            }
+
+            if let notice = migrationNotice {
+                migrationBanner(notice)
+            }
+        }
+        .onAppear {
+            KeyboardShortcutStore.runMigrationIfNeeded()
+            migrationNotice = KeyboardShortcutStore.consumeMigrationNotice()
+            // If the migration left an explicit Shortcut 2, reveal it now.
+            showsAddSecond = slot2 != nil
+        }
+    }
+
+    private func migrationBanner(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Got it") { migrationNotice = nil }
+                    .buttonStyle(.borderless)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.accentColor.opacity(0.10))
+        )
+    }
+
+    // MARK: - Persistence helpers
+
+    private enum SlotID { case slot1, slot2 }
+
+    private func write(_ slot: SlotID, _ shortcut: KeyboardShortcut?) {
+        switch slot {
+        case .slot1: KeyboardShortcutStore.setSlot1(shortcut)
+        case .slot2: KeyboardShortcutStore.setSlot2(shortcut)
+        }
+        // `@AppStorage` reads the underlying defaults on the next render — nudge it.
+        if !initialised { initialised = true }
+    }
+
+    private func decode(_ data: Data?) -> KeyboardShortcut? {
+        guard let data else { return nil }
+        struct Box: Codable { let value: KeyboardShortcut? }
+        return (try? JSONDecoder().decode(Box.self, from: data))?.value
+    }
+}

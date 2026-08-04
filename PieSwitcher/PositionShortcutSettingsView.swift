@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Tab
 
-/// Sub-tab selector for the Shortcuts tab (Bringr-dk3). The two lists are split because
+/// Sub-tab selector for the Positions tab (Bringr-dk3). The two lists are split because
 /// they address different rings and answer different questions — "which app" versus "which
 /// window of the app I'm in" — and a user typically fills one of them heavily and the other
 /// lightly.
@@ -10,7 +10,7 @@ enum PositionShortcutSubTab: String, PreferencesSubTab {
     case apps
     case windows
 
-    static let defaultsKey = "preferences.shortcutsSubTab"
+    static let defaultsKey = "preferences.positionsSubTab"
     static let `default`: PositionShortcutSubTab = .apps
 
     var title: String {
@@ -29,7 +29,7 @@ enum PositionShortcutSubTab: String, PreferencesSubTab {
     }
 }
 
-/// The Shortcuts tab body: the sub-tab strip over whichever list it selects.
+/// The Positions tab body: the sub-tab strip over whichever list it selects.
 struct PositionShortcutsTab: View {
     @AppStorage(PositionShortcutSubTab.defaultsKey)
     private var subTabRaw = PositionShortcutSubTab.default.rawValue
@@ -52,7 +52,7 @@ struct PositionShortcutsTab: View {
 
 // MARK: - Pane
 
-/// The Shortcuts pane for one position list (Bringr-dk3). The list is free-form: the user
+/// The Positions pane for one position list (Bringr-dk3). The list is free-form: the user
 /// adds as many rows as they like, and each row is a *pair* — the position to act on and
 /// the shortcut that acts on it — both editable in place.
 ///

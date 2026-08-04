@@ -239,6 +239,58 @@ final class PositionShortcutDetectorTests: XCTestCase {
 /// modifiers — are unaffected.
 final class KeyboardShortcutKeyRequirementTests: XCTestCase {
 
+    // MARK: - Release order
+
+    /// The natural way to let go of ⌥1 is to lift the digit first. That release is itself a
+    /// held state with no key in it, so a "latest held state wins" rule recorded a bare ⌥.
+    func testReleasingTheKeyBeforeTheModifierKeepsTheCombo() {
+        var machine = KeyboardShortcutCaptureMachine()
+        machine.start()
+        let option = SidedModifier(.option, .left)
+        let combo = HeldKeys(modifiers: [option], nonModifierKey: kVK_ANSI_1)
+        machine.update(held: HeldKeys(modifiers: [option]))
+        machine.update(held: combo)
+        machine.update(held: HeldKeys(modifiers: [option]))  // digit up, Option still down
+        machine.update(held: .empty)                          // Option up
+        XCTAssertEqual(machine.take(), combo)
+    }
+
+    func testReleasingTheModifierBeforeTheKeyKeepsTheCombo() {
+        var machine = KeyboardShortcutCaptureMachine()
+        machine.start()
+        let option = SidedModifier(.option, .left)
+        let combo = HeldKeys(modifiers: [option], nonModifierKey: kVK_ANSI_1)
+        machine.update(held: HeldKeys(modifiers: [option]))
+        machine.update(held: combo)
+        machine.update(held: HeldKeys(modifiers: [], nonModifierKey: kVK_ANSI_1))
+        machine.update(held: .empty)
+        XCTAssertEqual(machine.take(), combo, "both release orders must record the same thing")
+    }
+
+    func testComboSettlesWhenItsKeyGoesDown() {
+        var machine = KeyboardShortcutCaptureMachine()
+        machine.start()
+        let option = SidedModifier(.option, .left)
+        machine.update(held: HeldKeys(modifiers: [option]))
+        XCTAssertTrue(machine.isCapturing, "modifiers alone leave the recording open")
+        machine.update(held: HeldKeys(modifiers: [option], nonModifierKey: kVK_ANSI_1))
+        XCTAssertFalse(machine.isCapturing, "the key completes it — no release needed")
+    }
+
+    func testSwappingTheKeyBeforeReleasingRecordsTheFirstOne() {
+        // Once settled, later presses belong to the next session, not this one.
+        var machine = KeyboardShortcutCaptureMachine()
+        machine.start()
+        let option = SidedModifier(.option, .left)
+        let first = HeldKeys(modifiers: [option], nonModifierKey: kVK_ANSI_1)
+        machine.update(held: HeldKeys(modifiers: [option]))
+        machine.update(held: first)
+        machine.update(held: HeldKeys(modifiers: [option], nonModifierKey: kVK_ANSI_2))
+        XCTAssertEqual(machine.take(), first)
+    }
+
+    // MARK: - Key requirement
+
     func testModifierOnlyReleaseIsRefusedWhenAKeyIsRequired() {
         var machine = KeyboardShortcutCaptureMachine(requiresNonModifierKey: true)
         machine.start()

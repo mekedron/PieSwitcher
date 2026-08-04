@@ -31,6 +31,8 @@ struct KeyboardShortcutCaptureField: View {
     /// This field's registration in `ShortcutCaptureSession`, stable for the field's
     /// lifetime so begin/end always refer to the same entry.
     @State private var sessionToken = UUID()
+    /// Set once a shortcut has been settled but its keys are still down. See `handle(event:)`.
+    @State private var isDrainingRelease = false
 
     /// Whether a capture is in flight, so a caller can swap its own trailing controls for a
     /// Cancel button while the field is listening.
@@ -54,11 +56,8 @@ struct KeyboardShortcutCaptureField: View {
                     .buttonStyle(.borderless)
             }
         }
-        .onDisappear {
-            stopMonitoring()
-            // Closing Preferences mid-capture must not leave the taps disarmed.
-            endCaptureSession()
-        }
+        // Closing Preferences mid-capture must not leave the taps disarmed.
+        .onDisappear { finishCapture() }
     }
 
     private var slotContent: some View {
@@ -116,10 +115,17 @@ struct KeyboardShortcutCaptureField: View {
 
     private func cancelCapture() {
         capture.cancel()
+        finishCapture()
+        onCaptureStateChange(false)
+    }
+
+    /// Let go of the keyboard: stop listening and re-arm the global taps. Called once the
+    /// user's fingers are actually off the keys, never merely once a value has been settled.
+    private func finishCapture() {
+        isDrainingRelease = false
         liveSnapshot = nil
         stopMonitoring()
         endCaptureSession()
-        onCaptureStateChange(false)
     }
 
     private func endCaptureSession() {
@@ -149,13 +155,22 @@ struct KeyboardShortcutCaptureField: View {
         // doesn't close from the same key press.
         if event.type == .keyDown, event.keyCode == 53 { // 53 = kVK_Escape
             capture.handleEscape()
-            liveSnapshot = nil
-            stopMonitoring()
-            endCaptureSession()
+            finishCapture()
             onCaptureStateChange(false)
             return nil
         }
         let held = currentHeldKeys(after: event)
+
+        // A combination settles the moment its key goes down, which leaves its keys still
+        // held. Keep consuming until the keyboard is quiet: otherwise the trailing releases
+        // reach whatever is behind Preferences, and re-arming the global taps while the
+        // just-recorded keys are down would let them fire the very shortcut being edited.
+        if isDrainingRelease {
+            liveSnapshot = held
+            if held.modifiers.isEmpty, held.nonModifierKey == nil { finishCapture() }
+            return nil
+        }
+
         capture.update(held: held)
         if let snap = capture.snapshot {
             liveSnapshot = snap
@@ -168,10 +183,13 @@ struct KeyboardShortcutCaptureField: View {
                !requiresNonModifierKey || shortcut.hasNonModifierKey {
                 onCommit(shortcut)
             }
-            liveSnapshot = nil
-            stopMonitoring()
-            endCaptureSession()
             onCaptureStateChange(false)
+            if held.modifiers.isEmpty, held.nonModifierKey == nil {
+                finishCapture()
+            } else {
+                isDrainingRelease = true
+                liveSnapshot = held
+            }
         }
         return nil
     }
@@ -278,107 +296,5 @@ struct KeyCapBadge: View {
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(Color.secondary.opacity(0.4), lineWidth: 0.5)
             )
-    }
-}
-
-// MARK: - Two-slot block
-
-/// The shortcut block shown in the Keyboard Activation pane. Owns the two
-/// `@AppStorage` Data slots, applies migration on appear (defence in depth so an
-/// upgrader who heads straight to Preferences still gets the new defaults), and
-/// surfaces the one-time migration notice (AC: "a one-time in-app notice").
-struct KeyboardShortcutPicker: View {
-    @AppStorage(KeyboardShortcutStore.slot1Key)
-    private var slot1Data: Data?
-    @AppStorage(KeyboardShortcutStore.slot2Key)
-    private var slot2Data: Data?
-    @AppStorage(KeyboardShortcutStore.initialisedKey)
-    private var initialised = false
-    @State private var showsAddSecond = false
-    @State private var migrationNotice: String?
-
-    private var slot1: KeyboardShortcut? { decode(slot1Data) }
-    private var slot2: KeyboardShortcut? { decode(slot2Data) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            KeyboardShortcutSlotView(
-                label: "Shortcut 1",
-                shortcut: slot1,
-                placeholder: "Not set",
-                onCommit: { write(.slot1, $0) },
-                onClear: slot1 == nil ? nil : { write(.slot1, nil) },
-                onReset: { write(.slot1, KeyboardShortcutStore.freshInstallSlot1) }
-            )
-
-            if slot2 != nil || showsAddSecond {
-                KeyboardShortcutSlotView(
-                    label: "Shortcut 2",
-                    shortcut: slot2,
-                    placeholder: "Not set",
-                    onCommit: { write(.slot2, $0) },
-                    onClear: {
-                        write(.slot2, nil)
-                        showsAddSecond = false
-                    },
-                    onReset: nil
-                )
-            } else {
-                Button {
-                    showsAddSecond = true
-                } label: {
-                    Label("Add second shortcut", systemImage: "plus.circle")
-                }
-                .buttonStyle(.borderless)
-            }
-
-            if let notice = migrationNotice {
-                migrationBanner(notice)
-            }
-        }
-        .onAppear {
-            KeyboardShortcutStore.runMigrationIfNeeded()
-            migrationNotice = KeyboardShortcutStore.consumeMigrationNotice()
-            // If the migration left an explicit Shortcut 2, reveal it now.
-            showsAddSecond = slot2 != nil
-        }
-    }
-
-    private func migrationBanner(_ text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle.fill")
-                .foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(text)
-                    .font(.callout)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Got it") { migrationNotice = nil }
-                    .buttonStyle(.borderless)
-            }
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.accentColor.opacity(0.10))
-        )
-    }
-
-    // MARK: - Persistence helpers
-
-    private enum SlotID { case slot1, slot2 }
-
-    private func write(_ slot: SlotID, _ shortcut: KeyboardShortcut?) {
-        switch slot {
-        case .slot1: KeyboardShortcutStore.setSlot1(shortcut)
-        case .slot2: KeyboardShortcutStore.setSlot2(shortcut)
-        }
-        // `@AppStorage` reads the underlying defaults on the next render — nudge it.
-        if !initialised { initialised = true }
-    }
-
-    private func decode(_ data: Data?) -> KeyboardShortcut? {
-        guard let data else { return nil }
-        struct Box: Codable { let value: KeyboardShortcut? }
-        return (try? JSONDecoder().decode(Box.self, from: data))?.value
     }
 }

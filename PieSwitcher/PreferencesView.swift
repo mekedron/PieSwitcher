@@ -11,10 +11,13 @@ import SwiftUI
 /// keyboard panes apart: Activation → Keyboard is the key that summons,
 /// Selection → Keyboard is the keys that navigate an open wheel.
 ///
-/// Shortcuts is the one tab outside that arc, and deliberately so: its position
+/// Positions is the one tab outside that arc, and deliberately so: its position
 /// shortcuts (Bringr-dk3) skip every stage at once — no summon, no hover, no
 /// pick — so filing them under any single stage would misdescribe them. They act
-/// on the wheel the other tabs configure without ever showing it.
+/// on the wheel the other tabs configure without ever showing it. It is named for
+/// what it binds, not for the fact that it binds keys: "Shortcuts" would read as
+/// the home of every shortcut in the app, and the key that summons the wheel lives
+/// under Activation while the keys that drive it live under Selection.
 ///
 /// The selected tab is persisted under `defaultsKey` so the window reopens where
 /// the user left it, and the menu bar's "About PieSwitcher" item writes
@@ -23,7 +26,7 @@ import SwiftUI
 enum PreferencesTab: String, CaseIterable {
     case general
     case activation
-    case shortcuts
+    case positions
     case contents
     case selection
     case appearance
@@ -36,7 +39,7 @@ enum PreferencesTab: String, CaseIterable {
         switch self {
         case .general: return "General"
         case .activation: return "Activation"
-        case .shortcuts: return "Shortcuts"
+        case .positions: return "Positions"
         case .contents: return "Contents"
         case .selection: return "Selection"
         case .appearance: return "Appearance"
@@ -48,7 +51,7 @@ enum PreferencesTab: String, CaseIterable {
         switch self {
         case .general: return "gearshape"
         case .activation: return "cursorarrow.click.2"
-        case .shortcuts: return "command"
+        case .positions: return "list.number"
         case .contents: return "list.bullet.rectangle"
         case .selection: return "hand.point.up.left"
         case .appearance: return "paintbrush"
@@ -83,7 +86,7 @@ struct PreferencesView: View {
                 switch selection.wrappedValue {
                 case .general: GeneralTab()
                 case .activation: ActivationTab()
-                case .shortcuts: PositionShortcutsTab()
+                case .positions: PositionShortcutsTab()
                 case .contents: ContentsTab()
                 case .selection: SelectionTab()
                 case .appearance: AppearanceSettings()

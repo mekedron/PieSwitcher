@@ -38,8 +38,17 @@ enum ShortcutCaptureSession {
 ///   1. Slot click → `.idle` → `.listening`.
 ///   2. First flagsChanged with at least one modifier → `.recording(snapshot)`.
 ///   3. Subsequent events update `snapshot` to the latest non-empty held state.
-///   4. All keys released → `.committed(snapshot)`.
+///   4a. A non-modifier key going down while modifiers are held → `.committed` on the
+///       spot, with the combination as it stands at that instant.
+///   4b. Otherwise, all keys released → `.committed(snapshot)` — the bare-modifier case,
+///       where nothing but the release can say the user is done.
 ///   5. Escape pressed at any point with no other keys held → `.cancelled`.
+///
+/// Step 4a is what makes the release order irrelevant. A combination is settled the moment
+/// its key is pressed, so letting go of the key before the modifier — the natural way to
+/// release ⌥1 — cannot walk the snapshot back to the modifiers alone, which is what a
+/// "latest held state wins" rule did: the key's release is itself a new held state, and it
+/// no longer has the key in it.
 ///
 /// Empty-modifier presses (e.g. a stray non-modifier key with no modifiers) are
 /// rejected: the snapshot stays at whatever the user actually held last so accidental
@@ -109,21 +118,26 @@ struct KeyboardShortcutCaptureMachine: Equatable {
         }
     }
 
-    /// Feed the live held state. `nonModifierWasPressed` is the rising edge for the
-    /// non-modifier key in `held` — letters / digits / space etc. We track that
-    /// separately so the picker can decide "user pressed a key while holding a
-    /// modifier" (commit a combo shortcut) vs "modifiers held alone".
+    /// Feed the live held state — every modifier currently down plus the one non-modifier
+    /// key, if any. Modifiers alone keep the recording open; a key arriving under them
+    /// settles it.
     mutating func update(held: HeldKeys) {
         switch state {
         case .listening:
             if !held.modifiers.isEmpty {
-                // First modifier(s) down — start a recording with this snapshot.
-                state = .recording(held)
+                // First modifier(s) down — start a recording with this snapshot, or settle
+                // it outright if a key came down in the same breath.
+                state = held.nonModifierKey == nil ? .recording(held) : .committed(held)
             }
             // A stray non-modifier-only press while listening (no modifiers) is
             // ignored — we never commit a key-only shortcut from the picker.
         case .recording(let prev):
-            if held.modifiers.isEmpty, held.nonModifierKey == nil {
+            if !held.modifiers.isEmpty, held.nonModifierKey != nil {
+                // A key pressed under held modifiers completes the shortcut. Settling here
+                // rather than on release is what keeps the recorded value independent of
+                // which finger the user lifts first.
+                state = .committed(held)
+            } else if held.modifiers.isEmpty, held.nonModifierKey == nil {
                 // All keys released — commit whatever was last held, unless this field
                 // requires a real key and the user let go of modifiers alone. Refusing
                 // returns to listening rather than cancelling, so they can simply press
