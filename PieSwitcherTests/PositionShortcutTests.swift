@@ -1,0 +1,212 @@
+import Carbon.HIToolbox
+import XCTest
+@testable import PieSwitcher
+
+/// Covers the pure cores behind the position shortcuts (Bringr-dk3): position → ring index,
+/// persistence and ordering, and the per-binding rising-edge detector the live tap drives.
+final class PositionShortcutResolverTests: XCTestCase {
+
+    func testFirstPositionMapsToFirstIndex() {
+        XCTAssertEqual(PositionShortcutResolver.index(forPosition: 1, count: 5), 0)
+    }
+
+    func testLastPositionMapsToLastIndex() {
+        XCTAssertEqual(PositionShortcutResolver.index(forPosition: 5, count: 5), 4)
+    }
+
+    func testPositionPastTheRingIsNil() {
+        XCTAssertNil(PositionShortcutResolver.index(forPosition: 6, count: 5))
+    }
+
+    func testEmptyRingHasNoPositions() {
+        XCTAssertNil(PositionShortcutResolver.index(forPosition: 1, count: 0))
+    }
+
+    func testZeroAndNegativePositionsAreRejected() {
+        XCTAssertNil(PositionShortcutResolver.index(forPosition: 0, count: 5))
+        XCTAssertNil(PositionShortcutResolver.index(forPosition: -1, count: 5))
+    }
+}
+
+// MARK: - Storage
+
+final class PositionShortcutStoreTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var suiteName: String!
+
+    override func setUp() {
+        super.setUp()
+        suiteName = "PositionShortcutStoreTests.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suiteName)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suiteName)
+        defaults = nil
+        super.tearDown()
+    }
+
+    private func combo(_ keyCode: Int) -> KeyboardShortcut {
+        KeyboardShortcut(modifiers: [SidedModifier(.control, .right)], keyCode: keyCode)
+    }
+
+    func testBothListsStartEmpty() {
+        XCTAssertTrue(PositionShortcutStore.bindings(.apps, from: defaults).isEmpty)
+        XCTAssertTrue(PositionShortcutStore.bindings(.windows, from: defaults).isEmpty)
+        XCTAssertTrue(PositionShortcutStore.armed(from: defaults).isEmpty)
+    }
+
+    func testBindingsRoundTrip() {
+        let binding = PositionShortcutBinding(position: 3, shortcut: combo(kVK_ANSI_3))
+        PositionShortcutStore.setBindings([binding], for: .apps, in: defaults)
+        XCTAssertEqual(PositionShortcutStore.bindings(.apps, from: defaults), [binding])
+    }
+
+    func testListsAreIndependent() {
+        PositionShortcutStore.setBindings(
+            [PositionShortcutBinding(position: 1, shortcut: combo(kVK_ANSI_1))],
+            for: .apps, in: defaults
+        )
+        XCTAssertTrue(PositionShortcutStore.bindings(.windows, from: defaults).isEmpty)
+    }
+
+    func testBindingsAreReadBackAscendingByPosition() {
+        PositionShortcutStore.setBindings(
+            [
+                PositionShortcutBinding(position: 4, shortcut: combo(kVK_ANSI_4)),
+                PositionShortcutBinding(position: 1, shortcut: combo(kVK_ANSI_1))
+            ],
+            for: .apps, in: defaults
+        )
+        XCTAssertEqual(PositionShortcutStore.bindings(.apps, from: defaults).map(\.position), [1, 4])
+    }
+
+    func testSeveralShortcutsMayShareOnePosition() {
+        let first = PositionShortcutBinding(position: 1, shortcut: combo(kVK_ANSI_1))
+        let second = PositionShortcutBinding(position: 1, shortcut: combo(kVK_F1))
+        PositionShortcutStore.setBindings([first, second], for: .apps, in: defaults)
+        let armed = PositionShortcutStore.armed(from: defaults)
+        XCTAssertEqual(armed.count, 2)
+        XCTAssertEqual(armed.map(\.position), [1, 1])
+        // Ties keep their stored order, so the rows don't swap under the user between reads.
+        XCTAssertEqual(armed.map(\.id), [first.id, second.id])
+    }
+
+    func testRowsWithoutAShortcutAreNotArmed() {
+        PositionShortcutStore.setBindings(
+            [PositionShortcutBinding(position: 1, shortcut: nil)], for: .apps, in: defaults
+        )
+        XCTAssertEqual(PositionShortcutStore.bindings(.apps, from: defaults).count, 1)
+        XCTAssertTrue(PositionShortcutStore.armed(from: defaults).isEmpty)
+    }
+
+    func testOutOfRangePositionsAreDroppedOnRead() {
+        PositionShortcutStore.setBindings(
+            [
+                PositionShortcutBinding(position: 0, shortcut: combo(kVK_ANSI_1)),
+                PositionShortcutBinding(
+                    position: PositionShortcutStore.maxPosition + 1, shortcut: combo(kVK_ANSI_2)
+                ),
+                PositionShortcutBinding(position: 2, shortcut: combo(kVK_ANSI_3))
+            ],
+            for: .apps, in: defaults
+        )
+        XCTAssertEqual(PositionShortcutStore.bindings(.apps, from: defaults).map(\.position), [2])
+    }
+
+    func testArmedPutsAppsBeforeWindows() {
+        PositionShortcutStore.setBindings(
+            [PositionShortcutBinding(position: 9, shortcut: combo(kVK_ANSI_9))], for: .apps, in: defaults
+        )
+        PositionShortcutStore.setBindings(
+            [PositionShortcutBinding(position: 1, shortcut: combo(kVK_ANSI_1))], for: .windows, in: defaults
+        )
+        XCTAssertEqual(PositionShortcutStore.armed(from: defaults).map(\.list), [.apps, .windows])
+    }
+}
+
+// MARK: - Detector
+
+final class PositionShortcutDetectorTests: XCTestCase {
+    private let rightControl = SidedModifier(.control, .right)
+
+    private func armed(
+        _ list: PositionShortcutList, _ position: Int, keyCode: Int?
+    ) -> ArmedPositionShortcut {
+        ArmedPositionShortcut(
+            id: UUID(), list: list, position: position,
+            shortcut: KeyboardShortcut(modifiers: [rightControl], keyCode: keyCode)
+        )
+    }
+
+    private func held(_ keyCode: Int?) -> HeldKeys {
+        HeldKeys(modifiers: [rightControl], nonModifierKey: keyCode)
+    }
+
+    func testFiresOnTheRisingEdge() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        XCTAssertEqual(detector.handle(held: held(kVK_ANSI_1), armed: [one])?.position, 1)
+    }
+
+    func testDoesNotRefireWhileStillHeld() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        _ = detector.handle(held: held(kVK_ANSI_1), armed: [one])
+        XCTAssertNil(detector.handle(held: held(kVK_ANSI_1), armed: [one]))
+    }
+
+    func testFiresAgainAfterRelease() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        _ = detector.handle(held: held(kVK_ANSI_1), armed: [one])
+        _ = detector.handle(held: held(nil), armed: [one])
+        XCTAssertEqual(detector.handle(held: held(kVK_ANSI_1), armed: [one])?.position, 1)
+    }
+
+    func testSlidingBetweenTwoBindingsFiresEach() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        let two = armed(.apps, 2, keyCode: kVK_ANSI_2)
+        XCTAssertEqual(detector.handle(held: held(kVK_ANSI_1), armed: [one, two])?.position, 1)
+        XCTAssertEqual(detector.handle(held: held(kVK_ANSI_2), armed: [one, two])?.position, 2)
+    }
+
+    func testOnlyOneBindingFiresWhenTwoShareAShortcut() {
+        var detector = PositionShortcutDetector()
+        let first = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        let second = armed(.windows, 1, keyCode: kVK_ANSI_1)
+        let fired = detector.handle(held: held(kVK_ANSI_1), armed: [first, second])
+        XCTAssertEqual(fired?.id, first.id)
+        XCTAssertEqual(detector.activeIDs, [first.id, second.id])
+    }
+
+    func testEmptyArmedListNeverFires() {
+        var detector = PositionShortcutDetector()
+        XCTAssertNil(detector.handle(held: held(kVK_ANSI_1), armed: []))
+    }
+
+    func testSideSpecificShortcutIgnoresTheOtherSide() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        let leftHeld = HeldKeys(
+            modifiers: [SidedModifier(.control, .left)], nonModifierKey: kVK_ANSI_1
+        )
+        XCTAssertNil(detector.handle(held: leftHeld, armed: [one]))
+    }
+
+    func testBareModifierBindingFiresWithNoKey() {
+        var detector = PositionShortcutDetector()
+        let bare = armed(.apps, 1, keyCode: nil)
+        XCTAssertEqual(detector.handle(held: held(nil), armed: [bare])?.position, 1)
+    }
+
+    func testResetClearsLatchedMatches() {
+        var detector = PositionShortcutDetector()
+        let one = armed(.apps, 1, keyCode: kVK_ANSI_1)
+        _ = detector.handle(held: held(kVK_ANSI_1), armed: [one])
+        detector.reset()
+        XCTAssertTrue(detector.activeIDs.isEmpty)
+        XCTAssertEqual(detector.handle(held: held(kVK_ANSI_1), armed: [one])?.position, 1)
+    }
+}

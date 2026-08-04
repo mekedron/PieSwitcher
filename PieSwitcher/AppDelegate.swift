@@ -45,6 +45,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// under XCTest. Always installed but only consumes keys while the menu is open with the
     /// feature on.
     private var keyboardNavMonitor: KeyboardNavMonitor?
+    /// Global tap for the position shortcuts (Bringr-dk3) — the hotkeys that act on a wheel
+    /// slot without opening the wheel. `nil` under XCTest. Installed unconditionally, but it
+    /// matches nothing (and so consumes nothing) until the user binds a row in Preferences.
+    private var positionShortcutMonitor: PositionShortcutMonitor?
+    /// Performs what a position shortcut asks for, resolving the same tree the wheel would.
+    /// `nil` under XCTest.
+    private var positionActivator: PositionActivator?
     /// Pre-warmed cursor-progress indicator (Bringr-93j.103). Lit while either monitor's
     /// hold-delay timer is running, so the user can see how much longer they need to hold
     /// before the wheel opens. `nil` under XCTest.
@@ -77,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startActivationMonitor()
         startModifierMonitor()
         startKeyboardNavMonitor()
+        startPositionShortcutMonitor()
         updater.start()
 
         // First-launch auto-open (Bringr-93j.112). The presenter is the same
@@ -129,6 +137,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowControl.restoreFromSnapshotIfNeeded()
         radialMenu = RadialMenuController(registry: registry, windowControl: windowControl)
 
+        // The position shortcuts (Bringr-dk3) act on the same wheel, so they resolve through
+        // the same definition and the same enumerator — a slot means the same thing whether
+        // the user reached it by hovering or by hotkey. Their window control is separate and
+        // journal-less: they open no reveal session, so there is nothing to restore.
+        positionActivator = PositionActivator(menu: switcher, enumerator: enumerator)
+
         // Warm the icon cache now, on background tasks, so the first summon renders
         // every slice icon from memory instead of decoding through IconServices on the
         // main thread; the workspace observers keep it warm as apps launch and quit.
@@ -178,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.activationMonitor?.start()
                 self.modifierMonitor?.start()
                 self.keyboardNavMonitor?.start()
+                self.positionShortcutMonitor?.start()
             }
     }
 
@@ -215,6 +230,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onKey: { [weak self] key in self?.radialMenu?.handleKeyboardNavKey(key) ?? false }
         )
         keyboardNavMonitor = monitor
+        monitor.start()
+    }
+
+    /// Install the global position-shortcut tap (Bringr-dk3). Like the other taps it needs
+    /// Accessibility permission and is retried when trust is granted. Unlike them it can
+    /// consume the key of a matched combo, so it stands down entirely while the wheel is
+    /// open — keyboard navigation owns the keyboard then — and while the frontmost app is on
+    /// the activation exclusion list.
+    private func startPositionShortcutMonitor() {
+        let monitor = PositionShortcutMonitor(
+            onFire: { [weak self] list, position in
+                self?.positionActivator?.activate(list, position: position)
+            },
+            isSuppressed: { [weak self] in
+                if self?.radialMenu?.isVisible == true { return true }
+                return ActivationExclusionList.shouldSuppressActivation(
+                    frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                )
+            }
+        )
+        positionShortcutMonitor = monitor
         monitor.start()
     }
 
