@@ -1,5 +1,32 @@
 import Foundation
 
+// MARK: - Capture session
+
+/// Process-wide record of whether a Preferences shortcut field is currently recording.
+///
+/// The pickers listen through a *local* `NSEvent` monitor, but every armed shortcut is
+/// matched by a head-inserted `CGEventTap` that sees the same keystroke first — so without
+/// this, recording a new shortcut fires whatever the keys you are pressing happen to be
+/// bound to. Pressing Option to re-record a slot would summon the wheel or switch windows
+/// out from under the picker, which is exactly the state that makes a bad binding
+/// impossible to correct.
+///
+/// Tokens rather than a counter: a field registers under a stable id, so a double `begin`
+/// or an `end` from `onDisappear` after the field already committed are both no-ops instead
+/// of leaving the session stuck open (which would silently disarm every shortcut) or
+/// closing it early.
+@MainActor
+enum ShortcutCaptureSession {
+    private static var activeTokens: Set<UUID> = []
+
+    /// Whether any field is recording right now. Checked by every global shortcut tap on
+    /// the edge that would otherwise fire.
+    static var isCapturing: Bool { !activeTokens.isEmpty }
+
+    static func begin(_ token: UUID) { activeTokens.insert(token) }
+    static func end(_ token: UUID) { activeTokens.remove(token) }
+}
+
 // MARK: - Capture state machine (pure)
 
 /// State the picker's capture loop walks through while the user records a shortcut.
@@ -27,6 +54,23 @@ struct KeyboardShortcutCaptureMachine: Equatable {
     }
 
     private(set) var state: State = .idle
+
+    /// Whether this field refuses a modifiers-only shortcut. On for the position shortcuts
+    /// (Bringr-dk3): those fire an action outright and swallow their key, so a bare Option
+    /// bound to one would hijack every use of Option on the system — including the ones the
+    /// user needs to re-record it. The activation slots leave it off, because a held
+    /// modifier is precisely what summons the wheel.
+    var requiresNonModifierKey = false
+
+    /// Set when a release was refused for carrying no non-modifier key, so the field can
+    /// say what is missing rather than appearing to ignore the keys. Stays set for the rest
+    /// of the session — the requirement is still unmet while the user holds the modifier
+    /// again, so the hint has to survive until they add a key or give up.
+    private(set) var rejectedModifierOnly = false
+
+    init(requiresNonModifierKey: Bool = false) {
+        self.requiresNonModifierKey = requiresNonModifierKey
+    }
 
     /// Latest non-empty held state seen during recording. The picker renders this so
     /// the slot updates live as the user adjusts their fingers.
@@ -80,8 +124,16 @@ struct KeyboardShortcutCaptureMachine: Equatable {
             // ignored — we never commit a key-only shortcut from the picker.
         case .recording(let prev):
             if held.modifiers.isEmpty, held.nonModifierKey == nil {
-                // All keys released — commit whatever was last held.
-                state = .committed(prev)
+                // All keys released — commit whatever was last held, unless this field
+                // requires a real key and the user let go of modifiers alone. Refusing
+                // returns to listening rather than cancelling, so they can simply press
+                // again without re-clicking the field.
+                if requiresNonModifierKey, prev.nonModifierKey == nil {
+                    rejectedModifierOnly = true
+                    state = .listening
+                } else {
+                    state = .committed(prev)
+                }
             } else if !held.modifiers.isEmpty {
                 // Still holding modifiers (possibly with a non-modifier key) — keep
                 // the snapshot up to date so the picker renders the live combo.

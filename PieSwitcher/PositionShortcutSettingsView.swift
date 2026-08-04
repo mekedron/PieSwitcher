@@ -132,7 +132,10 @@ struct PositionShortcutSettings: View {
                 placeholder: "Not set",
                 onCommit: { setShortcut($0, forRow: binding.id) },
                 minWidth: 200,
-                onCaptureStateChange: { capturingRowID = $0 ? binding.id : nil }
+                onCaptureStateChange: { capturingRowID = $0 ? binding.id : nil },
+                // A position shortcut fires outright and swallows its key, so it must carry
+                // a real key: a bare modifier would hijack every use of that modifier.
+                requiresNonModifierKey: true
             )
 
             Spacer(minLength: 0)
@@ -234,8 +237,9 @@ struct PositionShortcutSettings: View {
 
     private var footer: String {
         let common = "\n\nShortcuts fire immediately, with no hold delay, and are swallowed so "
-            + "the app underneath never sees them. Apps listed under Activation → Excluded "
-            + "Apps keep their keys."
+            + "the app underneath never sees them. Each one needs a real key alongside its "
+            + "modifiers — a bare ⌥ or ⌘ would take over that modifier everywhere. Apps "
+            + "listed under Activation → Excluded Apps keep their keys."
         switch list {
         case .apps:
             return "Positions follow the wheel: reordering it under Contents → Sorting, or "

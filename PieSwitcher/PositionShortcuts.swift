@@ -89,13 +89,25 @@ enum PositionShortcutStore {
 
     /// One list's bindings, always ascending by position — the order the pane shows and the
     /// order the runtime walks, so what the user reads top-to-bottom is what fires first.
+    ///
+    /// A stored modifiers-only shortcut is blanked back to "not set" on the way out. A
+    /// position shortcut fires outright and swallows its key, so a bare Option bound to one
+    /// hijacks every use of Option on the system — including the presses needed to re-record
+    /// it. The picker refuses to create one; clearing it here disarms any that predates that
+    /// rule, and leaves the row visible so the user can see what needs re-recording.
     static func bindings(
         _ list: PositionShortcutList, from defaults: UserDefaults = .standard
     ) -> [PositionShortcutBinding] {
         guard let data = defaults.data(forKey: list.defaultsKey),
               let decoded = try? JSONDecoder().decode([PositionShortcutBinding].self, from: data)
         else { return [] }
-        return sorted(decoded.filter { $0.position >= 1 && $0.position <= maxPosition })
+        let inRange = decoded.filter { $0.position >= 1 && $0.position <= maxPosition }
+        return sorted(inRange.map { binding in
+            guard let shortcut = binding.shortcut, !shortcut.hasNonModifierKey else { return binding }
+            var cleared = binding
+            cleared.shortcut = nil
+            return cleared
+        })
     }
 
     /// Ascending by position, ties broken by existing order. The tie-break is what keeps

@@ -21,10 +21,16 @@ struct KeyboardShortcutCaptureField: View {
     /// controls while the field is listening — the capture machine's state lives here, and
     /// a parent that re-derived it from the committed value would lag a keystroke behind.
     var onCaptureStateChange: (Bool) -> Void = { _ in }
+    /// Whether a modifiers-only shortcut is refused for this field. See
+    /// `KeyboardShortcutCaptureMachine.requiresNonModifierKey`.
+    var requiresNonModifierKey = false
 
     @State private var capture = KeyboardShortcutCaptureMachine()
     @State private var liveSnapshot: HeldKeys?
     @State private var monitorToken: Any?
+    /// This field's registration in `ShortcutCaptureSession`, stable for the field's
+    /// lifetime so begin/end always refer to the same entry.
+    @State private var sessionToken = UUID()
 
     /// Whether a capture is in flight, so a caller can swap its own trailing controls for a
     /// Cancel button while the field is listening.
@@ -48,7 +54,11 @@ struct KeyboardShortcutCaptureField: View {
                     .buttonStyle(.borderless)
             }
         }
-        .onDisappear { stopMonitoring() }
+        .onDisappear {
+            stopMonitoring()
+            // Closing Preferences mid-capture must not leave the taps disarmed.
+            endCaptureSession()
+        }
     }
 
     private var slotContent: some View {
@@ -58,7 +68,7 @@ struct KeyboardShortcutCaptureField: View {
         let isEmpty = labels.isEmpty
         return HStack(spacing: 6) {
             if isEmpty {
-                Text(capture.isCapturing ? "Press a shortcut…" : placeholder)
+                Text(capture.isCapturing ? capturePrompt : placeholder)
                     .foregroundStyle(.secondary)
                     .italic(capture.isCapturing)
             } else {
@@ -84,14 +94,23 @@ struct KeyboardShortcutCaptureField: View {
         )
     }
 
+    /// What the empty slot says while listening. A refused modifiers-only attempt names the
+    /// missing half outright, since "Press a shortcut…" is what the user thinks they just did.
+    private var capturePrompt: String {
+        capture.rejectedModifierOnly ? "Also press a key — ⌥, ⌘… alone won't do" : "Press a shortcut…"
+    }
+
     // MARK: - Capture lifecycle
 
     private func enterCaptureMode() {
         guard !capture.isCapturing else { return }
-        capture = KeyboardShortcutCaptureMachine()
+        capture = KeyboardShortcutCaptureMachine(requiresNonModifierKey: requiresNonModifierKey)
         capture.start()
         liveSnapshot = nil
         startMonitoring()
+        // Disarm every global shortcut tap for the duration, so the keys being recorded act
+        // on this field and nothing else.
+        ShortcutCaptureSession.begin(sessionToken)
         onCaptureStateChange(true)
     }
 
@@ -99,7 +118,12 @@ struct KeyboardShortcutCaptureField: View {
         capture.cancel()
         liveSnapshot = nil
         stopMonitoring()
+        endCaptureSession()
         onCaptureStateChange(false)
+    }
+
+    private func endCaptureSession() {
+        ShortcutCaptureSession.end(sessionToken)
     }
 
     private func startMonitoring() {
@@ -127,6 +151,7 @@ struct KeyboardShortcutCaptureField: View {
             capture.handleEscape()
             liveSnapshot = nil
             stopMonitoring()
+            endCaptureSession()
             onCaptureStateChange(false)
             return nil
         }
@@ -136,11 +161,16 @@ struct KeyboardShortcutCaptureField: View {
             liveSnapshot = snap
         }
         if case .committed = capture.state, let committed = capture.take() {
-            if let shortcut = KeyboardShortcutFromHeld.make(from: committed) {
+            // The machine already refuses a modifiers-only release for such a field; the
+            // second check keeps the rule where the value is produced, so no future caller
+            // can commit one past it.
+            if let shortcut = KeyboardShortcutFromHeld.make(from: committed),
+               !requiresNonModifierKey || shortcut.hasNonModifierKey {
                 onCommit(shortcut)
             }
             liveSnapshot = nil
             stopMonitoring()
+            endCaptureSession()
             onCaptureStateChange(false)
         }
         return nil

@@ -280,6 +280,11 @@ final class ModifierHoldMonitor {
     private func applyEdge(_ edge: KeyboardShortcutDetector.Reaction) {
         switch edge {
         case .press:
+            // A Preferences shortcut field is recording: the keys belong to it, not to us.
+            // Checked here rather than folded into `exclusionProvider` so no injected
+            // provider can switch it off — a summon fired mid-recording is what makes a bad
+            // binding uncorrectable (Bringr-dk3).
+            guard !ShortcutCaptureSession.isCapturing else { return }
             // Frontmost-app exclusion (Bringr-93j.109): a fresh hold over an excluded app is
             // dropped, but the detector still tracks state so a later release of the same hold
             // (via the .release branch below) flows through cleanly — the gate stays idle, so

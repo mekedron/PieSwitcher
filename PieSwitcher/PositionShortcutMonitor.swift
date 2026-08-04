@@ -138,9 +138,11 @@ final class PositionShortcutMonitor {
         }
 
         // Suppressed contexts still feed the detector, so a shortcut held across the moment
-        // the wheel closes doesn't fire the instant suppression lifts — it has to be
-        // released and pressed again.
-        let armed = isSuppressed() ? [] : armedProvider()
+        // suppression lifts doesn't fire the instant it does — it has to be released and
+        // pressed again. `ShortcutCaptureSession` is checked here rather than left to the
+        // injected `isSuppressed` so no caller can switch it off: a position shortcut that
+        // fires while its own field is recording is what makes a bad binding uncorrectable.
+        let armed = (ShortcutCaptureSession.isCapturing || isSuppressed()) ? [] : armedProvider()
         guard let fired = detector.handle(held: held, armed: armed) else {
             return Unmanaged.passUnretained(event)
         }

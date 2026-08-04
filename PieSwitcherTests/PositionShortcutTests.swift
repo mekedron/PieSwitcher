@@ -100,6 +100,27 @@ final class PositionShortcutStoreTests: XCTestCase {
         XCTAssertTrue(PositionShortcutStore.armed(from: defaults).isEmpty)
     }
 
+    func testModifierOnlyShortcutIsClearedOnRead() {
+        // A bare modifier bound before the key requirement existed must stop firing, but the
+        // row stays so the user can see what needs re-recording.
+        let bare = PositionShortcutBinding(
+            position: 1,
+            shortcut: KeyboardShortcut(modifiers: [SidedModifier(.option, .left)], keyCode: nil)
+        )
+        PositionShortcutStore.setBindings([bare], for: .apps, in: defaults)
+        let read = PositionShortcutStore.bindings(.apps, from: defaults)
+        XCTAssertEqual(read.count, 1)
+        XCTAssertNil(read.first?.shortcut)
+        XCTAssertTrue(PositionShortcutStore.armed(from: defaults).isEmpty)
+    }
+
+    func testComboShortcutSurvivesRead() {
+        let combo = PositionShortcutBinding(position: 1, shortcut: self.combo(kVK_ANSI_1))
+        PositionShortcutStore.setBindings([combo], for: .apps, in: defaults)
+        XCTAssertEqual(PositionShortcutStore.bindings(.apps, from: defaults).first?.shortcut,
+                       combo.shortcut)
+    }
+
     func testOutOfRangePositionsAreDroppedOnRead() {
         PositionShortcutStore.setBindings(
             [
@@ -208,5 +229,51 @@ final class PositionShortcutDetectorTests: XCTestCase {
         detector.reset()
         XCTAssertTrue(detector.activeIDs.isEmpty)
         XCTAssertEqual(detector.handle(held: held(kVK_ANSI_1), armed: [one])?.position, 1)
+    }
+}
+
+// MARK: - Key-required capture fields
+
+/// Covers the capture rule position shortcuts add (Bringr-dk3): a field that will swallow
+/// its key refuses a modifiers-only shortcut, while the activation slots — built on bare
+/// modifiers — are unaffected.
+final class KeyboardShortcutKeyRequirementTests: XCTestCase {
+
+    func testModifierOnlyReleaseIsRefusedWhenAKeyIsRequired() {
+        var machine = KeyboardShortcutCaptureMachine(requiresNonModifierKey: true)
+        machine.start()
+        machine.update(held: HeldKeys(modifiers: [SidedModifier(.option, .left)]))
+        machine.update(held: .empty)
+        XCTAssertNil(machine.take(), "a bare modifier must not commit into a key-required field")
+    }
+
+    func testRefusedReleaseKeepsListeningAndFlagsTheReason() {
+        var machine = KeyboardShortcutCaptureMachine(requiresNonModifierKey: true)
+        machine.start()
+        machine.update(held: HeldKeys(modifiers: [SidedModifier(.option, .left)]))
+        machine.update(held: .empty)
+        XCTAssertTrue(machine.isCapturing, "the field stays open so the user can just try again")
+        XCTAssertTrue(machine.rejectedModifierOnly)
+    }
+
+    func testComboCommitsAfterARefusedModifierOnlyAttempt() {
+        var machine = KeyboardShortcutCaptureMachine(requiresNonModifierKey: true)
+        machine.start()
+        machine.update(held: HeldKeys(modifiers: [SidedModifier(.option, .left)]))
+        machine.update(held: .empty)
+        let combo = HeldKeys(modifiers: [SidedModifier(.option, .left)], nonModifierKey: kVK_ANSI_K)
+        machine.update(held: HeldKeys(modifiers: [SidedModifier(.option, .left)]))
+        machine.update(held: combo)
+        machine.update(held: .empty)
+        XCTAssertEqual(machine.take(), combo)
+    }
+
+    func testModifierOnlyStillCommitsWhenNoKeyIsRequired() {
+        var machine = KeyboardShortcutCaptureMachine()
+        machine.start()
+        let held = HeldKeys(modifiers: [SidedModifier(.command, .right)])
+        machine.update(held: held)
+        machine.update(held: .empty)
+        XCTAssertEqual(machine.take(), held, "the activation slots are built on bare modifiers")
     }
 }
