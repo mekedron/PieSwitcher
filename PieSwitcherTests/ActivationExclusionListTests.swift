@@ -242,6 +242,84 @@ final class ActivationExclusionListTests: XCTestCase {
         )
     }
 
+    // MARK: - Positions exclusion list (separate list, separate key)
+
+    func testPositionListDefaultsKeyIsStableAndDistinct() {
+        XCTAssertEqual(PositionShortcutExclusionList.defaultsKey, "positions.exclusionList")
+        XCTAssertNotEqual(PositionShortcutExclusionList.defaultsKey,
+                          ActivationExclusionList.defaultsKey,
+                          "the two lists must live under different keys — they are never merged")
+    }
+
+    func testPositionListIsEmptyByDefault() {
+        let defaults = makeDefaults()
+        XCTAssertTrue(PositionShortcutExclusionList.current(from: defaults).isEmpty,
+                      "first-run default: the Positions list is empty, shortcuts fire everywhere")
+        XCTAssertFalse(
+            PositionShortcutExclusionList.shouldSuppressShortcuts(
+                frontmostBundleID: "com.epic.fortnite", from: defaults
+            )
+        )
+    }
+
+    func testPositionListRoundTripsIndependently() {
+        let defaults = makeDefaults()
+        let apps = [CuratedApp(bundleIdentifier: "com.epic.fortnite", name: "Fortnite")]
+
+        PositionShortcutExclusionList.save(apps, to: defaults)
+
+        XCTAssertEqual(PositionShortcutExclusionList.current(from: defaults).apps, apps)
+        XCTAssertTrue(ActivationExclusionList.current(from: defaults).isEmpty,
+                      "saving the Positions list must not create or touch the activation list")
+    }
+
+    func testActivationListDoesNotSuppressPositionShortcuts() {
+        let defaults = makeDefaults()
+        ActivationExclusionList.save([
+            CuratedApp(bundleIdentifier: "com.epic.fortnite", name: "Fortnite")
+        ], to: defaults)
+
+        XCTAssertFalse(
+            PositionShortcutExclusionList.shouldSuppressShortcuts(
+                frontmostBundleID: "com.epic.fortnite", from: defaults
+            ),
+            "an app excluded from wheel activation still gets position shortcuts — the lists are independent"
+        )
+    }
+
+    func testPositionListDoesNotSuppressWheelActivation() {
+        let defaults = makeDefaults()
+        PositionShortcutExclusionList.save([
+            CuratedApp(bundleIdentifier: "com.epic.fortnite", name: "Fortnite")
+        ], to: defaults)
+
+        XCTAssertFalse(
+            ActivationExclusionList.shouldSuppressActivation(
+                frontmostBundleID: "com.epic.fortnite", from: defaults
+            ),
+            "an app on the Positions list still summons the wheel — the lists are independent"
+        )
+    }
+
+    func testPositionShortcutsSuppressedWhenFrontmostIsOnPositionList() {
+        let defaults = makeDefaults()
+        PositionShortcutExclusionList.save([
+            CuratedApp(bundleIdentifier: "com.epic.fortnite", name: "Fortnite")
+        ], to: defaults)
+
+        XCTAssertTrue(
+            PositionShortcutExclusionList.shouldSuppressShortcuts(
+                frontmostBundleID: "com.epic.fortnite", from: defaults
+            ),
+            "frontmost = listed app → the shortcut keys pass through to the app untouched"
+        )
+        XCTAssertFalse(
+            PositionShortcutExclusionList.shouldSuppressShortcuts(
+                frontmostBundleID: "com.apple.Safari", from: defaults
+            )
+        )
+    }
+
     // MARK: - Fixtures
 
     private static let finderBundleID = "com.apple.finder"

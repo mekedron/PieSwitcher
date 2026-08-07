@@ -6,12 +6,32 @@ import UniformTypeIdentifiers
 /// `CuratedApp` entries the user can add to (via a standard Open panel scoped to
 /// applications) and remove from. Modelled on `MyAppsEditor` so the rows look like
 /// the curated-apps pane — same icon-plus-name row, same plus/minus controls — and
-/// each edit writes through `ActivationExclusionList.save` so the activation
-/// monitors pick up the change on the next event.
+/// each edit writes through `save` so the monitors pick up the change on the next
+/// event. `defaultsKey` selects WHICH exclusion list this instance edits — the
+/// activation one or the Positions one — so the two panes share one editor without
+/// ever sharing a list.
 struct ActivationExclusionEditor: View {
-    @State private var apps: [CuratedApp] = ActivationExclusionList.current().apps
+    let defaultsKey: String
+    let emptyState: String
+    let panelPrompt: String
+    let panelMessage: String
+
+    @State private var apps: [CuratedApp]
     @State private var selection: CuratedApp.ID?
     @State private var isDropTargeted = false
+
+    init(
+        defaultsKey: String = ActivationExclusionList.defaultsKey,
+        emptyState: String = "Add an app to disable the pie menu while that app is active.",
+        panelPrompt: String = "Exclude",
+        panelMessage: String = "Choose apps that should disable the pie menu when they're active"
+    ) {
+        self.defaultsKey = defaultsKey
+        self.emptyState = emptyState
+        self.panelPrompt = panelPrompt
+        self.panelMessage = panelMessage
+        _apps = State(initialValue: ActivationExclusionList.current(key: defaultsKey).apps)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -31,10 +51,7 @@ struct ActivationExclusionEditor: View {
             }
         }
         .appListBox(height: 200, isDropTargeted: isDropTargeted)
-        .appListEmptyState(
-            "Add an app to disable the pie menu while that app is active.",
-            isVisible: apps.isEmpty
-        )
+        .appListEmptyState(emptyState, isVisible: apps.isEmpty)
         .dropDestination(for: URL.self) { urls, _ in
             addBundles(at: urls)
             return true
@@ -75,10 +92,7 @@ struct ActivationExclusionEditor: View {
 
     /// Picks merge through `ActivationExclusionList.adding`, which dedupes by bundle id.
     private func addViaPanel() {
-        addBundles(at: AppBundlePanel.pick(
-            prompt: "Exclude",
-            message: "Choose apps that should disable the pie menu when they're active"
-        ))
+        addBundles(at: AppBundlePanel.pick(prompt: panelPrompt, message: panelMessage))
     }
 
     private func addBundles(at urls: [URL]) {
@@ -104,7 +118,7 @@ struct ActivationExclusionEditor: View {
     }
 
     private func persist() {
-        ActivationExclusionList.save(apps)
+        ActivationExclusionList.save(apps, key: defaultsKey)
     }
 }
 
@@ -127,7 +141,8 @@ struct ActivationExclusionSettings: View {
                      + "to the app normally — with no hold delay. Use it for games, 3D, and "
                      + "drawing apps that need the same mouse buttons the wheel summons on.\n\n"
                      + "This does not change what the wheel contains. To keep an app out of "
-                     + "the wheel's list, add it under Contents → Hidden.")
+                     + "the wheel's list, add it under Contents → Hidden. Position shortcuts "
+                     + "have their own separate list under Positions → Excluded Apps.")
             }
         }
     }

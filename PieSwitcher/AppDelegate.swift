@@ -237,7 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Accessibility permission and is retried when trust is granted. Unlike them it can
     /// consume the key of a matched combo, so it stands down entirely while the wheel is
     /// open — keyboard navigation owns the keyboard then — and while the frontmost app is on
-    /// the activation exclusion list.
+    /// the Positions exclusion list (its own list, separate from Activation → Excluded Apps).
     private func startPositionShortcutMonitor() {
         let monitor = PositionShortcutMonitor(
             onFire: { [weak self] list, position in
@@ -245,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             isSuppressed: { [weak self] in
                 if self?.radialMenu?.isVisible == true { return true }
-                return ActivationExclusionList.shouldSuppressActivation(
+                return PositionShortcutExclusionList.shouldSuppressShortcuts(
                     frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
                 )
             }

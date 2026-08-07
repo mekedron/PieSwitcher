@@ -2,13 +2,15 @@ import SwiftUI
 
 // MARK: - Tab
 
-/// Sub-tab selector for the Positions tab (Bringr-dk3). The two lists are split because
-/// they address different rings and answer different questions — "which app" versus "which
-/// window of the app I'm in" — and a user typically fills one of them heavily and the other
-/// lightly.
+/// Sub-tab selector for the Positions tab (Bringr-dk3). The two binding lists are split
+/// because they address different rings and answer different questions — "which app" versus
+/// "which window of the app I'm in" — and a user typically fills one of them heavily and the
+/// other lightly. "Excluded Apps" is the Positions-only exclusion list: apps whose keys the
+/// shortcuts must never consume, independent of Activation → Excluded Apps.
 enum PositionShortcutSubTab: String, PreferencesSubTab {
     case apps
     case windows
+    case excluded
 
     static let defaultsKey = "preferences.positionsSubTab"
     static let `default`: PositionShortcutSubTab = .apps
@@ -17,19 +19,12 @@ enum PositionShortcutSubTab: String, PreferencesSubTab {
         switch self {
         case .apps: return "Apps"
         case .windows: return "Windows"
-        }
-    }
-
-    /// The list this sub-tab edits.
-    var list: PositionShortcutList {
-        switch self {
-        case .apps: return .apps
-        case .windows: return .windows
+        case .excluded: return "Excluded Apps"
         }
     }
 }
 
-/// The Positions tab body: the sub-tab strip over whichever list it selects.
+/// The Positions tab body: the sub-tab strip over whichever pane it selects.
 struct PositionShortcutsTab: View {
     @AppStorage(PositionShortcutSubTab.defaultsKey)
     private var subTabRaw = PositionShortcutSubTab.default.rawValue
@@ -42,10 +37,44 @@ struct PositionShortcutsTab: View {
         VStack(spacing: 0) {
             PreferencesSubTabs(selection: selection)
 
-            // Keyed by the list so switching sub-tabs rebuilds the pane from that list's
+            // Keyed by the sub-tab so switching rebuilds the pane from that pane's
             // persisted rows rather than reusing the other one's `@State`.
-            PositionShortcutSettings(list: selection.wrappedValue.list)
-                .id(selection.wrappedValue)
+            switch selection.wrappedValue {
+            case .apps:
+                PositionShortcutSettings(list: .apps).id(PositionShortcutSubTab.apps)
+            case .windows:
+                PositionShortcutSettings(list: .windows).id(PositionShortcutSubTab.windows)
+            case .excluded:
+                PositionShortcutExclusionSettings().id(PositionShortcutSubTab.excluded)
+            }
+        }
+    }
+}
+
+/// The "Excluded Apps" pane inside the Positions tab: the editor over
+/// `PositionShortcutExclusionList`'s own storage key. Starts empty — position shortcuts
+/// work everywhere until an app is added here — and never reads or writes the activation
+/// exclusion list, so the two panes can be configured independently.
+struct PositionShortcutExclusionSettings: View {
+    var body: some View {
+        PreferencesPane {
+            Section {
+                ActivationExclusionEditor(
+                    defaultsKey: PositionShortcutExclusionList.defaultsKey,
+                    emptyState: "Add an app to let it keep its keys — position shortcuts "
+                        + "won't fire while it is active.",
+                    panelPrompt: "Exclude",
+                    panelMessage: "Choose apps whose keystrokes position shortcuts should never take"
+                )
+            } header: {
+                Text("Excluded apps")
+            } footer: {
+                Text("While one of these apps is the active (frontmost) app, position "
+                     + "shortcuts do not fire and every keystroke passes through to the app "
+                     + "normally. Use it for apps whose own shortcuts collide with the ones "
+                     + "bound here.\n\nThis list is separate from Activation → Excluded Apps, "
+                     + "which only disables opening the pie menu.")
+            }
         }
     }
 }
@@ -295,7 +324,7 @@ struct PositionShortcutSettings: View {
         let common = "\n\nShortcuts fire immediately, with no hold delay, and are swallowed so "
             + "the app underneath never sees them. Each one needs a real key alongside its "
             + "modifiers — a bare ⌥ or ⌘ would take over that modifier everywhere. Apps "
-            + "listed under Activation → Excluded Apps keep their keys."
+            + "listed under Positions → Excluded Apps keep their keys."
         switch list {
         case .apps:
             return "Positions follow the wheel: reordering it under Contents → Sorting, or "

@@ -33,9 +33,10 @@ final class PositionShortcutMonitor {
     /// the convention every other activation setting follows. Injected so tests pin a set.
     private let armedProvider: () -> [ArmedPositionShortcut]
     /// Whether a press must be dropped: the wheel is open (its own keyboard navigation owns
-    /// the keys then), or the frontmost app is on the activation exclusion list. The
-    /// exclusion list is honoured here precisely because this tap *consumes* keys — an app
-    /// the user has told PieSwitcher to stay out of must keep every keystroke.
+    /// the keys then), or the frontmost app is on the Positions exclusion list. That list is
+    /// honoured here precisely because this tap *consumes* keys — an app the user has told
+    /// the position shortcuts to stay out of must keep every keystroke. It is the Positions
+    /// list, not Activation → Excluded Apps: the two are independent settings.
     private let isSuppressed: () -> Bool
 
     private var eventTap: CFMachPort?
@@ -47,7 +48,7 @@ final class PositionShortcutMonitor {
         onFire: @escaping (PositionShortcutList, Int) -> Void,
         armedProvider: @escaping () -> [ArmedPositionShortcut] = { PositionShortcutStore.armed() },
         isSuppressed: @escaping () -> Bool = {
-            ActivationExclusionList.shouldSuppressActivation(
+            PositionShortcutExclusionList.shouldSuppressShortcuts(
                 frontmostBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier
             )
         }

@@ -34,9 +34,13 @@ struct ActivationExclusionList: Equatable, Sendable {
     /// The persisted list, or an empty list when nothing has been saved (the first-run
     /// default — nothing excluded) or when the stored blob can't be decoded. Mirrors
     /// `CuratedApps.current` so the activation monitors and the Preferences editor share
-    /// one read path.
-    static func current(from defaults: UserDefaults = .standard) -> ActivationExclusionList {
-        guard let data = defaults.data(forKey: defaultsKey),
+    /// one read path. `key` selects which stored list to read — the activation list by
+    /// default, or `PositionShortcutExclusionList`'s separate one.
+    static func current(
+        from defaults: UserDefaults = .standard,
+        key: String = defaultsKey
+    ) -> ActivationExclusionList {
+        guard let data = defaults.data(forKey: key),
               let apps = try? JSONDecoder().decode([CuratedApp].self, from: data) else {
             return ActivationExclusionList(apps: [])
         }
@@ -45,9 +49,13 @@ struct ActivationExclusionList: Equatable, Sendable {
 
     /// Persist the list. A no-op if encoding fails (it cannot for these plain string
     /// fields), so a transient error never wipes the saved list. Mirrors `CuratedApps.save`.
-    static func save(_ apps: [CuratedApp], to defaults: UserDefaults = .standard) {
+    static func save(
+        _ apps: [CuratedApp],
+        to defaults: UserDefaults = .standard,
+        key: String = defaultsKey
+    ) {
         guard let data = try? JSONEncoder().encode(apps) else { return }
-        defaults.set(data, forKey: defaultsKey)
+        defaults.set(data, forKey: key)
     }
 
     /// Whether a frontmost app with this bundle id is excluded. Matched case-insensitively
@@ -94,10 +102,46 @@ extension ActivationExclusionList {
     /// while tests can pin a value without touching the live workspace.
     static func shouldSuppressActivation(
         frontmostBundleID: String?,
-        from defaults: UserDefaults = .standard
+        from defaults: UserDefaults = .standard,
+        key: String = defaultsKey
     ) -> Bool {
-        let list = ActivationExclusionList.current(from: defaults)
+        let list = ActivationExclusionList.current(from: defaults, key: key)
         guard !list.isEmpty else { return false }
         return list.excludes(bundleID: frontmostBundleID)
+    }
+}
+
+/// The Positions exclusion list: apps whose keystrokes the position shortcuts must never
+/// consume, checked while one of them is frontmost. Deliberately a SEPARATE list from
+/// `ActivationExclusionList` (Activation → Excluded Apps) with its own storage key and its
+/// own Preferences pane: excluding an app from wheel activation says nothing about its
+/// keyboard, and coupling the two would force users to give up one to keep the other.
+/// Empty by default — nothing suppresses position shortcuts until the user adds an app.
+/// Same `[CuratedApp]` JSON shape, so it shares `ActivationExclusionList`'s read/write and
+/// matching machinery via the `key` parameter.
+enum PositionShortcutExclusionList {
+    /// `UserDefaults` key backing the persisted list. The `positions.` prefix groups it with
+    /// the position-shortcut settings, apart from `activation.exclusionList`.
+    static let defaultsKey = "positions.exclusionList"
+
+    static func current(from defaults: UserDefaults = .standard) -> ActivationExclusionList {
+        ActivationExclusionList.current(from: defaults, key: defaultsKey)
+    }
+
+    static func save(_ apps: [CuratedApp], to defaults: UserDefaults = .standard) {
+        ActivationExclusionList.save(apps, to: defaults, key: defaultsKey)
+    }
+
+    /// Whether position shortcuts should be suppressed because the frontmost app is on
+    /// this list. Reads only `defaultsKey` — the activation list never leaks in here.
+    static func shouldSuppressShortcuts(
+        frontmostBundleID: String?,
+        from defaults: UserDefaults = .standard
+    ) -> Bool {
+        ActivationExclusionList.shouldSuppressActivation(
+            frontmostBundleID: frontmostBundleID,
+            from: defaults,
+            key: defaultsKey
+        )
     }
 }
