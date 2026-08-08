@@ -232,6 +232,71 @@ final class PositionShortcutDetectorTests: XCTestCase {
     }
 }
 
+// MARK: - Monitor state machine
+
+/// Covers the swallow/latch interplay across a real press–release sequence, which the pure
+/// detector tests above can't see: the monitor swallows a fired combo's keyUp, and the
+/// detector must still observe that release or its latch survives and the NEXT press of the
+/// same combo reads as still held — unfired, and leaked through to the app underneath.
+@MainActor
+final class PositionShortcutMonitorTests: XCTestCase {
+    private let leftOption = SidedModifier(.option, .left)
+
+    private func makeMonitor(fireCount: @escaping () -> Void) -> PositionShortcutMonitor {
+        let binding = ArmedPositionShortcut(
+            id: UUID(), list: .windows, position: 1,
+            shortcut: KeyboardShortcut(modifiers: [leftOption], keyCode: kVK_ANSI_Z)
+        )
+        return PositionShortcutMonitor(
+            onFire: { _, _ in fireCount() },
+            armedProvider: { [binding] },
+            isSuppressed: { false }
+        )
+    }
+
+    /// Press ⌥Z twice in a row: both presses must fire and be swallowed. This is the
+    /// regression test for the every-second-press leak.
+    func testEachRepeatedPressFiresAndIsSwallowed() {
+        var fires = 0
+        let monitor = makeMonitor { fires += 1 }
+
+        XCTAssertTrue(monitor.step(type: .flagsChanged, keyCode: kVK_Option, modifiers: [leftOption]))
+
+        XCTAssertFalse(monitor.step(type: .keyDown, keyCode: kVK_ANSI_Z, modifiers: [leftOption]),
+                       "first press: fires and is swallowed")
+        XCTAssertEqual(fires, 1)
+        XCTAssertFalse(monitor.step(type: .keyUp, keyCode: kVK_ANSI_Z, modifiers: [leftOption]),
+                       "the fired combo's release is swallowed too")
+
+        XCTAssertFalse(monitor.step(type: .keyDown, keyCode: kVK_ANSI_Z, modifiers: [leftOption]),
+                       "second press: must fire and be swallowed again, not leak to the app")
+        XCTAssertEqual(fires, 2)
+        XCTAssertFalse(monitor.step(type: .keyUp, keyCode: kVK_ANSI_Z, modifiers: [leftOption]))
+    }
+
+    func testAutoRepeatsOfAFiredComboAreSwallowedWithoutRefiring() {
+        var fires = 0
+        let monitor = makeMonitor { fires += 1 }
+
+        _ = monitor.step(type: .flagsChanged, keyCode: kVK_Option, modifiers: [leftOption])
+        XCTAssertFalse(monitor.step(type: .keyDown, keyCode: kVK_ANSI_Z, modifiers: [leftOption]))
+        XCTAssertFalse(monitor.step(type: .keyDown, keyCode: kVK_ANSI_Z, modifiers: [leftOption]),
+                       "a held combo's auto-repeat stays swallowed")
+        XCTAssertEqual(fires, 1, "auto-repeat must not re-fire the binding")
+    }
+
+    func testUnmatchedKeysPassThroughUntouched() {
+        var fires = 0
+        let monitor = makeMonitor { fires += 1 }
+
+        _ = monitor.step(type: .flagsChanged, keyCode: kVK_Option, modifiers: [leftOption])
+        XCTAssertTrue(monitor.step(type: .keyDown, keyCode: kVK_ANSI_X, modifiers: [leftOption]),
+                      "a key no binding claims reaches the app underneath")
+        XCTAssertTrue(monitor.step(type: .keyUp, keyCode: kVK_ANSI_X, modifiers: [leftOption]))
+        XCTAssertEqual(fires, 0)
+    }
+}
+
 // MARK: - Key-required capture fields
 
 /// Covers the capture rule position shortcuts add (Bringr-dk3): a field that will swallow

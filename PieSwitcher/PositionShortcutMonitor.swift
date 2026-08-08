@@ -125,17 +125,34 @@ final class PositionShortcutMonitor {
             if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
-        guard updateHeldSnapshot(type: type, event: event) else {
+        guard type == .flagsChanged || type == .keyDown || type == .keyUp else {
             return Unmanaged.passUnretained(event)
         }
-        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        let passesThrough = step(
+            type: type,
+            keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)),
+            modifiers: SidedModifierParser.modifiers(from: event.flags)
+        )
+        return passesThrough ? Unmanaged.passUnretained(event) : nil
+    }
 
-        // The tail of a combo we already swallowed: its repeats and its release must not
-        // surface in the app underneath, whatever the detector says about them.
+    /// One tracked event through the monitor's state machine; returns whether it passes
+    /// through to the app underneath (`false` = swallowed). Split from `handle` on the
+    /// already-decoded fields so tests can drive real press/release sequences — the
+    /// swallow/latch interplay across events is exactly what a pure detector test can't see.
+    func step(type: CGEventType, keyCode: Int, modifiers: Set<SidedModifier>) -> Bool {
+        updateHeldSnapshot(type: type, keyCode: keyCode, modifiers: modifiers)
+
+        // The tail of a combo we already swallowed: its auto-repeats and its matching keyUp
+        // must not surface in the app underneath. Only the RETURN is decided here — the
+        // detector below still observes the event, because the keyUp must clear its
+        // per-binding latch. A latch that survives the release would make the next press of
+        // the same combo read as still held: unfired, and leaked through to the app.
+        var isSwallowedTail = false
         if let swallowed = swallowedKeyCode, keyCode == swallowed,
            type == .keyDown || type == .keyUp {
+            isSwallowedTail = true
             if type == .keyUp { swallowedKeyCode = nil }
-            return nil
         }
 
         // Suppressed contexts still feed the detector, so a shortcut held across the moment
@@ -144,38 +161,28 @@ final class PositionShortcutMonitor {
         // injected `isSuppressed` so no caller can switch it off: a position shortcut that
         // fires while its own field is recording is what makes a bad binding uncorrectable.
         let armed = (ShortcutCaptureSession.isCapturing || isSuppressed()) ? [] : armedProvider()
-        guard let fired = detector.handle(held: held, armed: armed) else {
-            return Unmanaged.passUnretained(event)
-        }
+        let fired = detector.handle(held: held, armed: armed)
+        guard !isSwallowedTail else { return false }
+        guard let fired else { return true }
         onFire(fired.list, fired.position)
 
         // Bare-modifier shortcuts pass through: swallowing a `flagsChanged` would strand the
         // modifier as held everywhere else on the system.
-        guard fired.shortcut.hasNonModifierKey, type == .keyDown else {
-            return Unmanaged.passUnretained(event)
-        }
+        guard fired.shortcut.hasNonModifierKey, type == .keyDown else { return true }
         swallowedKeyCode = keyCode
-        return nil
+        return false
     }
 
-    /// Refresh `held` from the event, mirroring `ModifierHoldMonitor`. Returns `false` for
-    /// event types we don't track, so the caller can pass them straight through.
-    private func updateHeldSnapshot(type: CGEventType, event: CGEvent) -> Bool {
+    /// Refresh `held` from the event, mirroring `ModifierHoldMonitor`.
+    private func updateHeldSnapshot(type: CGEventType, keyCode: Int, modifiers: Set<SidedModifier>) {
+        held.modifiers = modifiers
         switch type {
-        case .flagsChanged:
-            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
-            return true
         case .keyDown:
-            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
-            held.nonModifierKey = Int(event.getIntegerValueField(.keyboardEventKeycode))
-            return true
+            held.nonModifierKey = keyCode
         case .keyUp:
-            held.modifiers = SidedModifierParser.modifiers(from: event.flags)
-            let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
             if held.nonModifierKey == keyCode { held.nonModifierKey = nil }
-            return true
         default:
-            return false
+            break
         }
     }
 }
