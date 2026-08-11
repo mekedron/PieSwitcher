@@ -10,7 +10,8 @@ struct PieSwitcherApp: App {
                 permissions: appDelegate.permissions,
                 radialMenu: appDelegate.radialMenu,
                 updater: appDelegate.updater,
-                onboarding: appDelegate.onboarding
+                onboarding: appDelegate.onboarding,
+                dockIcon: appDelegate.dockIcon
             )
         } label: {
             Image(systemName: "circle.hexagongrid")
@@ -38,6 +39,7 @@ private struct MenuContent: View {
     let radialMenu: RadialMenuController?
     let updater: SparkleUpdater
     let onboarding: OnboardingPresenter
+    let dockIcon: DockIconManager
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -63,7 +65,7 @@ private struct MenuContent: View {
         .keyboardShortcut(",")
 
         Button("Show Welcome…") {
-            NSApp.activate(ignoringOtherApps: true)
+            dockIcon.prepareToShowWindow()
             onboarding.showFromMenu()
         }
 
@@ -87,11 +89,19 @@ private struct MenuContent: View {
     /// is supplied we write the persisted key first so the TabView's `@AppStorage` picks
     /// it up the moment the window mounts (or, if already open, snaps to the new
     /// selection); when omitted, the window reopens on the last-used tab.
+    ///
+    /// The policy flip must precede `openWindow` and the activation must trail it by a
+    /// runloop pass — see `AppActivation` for the two hazards this ordering dodges.
     private func openPreferences(on tab: PreferencesTab? = nil) {
         if let tab {
             UserDefaults.standard.set(tab.rawValue, forKey: PreferencesTab.defaultsKey)
         }
-        NSApp.activate(ignoringOtherApps: true)
+        dockIcon.prepareToShowWindow()
         openWindow(id: "preferences")
+        AppActivation.bringToFront {
+            // SwiftUI names the scene's NSWindow after the scene id, with a
+            // "-AppWindow-…" suffix.
+            NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("preferences") == true }
+        }
     }
 }

@@ -21,6 +21,16 @@ final class DockIconManager {
         self.setPolicy = setPolicy ?? { NSApp.setActivationPolicy($0) }
     }
 
+    /// Call from the user action that is about to open (or raise) a Dock-worthy
+    /// window, before the window exists. Flips the policy to `.regular` immediately,
+    /// without touching the count: the system can refuse an activation request from
+    /// an `.accessory` app, which would strand the new window behind the frontmost
+    /// app's windows. The window's own `windowOpened()` still runs on appear;
+    /// setting `.regular` twice is harmless.
+    func prepareToShowWindow() {
+        setPolicy(.regular)
+    }
+
     /// Call when a Dock-worthy window appears. Shows the Dock icon on the first one.
     func windowOpened() {
         openWindowCount += 1

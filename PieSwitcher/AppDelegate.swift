@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startModifierMonitor()
         startKeyboardNavMonitor()
         startPositionShortcutMonitor()
-        updater.start()
+        updater.start(dockIcon: dockIcon)
 
         // First-launch auto-open (Bringr-93j.112). The presenter is the same
         // `lazy var` the menu bar reads, so first access here is also the one

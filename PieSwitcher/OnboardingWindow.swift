@@ -110,8 +110,11 @@ final class OnboardingPresenter {
             }
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        // The caller flips the activation policy to `.regular` before this runs
+        // (`DockIconManager.prepareToShowWindow()`); the activation itself must
+        // trail that flip and the closing status-bar menu by a runloop pass —
+        // see `AppActivation` for both hazards.
+        AppActivation.bringToFront { [weak self] in self?.window }
         // Mark seen the moment the window appears (not when "Done" is clicked)
         // so a user who closes early still doesn't get re-prompted next launch.
         OnboardingState.markSeen()

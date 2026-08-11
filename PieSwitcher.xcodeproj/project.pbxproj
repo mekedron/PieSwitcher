@@ -95,6 +95,7 @@
 		1A0000000000000000000119 /* ActivationExclusionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011A /* ActivationExclusionSettingsView.swift */; };
 		1A000000000000000000011B /* ActivationExclusionListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000011C /* ActivationExclusionListTests.swift */; };
 		1A0000000000000000000092 /* DockIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000091 /* DockIconManager.swift */; };
+		1A0000000000000000000341 /* AppActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000340 /* AppActivation.swift */; };
 		1A0000000000000000000094 /* DockIconManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000093 /* DockIconManagerTests.swift */; };
 		1A00000000000000000000E2 /* RadialNavigatorSkipLevelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */; };
 		1A000000000000000000009C /* RadialMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000009B /* RadialMenuController.swift */; };
@@ -243,6 +244,7 @@
 		1A0000000000000000000089 /* MyAppsMenuSortingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuSortingTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000FF /* MyAppsMenuDockSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyAppsMenuDockSourceTests.swift; sourceTree = "<group>"; };
 		1A0000000000000000000091 /* DockIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManager.swift; sourceTree = "<group>"; };
+		1A0000000000000000000340 /* AppActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppActivation.swift; sourceTree = "<group>"; };
 		1A0000000000000000000093 /* DockIconManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManagerTests.swift; sourceTree = "<group>"; };
 		1A00000000000000000000E1 /* RadialNavigatorSkipLevelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialNavigatorSkipLevelTests.swift; sourceTree = "<group>"; };
 		1A000000000000000000009B /* RadialMenuController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadialMenuController.swift; sourceTree = "<group>"; };
@@ -416,6 +418,7 @@
 				1A0000000000000000000324 /* PositionShortcutMonitor.swift */,
 				1A0000000000000000000326 /* PositionShortcutSettingsView.swift */,
 				1A0000000000000000000091 /* DockIconManager.swift */,
+				1A0000000000000000000340 /* AppActivation.swift */,
 				1A000000000000000000009B /* RadialMenuController.swift */,
 				1A000000000000000000009D /* RadialNavigator+Region.swift */,
 				1A000000000000000000009F /* HideOnCommit.swift */,
@@ -677,6 +680,7 @@
 				1A0000000000000000000325 /* PositionShortcutMonitor.swift in Sources */,
 				1A0000000000000000000327 /* PositionShortcutSettingsView.swift in Sources */,
 				1A0000000000000000000092 /* DockIconManager.swift in Sources */,
+				1A0000000000000000000341 /* AppActivation.swift in Sources */,
 				1A000000000000000000009C /* RadialMenuController.swift in Sources */,
 				1A000000000000000000009E /* RadialNavigator+Region.swift in Sources */,
 				1A00000000000000000000A0 /* HideOnCommit.swift in Sources */,
