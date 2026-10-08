@@ -1,7 +1,0 @@
-{
-  "database": "dolt",
-  "backend": "dolt",
-  "dolt_mode": "embedded",
-  "dolt_database": "Bringr",
-  "project_id": "c58aeef9-e4bd-4379-8e05-b4a738028615"
-}
